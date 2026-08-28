@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mosaico",
+  "description": "Official Mosaico plugin for Claude Code.",
+  "owner": {
+    "name": "Mosaico Limited",
+    "email": "support@mosaico.one"
+  },
+  "plugins": [
+    {
+      "name": "mosaico",
+      "source": "./plugins/mosaico-claude",
+      "description": "Manage Mosaico through its authenticated production MCP service."
+    }
+  ]
+}

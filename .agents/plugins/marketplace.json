@@ -1,0 +1,20 @@
+{
+  "name": "mosaico",
+  "interface": {
+    "displayName": "Mosaico"
+  },
+  "plugins": [
+    {
+      "name": "mosaico",
+      "source": {
+        "source": "local",
+        "path": "./plugins/mosaico-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "mosaico",
+  "description": "Manage Mosaico through its authenticated production MCP service.",
+  "author": {
+    "name": "Mosaico Limited",
+    "email": "support@mosaico.one"
+  },
+  "homepage": "https://app.mosaico.one"
+}

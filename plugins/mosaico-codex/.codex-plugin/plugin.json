@@ -1,0 +1,31 @@
+{
+  "name": "mosaico",
+  "version": "0.1.0",
+  "description": "Manage Mosaico through its authenticated production MCP service.",
+  "author": {
+    "name": "Mosaico Limited",
+    "email": "support@mosaico.one",
+    "url": "https://mosaico.one"
+  },
+  "homepage": "https://app.mosaico.one",
+  "repository": "https://github.com/mosaicohr-com/Mosaico-Codex-Plugin",
+  "license": "Proprietary",
+  "keywords": ["mosaico", "people", "flows", "domains", "outreach"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Mosaico",
+    "shortDescription": "Manage your Mosaico organization.",
+    "longDescription": "Use Mosaico's server-owned tools to manage flows, domains, capabilities, members, analytics, support and Outreach.",
+    "developerName": "Mosaico Limited",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write", "Interactive"],
+    "websiteURL": "https://app.mosaico.one",
+    "defaultPrompt": [
+      "Show me what needs attention in Mosaico.",
+      "Run my Mosaico Outreach day.",
+      "Review my organization's capability gaps."
+    ],
+    "brandColor": "#7C3AED"
+  }
+}
