@@ -31,6 +31,14 @@ From Claude Code:
 
 Complete Mosaico authorization using your own account when prompted.
 
+## Outreach workflows
+
+The provider packages include dedicated invitation, follow-up and schedule-installation skills.
+Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
+action. The schedule option installs two per-user local-time automations: invitation preparation at
+8:00 AM and delivery of already-approved invitations at 8:00 PM. Plugin installation never creates
+or enables a user's schedules silently.
+
 ## Public exposure boundary
 
 Assume every file in this repository and every installed plugin file is public and inspectable.
