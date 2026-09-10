@@ -45,6 +45,15 @@ Assume every file in this repository and every installed plugin file is public a
 The MCP tool names, descriptions and schemas are public contracts. All enforcement and proprietary
 implementation remain on the Mosaico server.
 
+## Outreach contract regression
+
+Before publishing either provider plugin, verify that both Outreach skill sets reference the same
+tools and that every referenced tool exists in the application registry:
+
+```bash
+python3 tests/test_outreach_tool_contract.py --app-repo ../mosaico-app
+```
+
 ## License
 
 Copyright Mosaico Limited. See [LICENSE](LICENSE).

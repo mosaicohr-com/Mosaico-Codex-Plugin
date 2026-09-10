@@ -30,11 +30,15 @@ Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead man
 `/mosaico:mosaico-outreach-lead-management`, and schedule installation to
 `/mosaico:mosaico-outreach-schedule-install`.
 
-Call `outreach_get_work_options` with the resolved intent and date. Do not ask the menu again when
-the person's intent is already explicit. The schedule action is platform configuration and does not
-require an Outreach workflow read before invoking its installer. For Outreach work, follow the
-recommended action and reread status after every transition. Use `outreach_get_skill` only for
-qualification and writing judgment.
+Use the current application-owned read for the resolved intent. For invitation sourcing call
+`outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
+`targetCount` (20 for the standard run). For approved invitation delivery use
+`intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
+checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. Do not ask the menu again
+when the person's intent is explicit. The schedule action is platform configuration and needs no
+Outreach read before its installer. Follow the returned recommended action and reread status after
+every transition. Call `outreach_get_agents` before qualification or writing and use the selected
+active Agent's search instructions, message instructions and Messaging Checklist for judgment only.
 
 Human approval applies to the exact current message. For LinkedIn delivery, perform the authorized
 browser action, verify the external result, report evidence through the tool named by Mosaico and

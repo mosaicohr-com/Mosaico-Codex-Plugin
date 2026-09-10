@@ -32,17 +32,25 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    Route Agent management to `$mosaico:mosaico-outreach-agent-management`, Lead management to
    `$mosaico:mosaico-outreach-lead-management`, and schedule installation to
    `$mosaico:mosaico-outreach-schedule-install`.
-3. Call `outreach_get_work_options` with the resolved intent and `runDate`. Do not ask the menu again
-   when the person's intent is already explicit. The schedule action is platform configuration and
-   does not require an Outreach workflow read before invoking its installer.
+3. Use the current application-owned read for the resolved intent. Do not ask the menu again when
+   the person's intent is already explicit:
+   - Invitation sourcing: call `outreach_get_day` with the preserved `day`,
+     `intent: source_invitation_leads`, and the requested `targetCount` (20 for the standard run).
+   - Approved invitation delivery: call `outreach_get_day` with the preserved `day` and
+     `intent: send_approved_invitations`.
+   - Day inspection: call `outreach_get_day` with the preserved `day` and `intent: inspect_day`.
+   - Follow-up checking or delivery: call `outreach_get_follow_ups`; it is calendar-agnostic.
+   The schedule action is platform configuration and does not require an Outreach read before
+   invoking its installer.
 4. Follow the returned recommended action and reread workflow status after every transition.
 5. Continue while the server reports remaining work.
 6. Stop only for server-declared completion, a typed external blocker or a human decision.
 
 ## Qualification and writing
 
-Call `outreach_get_skill` when the workflow asks for qualification or message writing. It governs
-judgment and language only; it does not determine workflow order, dates, recovery or authorization.
+Call `outreach_get_agents` before qualification or message writing. Use the selected active Agent's
+search instructions, message instructions and Messaging Checklist for judgment and language only.
+Agent guidance does not determine workflow order, dates, recovery or authorization.
 
 ## Approval and delivery
 
