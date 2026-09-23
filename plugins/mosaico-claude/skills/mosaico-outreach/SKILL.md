@@ -6,7 +6,9 @@ description: Run, resume, or inspect a Mosaico Outreach day through the connecte
 # Mosaico Outreach
 
 Mosaico owns workflow state, transitions, dates, validation, recovery and completion. Resolve an
-explicit intent once. When this skill is invoked without an explicit intent, ask "What do you want
+explicit intent once. If the person names a colleague, resolve and preserve that colleague's
+`ownerUserId` for the whole run; omit it to work on their own records. Only Owners and Admins can
+use Outreach. When this skill is invoked without an explicit intent, ask "What do you want
 to do in Mosaico Outreach?" and present these action headers and descriptions. Person-specific
 recommended actions may be mentioned inside the matching action, but must never replace the two
 all-dates follow-up actions:
@@ -34,8 +36,10 @@ Use the current application-owned read for the resolved intent. For invitation s
 `outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
 `targetCount` (20 for the standard run). For approved invitation delivery use
 `intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
-checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. Do not ask the menu again
-when the person's intent is explicit. The schedule action is platform configuration and needs no
+checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. Pass the preserved
+`ownerUserId` on every read and write when the run is for a colleague; `outreach_get_day` and
+`outreach_get_follow_ups` echo the resolved `ownerUserId` at the top level so you can confirm it. Do
+not ask the menu again when the person's intent is explicit. The schedule action is platform configuration and needs no
 Outreach read before its installer. Follow the returned recommended action and reread status after
 every transition. Call `outreach_get_agents` before qualification or writing and use the selected
 active Agent's search instructions, message instructions and Messaging Checklist for judgment only.
