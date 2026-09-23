@@ -14,11 +14,14 @@ scope. If the answer includes checking, ask before using tools:
 
 > Do you also want me to write follow-up drafts for connected Leads who accepted the connection but have not replied?
 
-Treat the answer as an additional drafting scope, not permission to approve or send those drafts.
+Treat the answer as an additional drafting scope, not permission to approve or send those drafts. If
+the person is running this for a colleague, pass that colleague's `ownerUserId` on every read and
+write in this run; `outreach_get_follow_ups` echoes the resolved `ownerUserId` so you can confirm it.
 
 ## Check for new follow-ups
 
-1. Work across all dates and read `outreach_get_follow_ups`.
+1. Work across all dates and read `outreach_get_follow_ups`, with `ownerUserId` when acting for a
+   colleague.
 2. Open `https://www.linkedin.com/mynetwork/invite-connect/connections/` and identify new
    connections that correspond to recorded Mosaico Outreach Leads.
 3. Inspect each relevant currently visible LinkedIn conversation.
@@ -55,4 +58,7 @@ Treat the answer as an additional drafting scope, not permission to approve or s
 
 For every scope, Mosaico is the workflow authority. Follow its allowed actions and recommended
 action. Stop only when the selected scope is complete, Mosaico reports a genuine blocker, or a human
-decision is required. Never modify another owner's records.
+decision is required. Outreach records belong to the company: if the person names a colleague, pass
+that member's `ownerUserId`; otherwise omit it to work on their own records. Mosaico decides which
+member a record belongs to and refuses a mismatched `ownerUserId` — do not try to work that out
+yourself. Only Owners and Admins can use Outreach.

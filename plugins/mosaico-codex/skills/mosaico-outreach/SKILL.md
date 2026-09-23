@@ -11,6 +11,8 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
 ## Start or resume
 
 1. Resolve the person's explicit intent and calendar date and preserve that date throughout the run.
+   If the person names a colleague, resolve and preserve that colleague's `ownerUserId` too; omit it
+   to work on their own records. Only Owners and Admins can use Outreach.
 2. When the skill is invoked without an explicit intent, ask "What do you want to do in Mosaico
    Outreach?" and present these action headers and descriptions. Person-specific recommended actions
    may be mentioned inside the matching action, but must never replace the two all-dates follow-up
@@ -32,8 +34,10 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    Route Agent management to `$mosaico:mosaico-outreach-agent-management`, Lead management to
    `$mosaico:mosaico-outreach-lead-management`, and schedule installation to
    `$mosaico:mosaico-outreach-schedule-install`.
-3. Use the current application-owned read for the resolved intent. Do not ask the menu again when
-   the person's intent is already explicit:
+3. Use the current application-owned read for the resolved intent. Pass the preserved `ownerUserId` on
+   every one of these reads when the run is for a colleague; `outreach_get_day` and
+   `outreach_get_follow_ups` echo the resolved `ownerUserId` at the top level of their result so you
+   can confirm it. Do not ask the menu again when the person's intent is already explicit:
    - Invitation sourcing: call `outreach_get_day` with the preserved `day`,
      `intent: source_invitation_leads`, and the requested `targetCount` (20 for the standard run).
    - Approved invitation delivery: call `outreach_get_day` with the preserved `day` and

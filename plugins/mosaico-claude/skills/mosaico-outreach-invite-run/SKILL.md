@@ -12,12 +12,14 @@ provided the answer as part of the current invocation:
 2. "For those days, do you want to source Leads and prepare invitation drafts, send approved invitations, or both?"
 
 Resolve today and tomorrow using the person's local business date. Preserve the exact selected dates
-throughout the run. Accept one action and run only the selected scope.
+throughout the run. Accept one action and run only the selected scope. If the person is running the
+day for a colleague, pass that colleague's `ownerUserId` on every read and write in this run;
+`outreach_get_day` echoes the resolved `ownerUserId` so you can confirm it.
 
 ## Source Leads and prepare drafts
 
 1. Read `outreach_get_agents`, then call `outreach_get_day` for each selected day with
-   `intent: source_invitation_leads` and `targetCount: 20`.
+   `intent: source_invitation_leads`, `targetCount: 20`, and `ownerUserId` when acting for a colleague.
 2. Follow `workflowStatus.recommendedAction`. Use its prepared count, remaining count, blockers and
    completion result; do not reconstruct them from separate records or conversation memory.
 3. A day with fewer than 20 qualified Leads is incomplete. Continue searching, broadening suitable
@@ -36,8 +38,9 @@ throughout the run. Accept one action and run only the selected scope.
 
 ## Send approved invitations
 
-1. Call `outreach_get_day` for each selected date with `intent: send_approved_invitations`. Work only
-   on exact outbound Invite messages returned as Approved and permitted by `workflowStatus`.
+1. Call `outreach_get_day` for each selected date with `intent: send_approved_invitations` and
+   `ownerUserId` when acting for a colleague. Work only on exact outbound Invite messages returned as
+   Approved and permitted by `workflowStatus`.
 2. Never approve, rewrite, replace or substitute an invitation. If the approved body does not exactly
    match the body about to be sent, stop for that invitation and report the blocker.
 3. Send through the authenticated LinkedIn browser.
@@ -56,4 +59,7 @@ throughout the run. Accept one action and run only the selected scope.
 
 For every scope, Mosaico is the workflow authority for stored state, target completion, ownership,
 validation, allowed actions and recovery. Stop only when the selected scope is complete, Mosaico
-reports a genuine blocker, or a human decision is required. Never modify another owner's records.
+reports a genuine blocker, or a human decision is required. Outreach records belong to the company: if
+the person names a colleague, pass that member's `ownerUserId`; otherwise omit it to work on their own
+records. Mosaico decides which member a record belongs to and refuses a mismatched `ownerUserId` — do
+not try to work that out yourself. Only Owners and Admins can use Outreach.

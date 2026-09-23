@@ -34,5 +34,8 @@ never update Agent definitions.
    visible conversation now. If yes, invoke `/mosaico:mosaico-outreach-follow-up-run` and let that
    skill deposit the conversation and prepare any follow-up draft.
 
-Never modify another owner's Lead. Mosaico owns validation, Agent assignment checks, persistence and
+Outreach records belong to the company. If the person names a colleague, pass that member's
+`ownerUserId`; otherwise omit it to work on their own records. Mosaico decides which member a Lead
+belongs to and refuses a mismatched `ownerUserId` — do not try to work that out yourself. Only Owners
+and Admins can use Outreach. Mosaico owns validation, Agent assignment checks, persistence and
 authorization.
