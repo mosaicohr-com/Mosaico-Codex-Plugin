@@ -29,8 +29,6 @@ to ownership, ids, timestamps, Leads or Messages.
    `outreach_create_agent`.
 4. Reread `outreach_get_agents` and report the created Agent.
 
-Outreach records belong to the company. If the person names a colleague, pass that member's
-`ownerUserId`; otherwise omit it to work on their own records. Mosaico decides which member an Agent
-belongs to and refuses a mismatched `ownerUserId` — do not try to work that out yourself. Only Owners
+This skill works only on the signed-in person's own Agents. Do not pass `ownerUserId`. Only Owners
 and Admins can use Outreach. Mosaico owns validation, duplicate-name checks, identity generation,
 persistence and authorization.

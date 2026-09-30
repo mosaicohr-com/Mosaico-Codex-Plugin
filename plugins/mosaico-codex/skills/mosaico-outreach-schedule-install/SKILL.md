@@ -27,6 +27,9 @@ configures personal automation state; it does not change Mosaico workflow record
      invitation. Send through the authenticated LinkedIn browser, verify each result and mark it sent
      in Mosaico only after successful verification. If nothing is approved, send nothing and report
      that outcome.
+   Each scheduled run must start its own Outreach run (read LinkedIn's Me page, then
+   `outreach_start_run`) through the invite-run skill. If Mosaico returns a blocker, the run stops and
+   reports it; it does not work around it.
 6. If the host supports only one persistent recurring automation, create one with both daily times
    and explicit time-based morning and evening behavior. Do not weaken either scope.
 7. Use the current project or thread context required by the host. Do not ask the person to repeat
