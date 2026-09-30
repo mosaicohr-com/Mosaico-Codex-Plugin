@@ -16,11 +16,13 @@ never update Agent definitions.
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and `intent: manage_leads`.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
-   `outreach_deposit_conversation` and `outreach_mark_message_sent` call. Never pass `ownerUserId` on
+   `outreach_deposit_conversation`, `outreach_mark_message_sent` and `outreach_record_delivery_block`
+   call. Never pass `ownerUserId` on
    a write; Mosaico takes the owner from the run.
 4. If Mosaico returns a blocker at any step, stop and tell the person what it says. Do not retry with
    a different profile or work around it. In a scheduled run, a blocker means stop and report.
-5. Before `outreach_deposit_conversation` and `outreach_mark_message_sent`, open the Me page again and
+5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent` and
+   `outreach_record_delivery_block`, open the Me page again and
    pass the profile you see then as `observedLinkedInProfile`.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
@@ -57,6 +59,13 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 To move a Lead between colleagues (Owner or Admin only), call `outreach_transfer_lead`, show the
 person the preview and let them confirm. Pass `toAgentId` explicitly (null if unknown). If Mosaico says
 several destination Leads match, ask the person which one and pass it as `mergeIntoLeadId`.
+
+To move several Leads at once (for example a colleague's share of the Leads just sourced), call
+`outreach_transfer_leads` with all their `leadIds`, the two members and the colleague's `toAgentId`.
+One preview, one confirmation. Mosaico allows at most 20 Leads per scheduled day for the destination
+owner and stops before changing anything if a day would go over or a Lead is blocked; show the person
+what it says. In a scheduled run with a standing answer for this move, the confirmation is that
+standing answer.
 
 Mosaico decides which member a Lead belongs to from the run; do not try to work that out yourself.
 Only Owners and Admins can use Outreach. Mosaico owns validation, Agent assignment checks, persistence and
