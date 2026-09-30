@@ -14,14 +14,31 @@ scope. If the answer includes checking, ask before using tools:
 
 > Do you also want me to write follow-up drafts for connected Leads who accepted the connection but have not replied?
 
-Treat the answer as an additional drafting scope, not permission to approve or send those drafts. If
-the person is running this for a colleague, pass that colleague's `ownerUserId` on every read and
-write in this run; `outreach_get_follow_ups` echoes the resolved `ownerUserId` so you can confirm it.
+Treat the answer as an additional drafting scope, not permission to approve or send those drafts. 
+
+## Start the run
+
+1. Open LinkedIn's Me page in the authenticated browser and read the profile URL of the signed-in
+   account. Report what you see; do not decide or correct it.
+2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `check_follow_ups` for checking, `send_approved_follow_ups` for sending. When doing both, start a separate run for each scope.
+3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
+   read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
+   `outreach_deposit_conversation` and `outreach_mark_message_sent` call. Never pass `ownerUserId` on
+   a write; Mosaico takes the owner from the run.
+4. If Mosaico returns a blocker at any step, stop and tell the person what it says. Do not retry with
+   a different profile or work around it. In a scheduled run, a blocker means stop and report.
+5. Before `outreach_deposit_conversation` and `outreach_mark_message_sent`, open the Me page again and
+   pass the profile you see then as `observedLinkedInProfile`.
+6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
+   `outreach_start_run` only. The LinkedIn account must then be that colleague's.
+
+If `outreach_save_lead` or `outreach_deposit_conversation` reports that the profile already exists
+under another owner, stop and show the person the owner, Lead and status. Re-send with
+`acknowledgeProfileOnOtherOwner: true` only after the person decides to; never set it yourself.
 
 ## Check for new follow-ups
 
-1. Work across all dates and read `outreach_get_follow_ups`, with `ownerUserId` when acting for a
-   colleague.
+1. Work across all dates and read `outreach_get_follow_ups` with the `runId`.
 2. Open `https://www.linkedin.com/mynetwork/invite-connect/connections/` and identify new
    connections that correspond to recorded Mosaico Outreach Leads.
 3. Inspect each relevant currently visible LinkedIn conversation.
@@ -58,7 +75,5 @@ write in this run; `outreach_get_follow_ups` echoes the resolved `ownerUserId` s
 
 For every scope, Mosaico is the workflow authority. Follow its allowed actions and recommended
 action. Stop only when the selected scope is complete, Mosaico reports a genuine blocker, or a human
-decision is required. Outreach records belong to the company: if the person names a colleague, pass
-that member's `ownerUserId`; otherwise omit it to work on their own records. Mosaico decides which
-member a record belongs to and refuses a mismatched `ownerUserId` — do not try to work that out
+decision is required. Mosaico decides which member a record belongs to from the run; do not try to work that out
 yourself. Only Owners and Admins can use Outreach.

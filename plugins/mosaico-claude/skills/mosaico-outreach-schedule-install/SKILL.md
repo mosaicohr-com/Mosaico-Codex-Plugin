@@ -28,6 +28,9 @@ browser session. This action configures personal schedule state; it does not cha
      status is already Approved. Never approve, rewrite, replace or alter an invitation. Send through
      the authenticated LinkedIn browser, verify each result and mark it sent in Mosaico only after
      successful verification. If nothing is approved, send nothing and report that outcome.
+   Each scheduled run must start its own Outreach run (read LinkedIn's Me page, then
+   `outreach_start_run`) through the invite-run skill. If Mosaico returns a blocker, the run stops and
+   reports it; it does not work around it.
 6. If the host supports only one persistent local task, create one with both daily times and explicit
    time-based morning and evening behavior. Do not weaken either scope.
 7. Do not ask the person to repeat the dates, actions, times, folder or timezone. Ask only when a
