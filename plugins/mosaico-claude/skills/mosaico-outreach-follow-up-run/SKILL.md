@@ -23,11 +23,13 @@ Treat the answer as an additional drafting scope, not permission to approve or s
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `check_follow_ups` for checking, `send_approved_follow_ups` for sending. When doing both, start a separate run for each scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
-   `outreach_deposit_conversation` and `outreach_mark_message_sent` call. Never pass `ownerUserId` on
+   `outreach_deposit_conversation`, `outreach_mark_message_sent` and `outreach_record_delivery_block`
+   call. Never pass `ownerUserId` on
    a write; Mosaico takes the owner from the run.
 4. If Mosaico returns a blocker at any step, stop and tell the person what it says. Do not retry with
    a different profile or work around it. In a scheduled run, a blocker means stop and report.
-5. Before `outreach_deposit_conversation` and `outreach_mark_message_sent`, open the Me page again and
+5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent` and
+   `outreach_record_delivery_block`, open the Me page again and
    pass the profile you see then as `observedLinkedInProfile`.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
@@ -39,12 +41,15 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 ## Check for new follow-ups
 
 1. Work across all dates and read `outreach_get_follow_ups` with the `runId`.
-2. Open `https://www.linkedin.com/mynetwork/invite-connect/connections/` and identify new
-   connections that correspond to recorded Mosaico Outreach Leads.
+2. For each returned Lead, open its pages directly: `navigation.messageUrl` (the stored
+   conversation) when present, otherwise `navigation.profileUrl`. Do not search LinkedIn lists for
+   Leads that carry a URL. Open `https://www.linkedin.com/mynetwork/invite-connect/connections/`
+   only to find new connections among Leads that have no conversation URL yet.
 3. Inspect each relevant currently visible LinkedIn conversation.
 4. Deposit each complete visible conversation oldest to newest through
-   `outreach_deposit_conversation`. Do not compare it with stored history or decide which reply is
-   newer; Mosaico owns identity matching, chronology, follow-up state, blockers and allowed actions.
+   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl` so the next
+   run opens it directly. Do not compare it with stored history or decide which reply is newer;
+   Mosaico owns identity matching, chronology, follow-up state, blockers and allowed actions.
 5. Save every missing follow-up reply through `outreach_record_message` as an outbound follow-up
    draft with `sentAt` null.
 6. If the person opted into connected Leads without replies, also save missing follow-up drafts for
@@ -57,14 +62,22 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 ## Send approved drafts
 
 1. Work only on exact outbound follow-up messages whose current Mosaico status is already Approved.
+   Messages Mosaico returns as blocked are never sent; do not retry them.
 2. Never approve, rewrite or substitute a message. If the approved body does not exactly match the
    body about to be sent, stop for that message and report the blocker.
-3. Send through the authenticated LinkedIn browser.
-4. Verify delivery on LinkedIn rather than trusting the click.
-5. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
+3. Open the conversation directly through the `linkedInMessageUrl` Mosaico returns when present;
+   otherwise open the Lead's profile and use Message. If the conversation cannot be opened or the
+   person cannot be messaged, call `outreach_record_delivery_block` with `reason: cannot-message` and
+   continue with the next message. Recording an outcome is not a blocker.
+4. Send through the authenticated LinkedIn browser.
+5. Verify delivery on LinkedIn rather than trusting the click.
+6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
    Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
-6. Continue until every currently approved follow-up draft is sent or Mosaico reports a genuine
-   blocker.
+7. Continue until every currently approved follow-up draft is sent or recorded, or Mosaico reports a
+   genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be messaged never
+   stops the run.
+8. In the final report list recorded outcomes separately from sends and blockers, each with its
+   Lead and reason.
 
 ## Both
 
