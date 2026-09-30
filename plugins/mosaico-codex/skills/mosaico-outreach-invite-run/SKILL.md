@@ -30,9 +30,14 @@ throughout the run. Accept one action and run only the selected scope.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
 
-If `outreach_save_lead` or `outreach_deposit_conversation` reports that the profile already exists
-under another owner, stop and show the person the owner, Lead and status. Re-send with
-`acknowledgeProfileOnOtherOwner: true` only after the person decides to; never set it yourself.
+When a profile already exists under another owner, read the state Mosaico returns and follow its
+recommended action. If `outreach_save_lead` returns `skipped` with `continue_sourcing`, nothing was
+saved and this is not a blocker: note the candidate for your final report, source a replacement and
+keep going. Mosaico records the skip on the run and does not count it toward the target. Stop only
+when Mosaico returns a blocker, `human_decision_required` or `stop_run`; then show the person the
+owner, Lead and status it returned. `outreach_deposit_conversation` returns such a blocker for a new
+Lead. Re-send with `acknowledgeProfileOnOtherOwner: true` only after the person decides to; never
+set it yourself.
 
 ## Source Leads and prepare drafts
 
