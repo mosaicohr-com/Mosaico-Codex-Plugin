@@ -1,16 +1,16 @@
 ---
 name: mosaico-outreach-follow-up-run
-description: Check Mosaico Outreach for new LinkedIn follow-ups, send already-approved drafts, or perform both workflows safely.
+description: Check Mosaico Outreach for new LinkedIn follow-ups, send already-approved drafts, perform both, or run one pass per thread, safely.
 ---
 
 # Mosaico Outreach Follow-up Run
 
 Before using any Outreach or browser tool, ask exactly:
 
-> Do you want to check for new follow-ups, send approved drafts, or both?
+> Do you want to check for new follow-ups, send approved drafts, both, or one pass per thread?
 
-Accept only **check for new follow-ups**, **send approved drafts**, or **both**, and run only that
-scope. If the answer includes checking, ask before using tools:
+Accept only **check for new follow-ups**, **send approved drafts**, **both**, or **one pass per
+thread**, and run only that scope. If the answer includes checking, ask before using tools:
 
 > Do you also want me to write follow-up drafts for connected Leads who accepted the connection but have not replied?
 
@@ -85,6 +85,30 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 2. Reread the current Mosaico state.
 3. Complete **Send approved drafts** only for messages that were already human-approved. Never
    approve a newly created draft automatically.
+
+## One pass per thread
+
+The scope for a scheduled daily run: each LinkedIn conversation is opened once, and replies are
+handled before anything else is sent.
+
+1. Read `outreach_get_follow_ups` with the `runId`. Work through every returned Lead in order.
+2. For each Lead, open `navigation.messageUrl` directly (the profile URL when there is no thread
+   yet; the connections page only for Leads without any URL).
+3. Deposit the complete visible conversation oldest to newest through
+   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl`. If
+   Mosaico reports `returnedToDraft`, that Lead's approved follow-up is now a draft because a new
+   reply arrived: do not send it.
+4. Reread the Lead's state. If Mosaico still lists an approved outbound follow-up for it, send it
+   exactly as approved, verify delivery on LinkedIn and call `outreach_mark_message_sent` only after
+   successful verification.
+5. If the conversation cannot be opened or the person cannot be messaged, call
+   `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next Lead.
+6. Save every missing follow-up draft Mosaico permits through `outreach_record_message` with
+   `sentAt` null, including a first follow-up for each accepted invitation without a reply. Never
+   approve a draft; never send a draft created in this run.
+7. Continue until every Lead has been handled or Mosaico reports a genuine blocker (Mosaico,
+   sign-in or LinkedIn failure). One Lead that fails is recorded and skipped, never a halt.
+8. Report sends, recorded outcomes, drafts written, and skipped Leads with reasons, separately.
 
 For every scope, Mosaico is the workflow authority. Follow its allowed actions and recommended
 action. Stop only when the selected scope is complete, Mosaico reports a genuine blocker, or a human
