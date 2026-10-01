@@ -99,7 +99,10 @@ handled before anything else is sent.
 
 1. Read `outreach_get_follow_ups` with the `runId`. Work through every returned Lead in order.
 2. For each Lead, open `navigation.messageUrl` directly (the profile URL when there is no thread
-   yet; the connections page only for Leads without any URL).
+   yet; the connections page only for Leads without any URL). If that URL opens a different
+   person's conversation, do not deposit it: call `outreach_update_lead` with
+   `linkedInMessageUrl: null` and `reason: wrong-person`, then open the Lead's profile and use
+   Message to find the right thread; if it cannot be found, continue with the next Lead.
 3. Deposit the complete visible conversation oldest to newest through
    `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl`. If
    Mosaico reports `returnedToDraft`, that Lead's approved follow-up is now a draft because a new
