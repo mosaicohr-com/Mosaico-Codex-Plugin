@@ -1,6 +1,6 @@
 {
   "name": "mosaico",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Manage Mosaico through its authenticated production MCP service.",
   "author": {
     "name": "Mosaico Limited",

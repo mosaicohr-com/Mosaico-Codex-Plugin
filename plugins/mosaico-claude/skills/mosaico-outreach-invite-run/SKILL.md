@@ -24,8 +24,14 @@ throughout the run. Accept one action and run only the selected scope.
    `outreach_deposit_conversation`, `outreach_mark_message_sent` and `outreach_record_delivery_block`
    call. Never pass `ownerUserId` on
    a write; Mosaico takes the owner from the run.
-4. If Mosaico returns a blocker at any step, stop and tell the person what it says. Do not retry with
-   a different profile or work around it. In a scheduled run, a blocker means stop and report.
+4. Tell a run-level blocker from a one-Lead outcome. A run-level blocker is about the run itself:
+   LinkedIn identity mismatch or not registered, the run expired, unknown or foreign, sign-in lost,
+   or Mosaico or LinkedIn failing. Only then stop and tell the person what Mosaico says; do not retry
+   with a different profile or work around it. Everything else is about one Lead or one Message:
+   a `skipped` result, a `blocked` state, a refused write, a `history-mismatch`, a draft that
+   already exists, a conflict, a not-found. Record what Mosaico returned, skip that Lead and
+   continue with the next one; Mosaico keeps the Lead for a person in To sort. A scheduled run
+   never stops for one Lead.
 5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent` and
    `outreach_record_delivery_block`, open the Me page again and
    pass the profile you see then as `observedLinkedInProfile`.
