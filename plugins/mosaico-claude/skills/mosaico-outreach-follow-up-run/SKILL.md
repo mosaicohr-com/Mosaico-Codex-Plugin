@@ -23,8 +23,8 @@ Treat the answer as an additional drafting scope, not permission to approve or s
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `check_follow_ups` for checking, `send_approved_follow_ups` for sending. When doing both, start a separate run for each scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
-   `outreach_deposit_conversation`, `outreach_mark_message_sent`, `outreach_record_delivery_block`
-   and `outreach_record_connection_evidence` call. Never pass `ownerUserId` on
+   `outreach_deposit_conversation`, `outreach_mark_message_sent`, `outreach_record_delivery_block`,
+   `outreach_record_connection_evidence` and `outreach_record_connections_snapshot` call. Never pass `ownerUserId` on
    a write; Mosaico takes the owner from the run.
 4. Tell a run-level blocker from a one-Lead outcome. A run-level blocker is about the run itself:
    LinkedIn identity mismatch or not registered, the run expired, unknown or foreign, sign-in lost,
@@ -35,7 +35,8 @@ Treat the answer as an additional drafting scope, not permission to approve or s
    continue with the next one; Mosaico keeps the Lead for a person in To sort. A scheduled run
    never stops for one Lead.
 5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent`,
-   `outreach_record_delivery_block` and `outreach_record_connection_evidence`, open the Me page again
+   `outreach_record_delivery_block`, `outreach_record_connection_evidence` and
+   `outreach_record_connections_snapshot`, open the Me page again
    and pass the profile you see then as `observedLinkedInProfile`.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
@@ -47,7 +48,8 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 ## Check for new follow-ups
 
 1. Work across all dates and read `outreach_get_follow_ups` with the `runId`. When the recommended
-   action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or unverified in
+   action is `capture_connections`, run **Capture recent connections** once, then reread. When the
+   recommended action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or unverified in
    `unverifiedLeads`, each with its profile URL: for each one run **Capture connection evidence**, then
    reread `outreach_get_follow_ups`. Never guess a connection and never skip to drafting for a listed
    Lead.
@@ -130,6 +132,59 @@ const inc = (j && j.included) || [];
    leave the Lead unverified, list it as skipped and continue; follow any action Mosaico names, and do
    nothing else.
 
+## Capture recent connections
+
+Whether an invitation was accepted is a fact in LinkedIn's own list of your connections, newest first,
+not on a profile's buttons. This procedure carries that list to Mosaico unchanged; Mosaico matches it to
+the owner's own Leads and decides who accepted. Never compare names, never decide who accepted and never
+choose where to stop: the script stops by itself.
+
+Run it once per run, before drafting, when the read of `outreach_get_follow_ups` returns the recommended
+action `capture_connections`. It is not repeated for each Lead.
+
+This capture needs the built-in browser pane, for the same reason as **Capture connection evidence**: it
+does not work through the Chrome extension, because the extension's script tool cannot read the LinkedIn
+session cookie the call needs and its network listing returns no response bodies.
+
+Run these steps in order:
+
+1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
+   `observedLinkedInProfile`.
+2. Open any LinkedIn page in the built-in browser pane, so the LinkedIn session cookie is present.
+3. Run this fixed script with the browser pane's `javascript_tool`,
+   changing only `STOP_AT` to the `stopAtCreatedAt` that `connectionsCapture` returned in
+   `outreach_get_follow_ups` (or `0` when it returned none). Do not paraphrase, reorder or extend the
+   script. The list address inside it is the one known to work today: if LinkedIn stops answering it,
+   stop and report that; do not guess another.
+
+```js
+const stopAt = STOP_AT;
+const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1];
+const H = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" };
+const pages = [];
+let start = 0, done = false, status = 200;
+while (!done && pages.length < 5) {
+  const r = await fetch("https://www.linkedin.com/voyager/api/relationships/dash/connections?decorationId=com.linkedin.voyager.dash.deco.web.mynetwork.ConnectionListWithProfile-16&count=40&q=search&sortType=RECENTLY_ADDED&start=" + start, { credentials: "include", headers: H });
+  status = r.status; if (!r.ok) break;
+  const j = await r.json();
+  const elements = (j.data && j.data["*elements"]) || [];
+  const entries = (j.included || []).filter(e => /relationships\.Connection$/.test(String(e["$type"])) || (e.publicIdentifier && /profile\.Profile$/.test(String(e["$type"]))));
+  pages.push({ elements, entries });
+  const conns = entries.filter(e => /relationships\.Connection$/.test(String(e["$type"])));
+  const oldest = conns.length ? Math.min(...conns.map(e => e.createdAt || 0)) : 0;
+  done = elements.length < 40 || oldest <= stopAt;
+  start += 40;
+}
+({ status, capturedAt: new Date().toISOString(), pages })
+```
+
+4. If `status` is not 200 or `pages` is empty, report that the connections list could not be read and
+   continue with the rest of the run. Never guess.
+5. Call `outreach_record_connections_snapshot` with `runId`, `observedLinkedInProfile`, `capturedAt` and
+   `pages` exactly as the script returned them. Report Mosaico's answer in plain words: how many Leads it
+   matched. If Mosaico refused, report the blocker it returned, change nothing and continue with the rest
+   of the run. Then reread `outreach_get_follow_ups`.
+
 ## Both
 
 1. Complete **Check for new follow-ups** first.
@@ -142,8 +197,9 @@ const inc = (j && j.included) || [];
 The scope for a scheduled daily run: each LinkedIn conversation is opened once, and replies are
 handled before anything else is sent.
 
-1. Read `outreach_get_follow_ups` with the `runId`. Work through every returned Lead in order. When
-   the recommended action is `verify_connection`, run **Capture connection evidence** for each Lead in
+1. Read `outreach_get_follow_ups` with the `runId`. When the recommended action is
+   `capture_connections`, run **Capture recent connections** once, then reread. Work through every
+   returned Lead in order. When the recommended action is `verify_connection`, run **Capture connection evidence** for each Lead in
    `unverifiedLeads` first and reread; never guess a connection and never draft for a Lead Mosaico
    still lists as unverified.
 2. For each Lead, open `navigation.messageUrl` directly (the profile URL when there is no thread
