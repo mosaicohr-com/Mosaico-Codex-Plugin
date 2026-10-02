@@ -9,10 +9,16 @@ from pathlib import Path
 
 
 TOOL_REFERENCE = re.compile(r"`(outreach_[a-z0-9_]+)`")
-REGISTERED_TOOL = re.compile(r"(?:name|toolName):\s*'(?P<name>outreach_[a-z0-9_]+)'")
+REGISTERED_TOOL = re.compile(
+    r"(?:name|toolName):\s*'(?P<name>outreach_[a-z0-9_]+)'"
+    r"|OUTREACH_EVIDENCE_TOOL\s*=\s*'(?P<evidence>outreach_[a-z0-9_]+)'"
+)
 REGISTRY_FILES = (
     "features/outreach/server/outreach-mcp-registry.ts",
     "features/outreach/server/outreach-transfer-tool.ts",
+    "features/outreach/server/outreach-transfer-batch-tool.ts",
+    # The connection-evidence tool's name is a shared constant, not a literal in the registry.
+    "features/outreach/shared/outreach-connection-evidence.ts",
 )
 REQUIRED_TOOLS = {"outreach_start_run"}
 
@@ -48,7 +54,10 @@ def main() -> None:
         registry_path = args.app_repo.resolve() / relative
         if not registry_path.is_file():
             raise SystemExit(f"Application Outreach registry not found: {registry_path}")
-        registered |= set(REGISTERED_TOOL.findall(registry_path.read_text(encoding="utf-8")))
+        registered |= {
+            match.group("name") or match.group("evidence")
+            for match in REGISTERED_TOOL.finditer(registry_path.read_text(encoding="utf-8"))
+        }
     unused = REQUIRED_TOOLS - codex
     if unused:
         raise SystemExit(f"Skills never start a run: missing {sorted(unused)}")
