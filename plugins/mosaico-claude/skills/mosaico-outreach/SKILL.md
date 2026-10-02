@@ -37,7 +37,7 @@ Use the current application-owned read for the resolved intent. For invitation s
 checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. Before any of
 those reads, open LinkedIn's Me page, report the profile URL you see to `outreach_start_run` with the
 matching intent (`inspect_day` for inspection), keep the `runId`, pass it on every Outreach read and
-write, and stop and tell the person on any blocker. Never pass `ownerUserId` on a write. The invite
+write, and stop and tell the person on any blocker. Never pass `ownerUserId` on a write. Never read a Message, Connect or Pending button as a connection state: the invite and follow-up skills carry LinkedIn's own profile data to Mosaico, which decides. The invite
 and follow-up skills give the exact steps. Do
 not ask the menu again when the person's intent is explicit. The schedule action is platform configuration and needs no
 Outreach read before its installer. Follow the returned recommended action and reread status after

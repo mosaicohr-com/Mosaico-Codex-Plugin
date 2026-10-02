@@ -39,8 +39,8 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 
 ## Update existing Leads
 
-1. Explain that the available Lead fields are name, company, job title, assigned Agent, connected
-   state, scheduled date, active or dropped status, LinkedIn profile URL and LinkedIn message URL.
+1. Explain that the available Lead fields are name, company, job title, assigned Agent,
+   scheduled date, active or dropped status, LinkedIn profile URL and LinkedIn message URL.
 2. Ask which fields to update.
 3. Read `outreach_get_leads` and `outreach_get_agents`, then show a complete Lead report before asking
    which Leads should receive the selected changes. Include every available Lead field and id.
@@ -54,8 +54,8 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 
 1. Read `outreach_get_agents` and show the available active owned Agents.
 2. Ask which Agent should own the Lead, then ask for every required Lead value: Lead id, name, company
-   or null, job title or null, LinkedIn profile URL or null, LinkedIn message URL or null, connected
-   state and scheduled date.
+   or null, job title or null, LinkedIn profile URL or null, LinkedIn message URL or null and
+   scheduled date. Do not ask for a connection state: Mosaico records it from LinkedIn evidence.
 3. Summarize the complete Lead and ask for confirmation immediately before calling
    `outreach_save_lead`.
 4. After saving, do not load or edit Messages in this skill. Ask whether the person wants to load the
