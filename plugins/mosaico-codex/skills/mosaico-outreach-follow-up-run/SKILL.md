@@ -94,96 +94,33 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 
 ## Capture connection evidence
 
-Whether you are connected to a Lead is a fact in LinkedIn's own data, not on the page's buttons. This
-procedure carries that data to Mosaico unchanged; Mosaico reads it and decides. Never read a Message,
-Connect or Pending button as a connection state, never choose a field by what it means and never decide
-the relationship yourself.
+Whether you are connected to a Lead is a fact in LinkedIn's own data, not on the page's buttons. Mosaico
+records a connection state only from that data, carried by the connection-evidence capability of the
+Mosaico plugin for Claude Code: one approved script, run word for word in the signed-in LinkedIn page and
+enforced by that plugin's browser-script gate. The Codex package has no such capability, so this run does
+not capture connection evidence:
 
-This capture needs the built-in browser pane. It does not work through the Chrome extension, because
-the extension's script tool cannot read the LinkedIn session cookie the call needs and its network
-listing returns no response bodies.
-
-Run these steps in order for one Lead:
-
-1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
-   `observedLinkedInProfile`.
-2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane, so the LinkedIn session cookie is
-   present. No reload is needed.
-3. Run this fixed script with the built-in browser's script tool (the one that runs JavaScript in the open page),
-   changing only `PUBLIC_IDENTIFIER` to the last segment of the profile URL's path (the part after
-   `/in/`, with no trailing slash or query). Do not paraphrase, reorder or extend the script. The query id inside it is the one known to work today: if LinkedIn
-   stops answering it, stop and report that; do not guess another.
-
-```js
-const id = "PUBLIC_IDENTIFIER";
-const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1];
-const r = await fetch("https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(id) + ")&queryId=voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a", { credentials: "include", headers: { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" } });
-const j = r.ok ? await r.json() : null;
-const inc = (j && j.included) || [];
-({ status: r.status, capturedAt: new Date().toISOString(), entries: inc.filter(e => /MemberRelationship$/.test(String(e["$type"])) || (e.publicIdentifier === id && /profile\.Profile$/.test(String(e["$type"])))) })
-```
-
-4. If `status` is not 200 or `entries` is empty, stop: leave the Lead unverified, list it as skipped
-   and continue with the next Lead.
-5. Call `outreach_record_connection_evidence` with `leadId`, `profileUrl` (the Lead's
-   `linkedInProfileUrl`), `capturedAt` and `entries` exactly as the script returned them, the `runId`
-   and `observedLinkedInProfile`. Report Mosaico's answer in plain words: connected, invite-pending,
-   not-connected, or the blocker it returned. If Mosaico refused or the capture gave it nothing usable,
-   leave the Lead unverified, list it as skipped and continue; follow any action Mosaico names, and do
-   nothing else.
+1. Never read, copy, export or look for a LinkedIn cookie, token or session: not from the page, browser
+   storage, profile files, DevTools data or the keychain. Never write a script that calls LinkedIn.
+2. Do not call `outreach_record_connection_evidence`; it accepts only what the approved script returns.
+3. Leave the Lead unverified and list it as skipped, noting in the report only what the LinkedIn page
+   visibly shows (a Message, Connect or Pending button) for the person to read. That note is never a
+   connection state and never a reason to draft or send.
+4. Continue with the next Lead. When the run cannot proceed without a verified connection, stop that
+   step and report it.
 
 ## Capture recent connections
 
 Whether an invitation was accepted is a fact in LinkedIn's own list of your connections, newest first,
-not on a profile's buttons. This procedure carries that list to Mosaico unchanged; Mosaico matches it to
-the owner's own Leads and decides who accepted. Never compare names, never decide who accepted and never
-choose where to stop: the script stops by itself.
+not on a profile's buttons. Mosaico matches that list to the owner's own Leads only when it is carried by
+the connection-evidence capability of the Mosaico plugin for Claude Code, under the same rules as
+**Capture connection evidence**. The Codex package has no such capability, so when the read of
+`outreach_get_follow_ups` returns the recommended action `capture_connections`:
 
-Run it once per run, before drafting, when the read of `outreach_get_follow_ups` returns the recommended
-action `capture_connections`. It is not repeated for each Lead.
-
-This capture needs the built-in browser pane, for the same reason as **Capture connection evidence**: it
-does not work through the Chrome extension, because the extension's script tool cannot read the LinkedIn
-session cookie the call needs and its network listing returns no response bodies.
-
-Run these steps in order:
-
-1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
-   `observedLinkedInProfile`.
-2. Open any LinkedIn page in the built-in browser pane, so the LinkedIn session cookie is present.
-3. Run this fixed script with the built-in browser's script tool (the one that runs JavaScript in the open page),
-   changing only `STOP_AT` to the `stopAtCreatedAt` that `connectionsCapture` returned in
-   `outreach_get_follow_ups` (or `0` when it returned none). Do not paraphrase, reorder or extend the
-   script. The list address inside it is the one known to work today: if LinkedIn stops answering it,
-   stop and report that; do not guess another.
-
-```js
-const stopAt = STOP_AT;
-const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1];
-const H = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" };
-const pages = [];
-let start = 0, done = false, status = 200;
-while (!done && pages.length < 5) {
-  const r = await fetch("https://www.linkedin.com/voyager/api/relationships/dash/connections?decorationId=com.linkedin.voyager.dash.deco.web.mynetwork.ConnectionListWithProfile-16&count=40&q=search&sortType=RECENTLY_ADDED&start=" + start, { credentials: "include", headers: H });
-  status = r.status; if (!r.ok) break;
-  const j = await r.json();
-  const elements = (j.data && j.data["*elements"]) || [];
-  const entries = (j.included || []).filter(e => /relationships\.Connection$/.test(String(e["$type"])) || (e.publicIdentifier && /profile\.Profile$/.test(String(e["$type"]))));
-  pages.push({ elements, entries });
-  const conns = entries.filter(e => /relationships\.Connection$/.test(String(e["$type"])));
-  const oldest = conns.length ? Math.min(...conns.map(e => e.createdAt || 0)) : 0;
-  done = elements.length < 40 || oldest <= stopAt;
-  start += 40;
-}
-({ status, capturedAt: new Date().toISOString(), pages })
-```
-
-4. If `status` is not 200 or `pages` is empty, report that the connections list could not be read and
-   continue with the rest of the run. Never guess.
-5. Call `outreach_record_connections_snapshot` with `runId`, `observedLinkedInProfile`, `capturedAt` and
-   `pages` exactly as the script returned them. Report Mosaico's answer in plain words: how many Leads it
-   matched. If Mosaico refused, report the blocker it returned, change nothing and continue with the rest
-   of the run. Then reread `outreach_get_follow_ups`.
+1. Do not call `outreach_record_connections_snapshot`; it accepts only what the approved script returns.
+2. Never compare names or decide who accepted yourself.
+3. Report that the connections list was not captured, record nothing, continue with the rest of the run
+   and reread `outreach_get_follow_ups`.
 
 ## Both
 
