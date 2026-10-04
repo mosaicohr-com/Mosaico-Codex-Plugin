@@ -121,7 +121,8 @@ Whether you are connected to a Lead is a fact in LinkedIn's own data, not on the
 records a connection state only from that data, carried by the connection-evidence capability of the
 Mosaico plugin for Claude Code: one approved script, run word for word in the signed-in LinkedIn page and
 enforced by that plugin's browser-script gate. The Codex package has no such capability, so this run does
-not capture connection evidence:
+not capture connection evidence. For the same reason the Codex package cannot run the approved whoami
+script either; read LinkedIn's Me page as above:
 
 1. Never read, copy, export or look for a LinkedIn cookie, token or session: not from the page, browser
    storage, profile files, DevTools data or the keychain. Never write a script that calls LinkedIn.

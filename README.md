@@ -44,11 +44,12 @@ or enables a user's schedules silently.
 The Claude Code package verifies LinkedIn connection status through a browser-side capability instead
 of any cookie or session export:
 
-- `plugins/mosaico-claude/browser/` holds the two approved capture scripts. Each runs inside the
+- `plugins/mosaico-claude/browser/` holds the three approved capture scripts. Each runs inside the
   signed-in LinkedIn page in Claude's built-in browser pane, calls one fixed LinkedIn endpoint, uses the
   page's own session and CSRF material without ever returning it, and returns only the fields Mosaico's
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
+- `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the first line's value may change) and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,

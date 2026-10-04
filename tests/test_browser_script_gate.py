@@ -21,6 +21,7 @@ spec.loader.exec_module(gate)
 
 EVIDENCE = (BROWSER / "linkedin-connection-evidence.js").read_text(encoding="utf-8")
 CONNECTIONS = (BROWSER / "linkedin-recent-connections.js").read_text(encoding="utf-8")
+WHOAMI = (BROWSER / "linkedin-whoami.js").read_text(encoding="utf-8")
 TOOL = "mcp__Claude_Browser__javascript_tool"
 CHROME_TOOL = "mcp__claude-in-chrome__javascript_tool"
 
@@ -46,6 +47,16 @@ def main() -> None:
     check(call(TOOL, {"text": substituted(EVIDENCE, '"jane-doe_42"')})[0], "evidence script with identifier refused")
     check(call(CHROME_TOOL, {"text": substituted(CONNECTIONS, "1759400000000")})[0], "connections script with stop marker refused")
     check(call(TOOL, {"text": substituted(CONNECTIONS, "0") + "\n"})[0], "trailing newline changed the verdict")
+
+    # The whoami script takes no variable: it passes word for word, and nothing else in its place does.
+    check(call(TOOL, {"text": WHOAMI})[0], "approved whoami script refused")
+    check(call(CHROME_TOOL, {"text": WHOAMI + "\n"})[0], "whoami script with trailing newline refused")
+    check(not call(TOOL, {"text": WHOAMI.replace("plainId, entries })", "plainId, entries, csrf })")})[0], "edited whoami body passed")
+    check(not call(TOOL, {"text": WHOAMI.replace("/voyager/api/me", "/voyager/api/mex")})[0], "one-character change to whoami passed")
+    check(not call(TOOL, {"text": substituted(WHOAMI, "1")})[0], "whoami with NOOP other than 0 passed")
+    check(not call(TOOL, {"text": substituted(WHOAMI, '"0"')})[0], "whoami with quoted NOOP passed")
+    check(not call(TOOL, {"text": substituted(WHOAMI, "00")})[0], "whoami with NOOP 00 passed")
+    check(not call(TOOL, {"text": WHOAMI + "\nconsole.log(document.cookie)"})[0], "whoami with appended line passed")
 
     # A changed body, an unsafe first-line value or a stray line is not the approved script.
     check(not call(TOOL, {"text": EVIDENCE.replace("entries })", "entries, csrf })")})[0], "edited body passed")

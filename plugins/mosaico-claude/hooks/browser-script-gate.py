@@ -30,6 +30,7 @@ APPROVED_DIR = Path(__file__).resolve().parent.parent / "browser"
 PLACEHOLDERS: dict[str, tuple[str, re.Pattern[str]]] = {
     "PUBLIC_IDENTIFIER": ('"PUBLIC_IDENTIFIER"', re.compile(r'^"[A-Za-z0-9._%-]{1,120}"$')),
     "STOP_AT": ("0", re.compile(r"^[0-9]{1,16}$")),
+    "NOOP": ("0", re.compile(r"^0$")),
 }
 FIRST_LINE = re.compile(r"^const (?P<name>[A-Z_]+) = (?P<value>.+);$")
 

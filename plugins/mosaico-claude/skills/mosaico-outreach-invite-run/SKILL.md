@@ -18,6 +18,15 @@ throughout the run. Accept one action and run only the selected scope.
 
 1. Open LinkedIn's Me page in the authenticated browser and read the profile URL of the signed-in
    account. Report what you see; do not decide or correct it.
+   Or run the approved whoami script instead: print it without changing it,
+
+   ```bash
+   cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-whoami.js' -print -quit)")")}/browser/linkedin-whoami.js"
+   ```
+
+   run it word for word with the browser pane's `javascript_tool`, and pass its output unchanged as
+   `identityEvidence` to `outreach_start_run`. Mosaico compares the identifiers from the record. If the
+   script is unavailable, read the Me page as above.
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `source_invitation_leads` for sourcing, `send_approved_invitations` for sending. When doing both, start a separate run for each scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
@@ -35,6 +44,7 @@ throughout the run. Accept one action and run only the selected scope.
 5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent`,
    `outreach_record_delivery_block` and `outreach_record_connection_evidence`, open the Me page again
    and pass the profile you see then as `observedLinkedInProfile`.
+   Or run the whoami script again and pass its output unchanged as `identityEvidence` on the write.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
 
@@ -137,6 +147,8 @@ Run these steps in order for one Lead:
 
 1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
    `observedLinkedInProfile`.
+   Or run the approved whoami script, as in **Start the run**, and pass its output unchanged as
+   `identityEvidence` to `outreach_start_run`. If the script is unavailable, read the Me page.
 2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane. No reload is needed.
 3. Print the approved script without changing it:
 
