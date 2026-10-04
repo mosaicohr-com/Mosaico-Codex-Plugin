@@ -90,7 +90,12 @@ def main() -> None:
     check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
     sync = claude[claude.index("Mosaico Outreach — Sync data") : claude.index("Mosaico Outreach — Source leads")]
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
-    check("0.6.1 or later" in sync, "Sync data schedule text does not require plugin 0.6.1")
+    check("0.7.1 or later" in sync, "Sync data schedule text does not require plugin 0.7.1")
+    check("browser/linkedin-thread-messages.js" in sync, "Sync data schedule text does not name the thread script")
+    check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Sync data schedule text does not deposit through the thread script")
+    check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Sync data schedule text does not keep the by-eye deposit as the fallback only")
+    check("Deposit the complete visible conversation" not in sync, "Sync data schedule text still deposits by eye as the normal path")
+    check("threads read from data versus by eye" in sync, "Sync data schedule report does not count threads read from data versus by eye")
 
     for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
@@ -114,7 +119,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.7.0", f"{manifest.name} is not at 0.7.0")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.7.1", f"{manifest.name} is not at 0.7.1")
     print("PASS: both schedule-install skills describe the two schedules, qualified skill names and the stale-copy checks.")
 
 

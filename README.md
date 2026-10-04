@@ -101,6 +101,15 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.7.1
+
+- The Claude schedule installer's Sync data text now reads each Lead's thread through the approved script
+  `browser/linkedin-thread-messages.js`, as the follow-up-run skill has done since 0.7.0. It passes the output
+  unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives direction and times. The
+  by-eye deposit stays only as the fallback when the script cannot run, and the report says so. The text
+  requires plugin 0.7.1 or later and its report now counts threads read from data versus by eye.
+  Reinstall or repair the Sync data schedule to pick it up.
+
 ### 0.7.0
 
 - New approved script `browser/linkedin-thread-messages.js` reads a Lead's thread from LinkedIn's own
