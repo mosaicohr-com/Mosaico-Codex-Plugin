@@ -117,43 +117,21 @@ each owner's drafts are later written under their own Agent and voice.
 
 ## Capture connection evidence
 
-Whether you are connected to a Lead is a fact in LinkedIn's own data, not on the page's buttons. This
-procedure carries that data to Mosaico unchanged; Mosaico reads it and decides. Never read a Message,
-Connect or Pending button as a connection state, never choose a field by what it means and never decide
-the relationship yourself.
+Whether you are connected to a Lead is a fact in LinkedIn's own data, not on the page's buttons. Mosaico
+records a connection state only from that data, carried by the connection-evidence capability of the
+Mosaico plugin for Claude Code: one approved script, run word for word in the signed-in LinkedIn page and
+enforced by that plugin's browser-script gate. The Codex package has no such capability, so this run does
+not capture connection evidence. For the same reason the Codex package cannot run the approved whoami
+script either; read LinkedIn's Me page as above:
 
-This capture needs the built-in browser pane. It does not work through the Chrome extension, because
-the extension's script tool cannot read the LinkedIn session cookie the call needs and its network
-listing returns no response bodies.
-
-Run these steps in order for one Lead:
-
-1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
-   `observedLinkedInProfile`.
-2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane, so the LinkedIn session cookie is
-   present. No reload is needed.
-3. Run this fixed script with the built-in browser's script tool (the one that runs JavaScript in the open page),
-   changing only `PUBLIC_IDENTIFIER` to the last segment of the profile URL's path (the part after
-   `/in/`, with no trailing slash or query). Do not paraphrase, reorder or extend the script. The query id inside it is the one known to work today: if LinkedIn
-   stops answering it, stop and report that; do not guess another.
-
-```js
-const id = "PUBLIC_IDENTIFIER";
-const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1];
-const r = await fetch("https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(id) + ")&queryId=voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a", { credentials: "include", headers: { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" } });
-const j = r.ok ? await r.json() : null;
-const inc = (j && j.included) || [];
-({ status: r.status, capturedAt: new Date().toISOString(), entries: inc.filter(e => /MemberRelationship$/.test(String(e["$type"])) || (e.publicIdentifier === id && /profile\.Profile$/.test(String(e["$type"])))) })
-```
-
-4. If `status` is not 200 or `entries` is empty, stop: leave the Lead unverified, list it as skipped
-   and continue with the next Lead.
-5. Call `outreach_record_connection_evidence` with `leadId`, `profileUrl` (the Lead's
-   `linkedInProfileUrl`), `capturedAt` and `entries` exactly as the script returned them, the `runId`
-   and `observedLinkedInProfile`. Report Mosaico's answer in plain words: connected, invite-pending,
-   not-connected, or the blocker it returned. If Mosaico refused or the capture gave it nothing usable,
-   leave the Lead unverified, list it as skipped and continue; follow any action Mosaico names, and do
-   nothing else.
+1. Never read, copy, export or look for a LinkedIn cookie, token or session: not from the page, browser
+   storage, profile files, DevTools data or the keychain. Never write a script that calls LinkedIn.
+2. Do not call `outreach_record_connection_evidence`; it accepts only what the approved script returns.
+3. Leave the Lead unverified and list it as skipped, noting in the report only what the LinkedIn page
+   visibly shows (a Message, Connect or Pending button) for the person to read. That note is never a
+   connection state and never a reason to draft or send.
+4. Continue with the next Lead. When the run cannot proceed without a verified connection, stop that
+   step and report it.
 
 ## Both
 
