@@ -115,15 +115,35 @@ each owner's drafts are later written under their own Agent and voice.
    one. If the capture gave Mosaico nothing it could use, do not send: leave the Lead unverified, list
    it as skipped and continue. Never call `outreach_record_delivery_block` with `already-connected` or
    `invite-pending`.
-4. Send through the authenticated LinkedIn browser.
-5. Verify each invitation against LinkedIn rather than trusting the click.
-6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
-   Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
-7. Reread the same day after each send, capture or recorded outcome and continue until Mosaico reports
+4. Send through the authenticated LinkedIn browser: click Connect and type the approved note. Do not
+   judge from the screen whether it worked; LinkedIn's data says so, in the next step.
+5. **Confirm the send from data.** Straight after the send, run the approved connection-evidence
+   script again for the same Lead (**Capture connection evidence**, steps 3 and 4; the page can be the
+   one you are on) and call `outreach_mark_message_sent` with the exact Lead and Message identities, the
+   exact send time when LinkedIn exposes it, otherwise null, the script's output unchanged as
+   `sendEvidence`, fresh `identityEvidence` (run the whoami script again) and the `runId`. Mosaico reads
+   the capture: it accepts the mark only when LinkedIn now shows the invitation as pending (or the person
+   as connected), and records that capture as the Lead's connection evidence too. Report its answer in
+   plain words. Never call `outreach_record_connection_evidence` for this capture; the mark records it.
+6. If Mosaico answers `send-not-confirmed`, LinkedIn's data does not show the invitation: it did not go
+   out. Do not retype the note and do not mark it sent. Retry the send once, run the script again and pass
+   its output again as `sendEvidence`. If Mosaico answers `send-not-confirmed` again, call
+   `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next
+   invitation. For `send-evidence-stale`, `send-evidence-before-send` or `send-evidence-malformed`, the
+   capture was unusable: run the script again once and pass it again; if it is still refused, leave the
+   invitation Approved, list it as skipped with the code and continue (the next run checks the Lead
+   before sending, so an invitation that did go out is never sent twice). For `send-evidence-lead-mismatch`,
+   the capture was for another profile: run the script for this Lead's own public identifier.
+7. Never mark an invitation sent from the screen alone. Only when the script cannot run (the script file
+   is missing, the gate refuses it, or LinkedIn stops answering it), and the Connect click and note
+   visibly went through, call `outreach_mark_message_sent` without `sendEvidence`: Mosaico records it as a
+   reading of the screen and answers `send-proof-missing`. Say so in the final report, with each Lead.
+8. Reread the same day after each send, capture or recorded outcome and continue until Mosaico reports
    completion or a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
    invited never stops the run.
-8. In the final report list recorded outcomes and Leads left unverified separately from sends and
-   blockers, each with its Lead and reason.
+9. In the final report list recorded outcomes and Leads left unverified separately from sends and
+   blockers, each with its Lead and reason, and count the sends confirmed from data separately from
+   any marked by screen.
 
 ## Capture connection evidence
 

@@ -88,11 +88,16 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 5. Verify delivery on LinkedIn rather than trusting the click.
 6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
    Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
+   Codex cannot run the approved thread script, so it cannot pass `threadEvidence`: Mosaico records the
+   mark as a reading of the screen and answers `send-proof-missing`. Say so in the final report, with
+   each Lead. A Claude run, which runs the thread script again after the send, confirms a send from
+   LinkedIn's data. If Mosaico answers `send-not-confirmed` it did not go out: do not retype it and do
+   not mark it sent; call `outreach_record_delivery_block` with `reason: cannot-message` and continue.
 7. Continue until every currently approved follow-up draft is sent or recorded, or Mosaico reports a
    genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be messaged never
    stops the run.
 8. In the final report list recorded outcomes separately from sends and blockers, each with its
-   Lead and reason.
+   Lead and reason, and name the sends marked by screen.
 
 ## Capture the thread
 
@@ -173,7 +178,9 @@ handled before anything else is sent.
    follow-up is now a draft because a new reply arrived: do not send it.
 4. Reread the Lead's state. If Mosaico still lists an approved outbound follow-up for it, send it
    exactly as approved, verify delivery on LinkedIn and call `outreach_mark_message_sent` only after
-   successful verification.
+   successful verification. Codex cannot run the thread script, so Mosaico records the mark as a reading
+   of the screen and answers `send-proof-missing`; say so in the report. If Mosaico answers
+   `send-not-confirmed` it did not go out: do not retype it and do not mark it sent.
 5. If the conversation cannot be opened or the person cannot be messaged, call
    `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next Lead.
 6. Save every missing follow-up draft Mosaico permits through `outreach_record_message` with
@@ -182,8 +189,8 @@ handled before anything else is sent.
    draft created in this run.
 7. Continue until every Lead has been handled or Mosaico reports a genuine blocker (Mosaico,
    sign-in or LinkedIn failure). One Lead that fails is recorded and skipped, never a halt.
-8. Report sends, recorded outcomes, drafts written, Leads left unverified, and skipped Leads with
-   reasons, separately.
+8. Report sends (all marked by screen in Codex), recorded outcomes, drafts written, Leads left
+   unverified, and skipped Leads with reasons, separately.
 
 For every scope, Mosaico is the workflow authority. Follow its allowed actions and recommended
 action. Stop only when the selected scope is complete, Mosaico reports a genuine blocker, or a human

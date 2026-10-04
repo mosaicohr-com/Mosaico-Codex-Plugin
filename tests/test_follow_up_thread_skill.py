@@ -72,11 +72,11 @@ def main() -> None:
     check("by-eye form" in flat(section(codex, "One pass per thread")), "Codex one-pass scope does not name the by-eye form")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.7.1", f"{manifest.name} is not at 0.7.1")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.0", f"{manifest.name} is not at 0.8.0")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    check("### 0.7.0" in readme and readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.7.0 above 0.6.1")
+    check("### 0.7.0" in readme and readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.0 above 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) and the version is 0.7.1.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) and the version is 0.8.0.")
 
 
 if __name__ == "__main__":

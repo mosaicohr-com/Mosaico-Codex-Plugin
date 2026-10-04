@@ -93,15 +93,32 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
    otherwise open the Lead's profile and use Message. If the conversation cannot be opened or the
    person cannot be messaged, call `outreach_record_delivery_block` with `reason: cannot-message` and
    continue with the next message. Recording an outcome is not a blocker.
-4. Send through the authenticated LinkedIn browser.
-5. Verify delivery on LinkedIn rather than trusting the click.
-6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
-   Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
-7. Continue until every currently approved follow-up draft is sent or recorded, or Mosaico reports a
+4. Send through the authenticated LinkedIn browser: type the approved message and send it. Do not judge
+   from the screen whether it worked; LinkedIn's data says so, in the next step.
+5. **Confirm the send from data.** Straight after the send, run the approved thread script again for the
+   same Lead (**Capture the thread**, steps 1 to 4) and call `outreach_mark_message_sent` with the exact
+   Lead and Message identities, the exact send time when LinkedIn exposes it, otherwise null, the script's
+   output unchanged as `threadEvidence`, fresh `identityEvidence` and the `runId`. Mosaico reads the
+   thread: it accepts the mark only when the newest message from you in it is the approved message,
+   delivered after your check before the send. Report its answer in plain words. Do not call
+   `outreach_deposit_conversation` for this capture; the mark records it.
+6. If Mosaico answers `send-not-confirmed`, LinkedIn's data does not show the message: it did not go out.
+   Do not retype it and do not mark it sent. Retry the send once, run the thread script again and pass
+   its output again as `threadEvidence`. If Mosaico answers `send-not-confirmed` again, call
+   `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next message.
+   For `send-evidence-stale` or `send-evidence-malformed`, the capture was unusable: run the script again
+   once and pass it again; if it is still refused, leave the message Approved, list it as skipped with
+   the code and continue. For `send-evidence-lead-mismatch`, run the script for this Lead's own public
+   identifier.
+7. Never mark a message sent from the screen alone. Only when the script cannot run (the script file is
+   missing, the gate refuses it, or LinkedIn stops answering it), and the message visibly appears in the
+   thread, call `outreach_mark_message_sent` without `threadEvidence`: Mosaico records it as a reading of
+   the screen and answers `send-proof-missing`. Say so in the final report, with each Lead.
+8. Continue until every currently approved follow-up draft is sent or recorded, or Mosaico reports a
    genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be messaged never
    stops the run.
-8. In the final report list recorded outcomes separately from sends and blockers, each with its
-   Lead and reason.
+9. In the final report list recorded outcomes separately from sends and blockers, each with its
+   Lead and reason, and count the sends confirmed from data separately from any marked by screen.
 
 ## Capture the thread
 
@@ -297,8 +314,12 @@ handled before anything else is sent.
    different person's conversation, do not send: call `outreach_update_lead` with
    `linkedInMessageUrl: null` and `reason: wrong-person`, then open the Lead's profile and use
    Message to find the right thread; if it cannot be found, continue with the next Lead.
-4. Send the approved follow-up exactly as approved, verify delivery on LinkedIn and call
-   `outreach_mark_message_sent` only after successful verification.
+4. Send the approved follow-up exactly as approved, then confirm it from data: run **Capture the thread**
+   steps 1 to 4 again for the Lead and call `outreach_mark_message_sent` with the script's output unchanged
+   as `threadEvidence` and fresh `identityEvidence`, as in **Send approved drafts**, steps 5 to 7. If Mosaico
+   answers `send-not-confirmed`, do not retype: retry the send once, run the script again, and if it is not
+   confirmed again call `outreach_record_delivery_block` with `reason: cannot-message`. Never mark a
+   message sent from the screen alone unless the script cannot run, and then say so in the report.
 5. If the conversation cannot be opened or the person cannot be messaged, call
    `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next Lead.
 6. Save every missing follow-up draft Mosaico permits through `outreach_record_message` with
@@ -307,8 +328,8 @@ handled before anything else is sent.
    draft created in this run.
 7. Continue until every Lead has been handled or Mosaico reports a genuine blocker (Mosaico,
    sign-in or LinkedIn failure). One Lead that fails is recorded and skipped, never a halt.
-8. Report sends, recorded outcomes, drafts written, Leads left unverified, and skipped Leads with
-   reasons, separately.
+8. Report sends (confirmed from data versus marked by screen), recorded outcomes, drafts written, Leads left
+   unverified, and skipped Leads with reasons, separately.
 
 For every scope, Mosaico is the workflow authority. Follow its allowed actions and recommended
 action. Stop only when the selected scope is complete, Mosaico reports a genuine blocker, or a human

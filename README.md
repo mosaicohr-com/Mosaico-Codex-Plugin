@@ -101,6 +101,27 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.8.0
+
+- A send is confirmed from LinkedIn's data, not from the screen. After the Connect click (invitations) or the
+  send (follow-ups), the Claude invite-run and follow-up-run skills run the same approved script again for
+  that Lead and pass its output unchanged to `outreach_mark_message_sent`: the connection-evidence script
+  output as `sendEvidence`, or the thread script output as `threadEvidence`, together with fresh
+  `identityEvidence`. Mosaico reads it and marks the Message sent only when LinkedIn shows the invitation as
+  pending (or the person as connected), or the newest message in the thread is the approved one. No browser
+  script and no gate rule changed.
+- If Mosaico answers `send-not-confirmed`, the run does not retype the note or message: it retries the send
+  once, runs the script again, and if it is still not confirmed calls `outreach_record_delivery_block` with
+  `reason: cannot-message`. A run never marks a send from the screen alone unless the script cannot run, and
+  then the report says so; Mosaico records that as a reading and answers `send-proof-missing` (a declared
+  fallback until the next release removes it).
+- Codex cannot run page scripts, so its sends stay by screen and declared as such in its report. Sync data
+  is installed from Claude.
+- The Claude schedule installer's Sync data text requires plugin 0.8.0 or later, uses the post-send check in
+  Steps 2 and 3, and its Step 4 report counts sends confirmed from data versus by screen. Reinstall or repair
+  the Sync data schedule to pick it up. Needs the application change "Outreach: a send is marked only when
+  LinkedIn data confirms it (w8pg)".
+
 ### 0.7.1
 
 - The Claude schedule installer's Sync data text now reads each Lead's thread through the approved script

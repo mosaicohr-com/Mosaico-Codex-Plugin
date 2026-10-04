@@ -90,12 +90,23 @@ def main() -> None:
     check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
     sync = claude[claude.index("Mosaico Outreach — Sync data") : claude.index("Mosaico Outreach — Source leads")]
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
-    check("0.7.1 or later" in sync, "Sync data schedule text does not require plugin 0.7.1")
+    check("0.8.0 or later" in sync, "Sync data schedule text does not require plugin 0.8.0")
     check("browser/linkedin-thread-messages.js" in sync, "Sync data schedule text does not name the thread script")
     check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Sync data schedule text does not deposit through the thread script")
     check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Sync data schedule text does not keep the by-eye deposit as the fallback only")
     check("Deposit the complete visible conversation" not in sync, "Sync data schedule text still deposits by eye as the normal path")
     check("threads read from data versus by eye" in sync, "Sync data schedule report does not count threads read from data versus by eye")
+    step2 = sync[sync.index("Step 2.") : sync.index("Step 3.")]
+    step3 = sync[sync.index("Step 3.") : sync.index("Step 4.")]
+    step4 = sync[sync.index("Step 4.") :]
+    check("run the approved thread script again" in step2 and "threadEvidence to outreach_mark_message_sent" in step2 and "fresh identityEvidence" in step2, "Sync data Step 2 does not confirm a follow-up send from the thread script")
+    check("send-not-confirmed" in step2 and "retry the send once" in step2 and "outreach_record_delivery_block with reason cannot-message" in step2, "Sync data Step 2 does not say what to do on send-not-confirmed")
+    check("verify delivery on LinkedIn" not in step2, "Sync data Step 2 still marks a follow-up from a screen check")
+    check("run the approved connection-evidence script again" in step3 and "sendEvidence to outreach_mark_message_sent" in step3 and "fresh identityEvidence" in step3, "Sync data Step 3 does not confirm an invitation send from the connection-evidence script")
+    check("send-not-confirmed" in step3 and "retry the send once" in step3 and "do not retype" in step3, "Sync data Step 3 does not say what to do on send-not-confirmed")
+    check("Verify each sent invitation on LinkedIn" not in step3, "Sync data Step 3 still marks an invitation from a screen check")
+    check("from the screen alone" in step2 and "from the screen alone" in step3, "Sync data Steps 2 and 3 do not forbid marking from the screen alone")
+    check("sends confirmed from data versus by screen" in step4, "Sync data Step 4 does not report sends confirmed from data versus by screen")
 
     for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
@@ -119,8 +130,8 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.7.1", f"{manifest.name} is not at 0.7.1")
-    print("PASS: both schedule-install skills describe the two schedules, qualified skill names and the stale-copy checks.")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.0", f"{manifest.name} is not at 0.8.0")
+    print("PASS: both schedule-install skills describe the two schedules, qualified skill names, the post-send check and the stale-copy checks.")
 
 
 if __name__ == "__main__":
