@@ -23,8 +23,9 @@ all-dates follow-up actions:
 - **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
 - **Manage Outreach Agents** — Review, create, or update owned Agents.
 - **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
-- **Install daily invitation schedule** — Idempotently create the local-time 8:00 AM preparation and
-  8:00 PM approved-delivery schedules.
+- **Install the Outreach schedules** — Idempotently create two local-time schedules: Sync data
+  (connections and messaging, once a day) and Source leads (every two hours in business hours, at
+  least 60 minutes from Sync). Only Sync data sends.
 
 Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
 `/mosaico:mosaico-outreach-lead-management`, and schedule installation to

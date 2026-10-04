@@ -1,39 +1,133 @@
 ---
 name: mosaico-outreach-schedule-install
-description: Install or repair daily Mosaico Outreach invitation preparation and approved-delivery schedules in the user's local timezone.
+description: Install or repair the two Mosaico Outreach schedules, Sync data and Source leads, in the user's local timezone.
 ---
 
-# Install the daily Mosaico Outreach schedule
+# Install the Mosaico Outreach schedules
 
 Use Claude Desktop's supported persistent local scheduled-task mechanism. These workflows require the
 person's authenticated LinkedIn browser, so do not substitute a cloud routine that lacks that local
 browser session. This action configures personal schedule state; it does not change Mosaico records.
 
+## Check before installing
+
+Do these checks first. If one fails, install nothing and tell the person what to do.
+
+1. **Browser permissions.** Read `~/.claude/settings.json`. Both `"mcp__Claude_Browser__javascript_tool"`
+   and `"mcp__Claude_Browser__computer"` must be in `permissions.allow`. If the file is missing or
+   either rule is absent, do not install. Print this snippet for the person to add, merged into any
+   existing `permissions.allow` list:
+
+   ```json
+   {
+     "permissions": {
+       "allow": [
+         "mcp__Claude_Browser__javascript_tool",
+         "mcp__Claude_Browser__computer"
+       ]
+     }
+   }
+   ```
+
+   Say in two sentences: scheduled sessions ignore project-level rules, so without these two user-level
+   rules every browser step waits for a person who is not there. Once they exist, the plugin's
+   browser-script gate stays the safety net, because it still refuses any script that is not an
+   approved capture script. The plugin cannot write that file; the person must edit it. Offer to
+   continue once they have.
+2. **Stale skill copies.** Look in `~/.codex/skills/` and `~/.claude/skills/` for folders named
+   `mosaico-outreach-*`. They are old unqualified copies. A schedule would resolve to the stale copy
+   instead of the plugin. If any exist, refuse to install. Tell the person to archive them, using
+   today's date, for example:
+
+   ```bash
+   mkdir -p ~/.codex/_archived-YYYY-MM-DD && mv ~/.codex/skills/mosaico-outreach-* ~/.codex/_archived-YYYY-MM-DD/
+   ```
+
+   Give the same command for `~/.claude/skills/` if copies are there. Check again after they say it is
+   done.
+3. **Old Codex automations.** Look for `~/.codex/automations/daily-approved-outreach-sends` and
+   `~/.codex/automations/mosaico-lead-preparation`. If either exists and its `automation.toml` says
+   `status = "ACTIVE"`, tell the person to disable it. Codex cannot run the connection check, and a
+   parallel run would send invitations twice. Do not install the Sync data schedule while one is active.
+
+## The two schedules
+
+Install two active persistent local scheduled tasks. Each scheduled run starts its own Outreach run
+through the invite-run or follow-up-run skill. If Mosaico returns a blocker, the run stops and reports
+it; it does not work around it.
+
+Fill the placeholders from the person and the current context, never from a fixed value:
+`<public identifier>` is the last part of the person's LinkedIn profile address (the part after
+`/in/`); `<timezone>` is their local timezone. Ask only if one of them cannot be found.
+
+**Mosaico Outreach — Sync data (connections and messaging)** — once a day, at 1:00 PM local time unless
+the person chose another time. This is the only schedule that clicks Connect or sends a message. Its
+text is:
+
+```text
+Use the installed mosaico:mosaico-outreach-follow-up-run and mosaico:mosaico-outreach-invite-run skills (plugin mosaico, 0.5.0 or later). This is the Sync data flow of Mosaico Outreach: connections and messaging. It does not source, transfer or draft invitations; the Source leads schedule does that.
+
+Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, which is signed in to my LinkedIn (<public identifier>). Obtain connection evidence and identity only through the plugin's approved capture scripts, run word for word with only the first line's value changed, exactly as the skills describe. The approved scripts are browser/linkedin-whoami.js, browser/linkedin-connection-evidence.js and browser/linkedin-recent-connections.js; read each from the installed plugin. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
+
+Step 1. Open https://www.linkedin.com/feed/ once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope and pass its runId on every read and write; before each send-evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it.
+
+Step 2. Run the mosaico:mosaico-outreach-follow-up-run skill across all dates with the selected action "one pass per thread". Follow workflowStatus.recommendedAction from outreach_get_follow_ups. When Mosaico recommends capture_connections, run the approved recent-connections script once and pass its output unchanged to outreach_record_connections_snapshot, then reread. For each Lead Mosaico returns, open its navigation.messageUrl (its profile URL when there is no thread yet). Deposit the complete visible conversation oldest-to-newest with outreach_deposit_conversation, passing the conversation URL as linkedInMessageUrl. If Mosaico still lists an approved outbound Follow-up for that Lead as deliverable, send it exactly as approved, verify delivery on LinkedIn, and mark it sent with outreach_mark_message_sent only after successful verification. If the conversation cannot be opened, call outreach_record_delivery_block with reason cannot-message and continue. Save every missing outbound follow-up draft Mosaico permits with sentAt null. If Mosaico lists a Lead as connection unverified, do not draft or send for it: open its profile, run the approved connection-evidence script, pass the result to outreach_record_connection_evidence, and continue only if Mosaico then lists the Lead as connected. Never approve, rewrite, replace or substitute a message.
+
+Step 3. Run the mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected action "send approved invitations". Work only on today and send only exact outbound Invite messages whose current Mosaico status is already Approved. Before each one, open the Lead's linkedInProfileUrl, wait until the page has loaded, run the approved connection-evidence script, and pass the result unchanged to outreach_record_connection_evidence together with fresh identityEvidence. Mosaico answers connected, invite pending or not connected and records it. Send only when Mosaico answers not connected and still lists the invitation as Approved. If Mosaico answers connected or invite pending, continue with the next invitation; Mosaico has already taken that invitation off the send list. Verify each sent invitation on LinkedIn and mark it sent in Mosaico only after successful verification. A recorded or skipped Lead is not a blocker. Reread the day after every write and continue until Mosaico reports completion (no-approved-invitations-remain) or a genuine blocker (Mosaico, sign-in or LinkedIn failure).
+
+Step 4. Report separately, using Mosaico's counts, not memory: how identity was established (whoami evidence or Me page); approved follow-up sends; follow-ups recorded as cannot-message; new follow-up drafts written; whether the connections list was captured and how many Leads it marked connected; today's invitation sends; invitations where Mosaico answered connected or invite pending; Leads left unverified; skipped Leads with reasons; blockers. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+
+Guards: pacing between page loads, the weekly invitation ceiling and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
+```
+
+**Mosaico Outreach — Source leads** — every two hours during business hours, by default 8:00 AM to
+6:00 PM local time, unless the person chose other hours. It runs from any linkedin.com page. It never
+approves or sends anything. Its text is:
+
+```text
+Use the installed mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.5.0 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
+
+Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com page, signed in to my LinkedIn (<public identifier>). Obtain connection evidence and identity only through the plugin's approved capture scripts, run word for word with only the first line's value changed, exactly as the skills describe. The approved scripts are browser/linkedin-whoami.js and browser/linkedin-connection-evidence.js; read each from the installed plugin. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
+
+Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it.
+
+Step 2. Run the mosaico:mosaico-outreach-invite-run skill with the selected day the next business day and the selected action "source Leads only", using the quota Mosaico reports. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead.
+
+Step 3. Run the mosaico:mosaico-outreach-invite-run skill again with the same day and the selected action "source Leads and prepare invitation drafts". For each Lead Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. Never approve or send an invitation.
+
+Step 4. Stop only when Mosaico says the quota is met, or when Mosaico reports stop_run after the tenth failure. In that case write the sourcing report Mosaico asks for. A skipped candidate or a refused write for one Lead is not a reason to stop.
+
+Step 5. Report separately, using Mosaico's counts, not memory: Leads saved, drafts written, quota remaining, candidates skipped with reasons, Leads left unverified, blockers. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+
+Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
+```
+
+## Keep the two schedules apart
+
+The schedules must not overlap. Place every Source leads time at least 60 minutes before or after the
+Sync data time. With the default 1:00 PM Sync, the default Source leads times are 8:00 AM, 10:00 AM,
+12:00 PM, 2:00 PM, 4:00 PM and 6:00 PM. If the person moves the Sync time, move or drop any Source
+leads time that falls closer than 60 minutes to it. Say in the readback that you did this.
+
+## Install
+
 1. Use the person's local timezone and current working folder. Inspect existing scheduled tasks
    before writing anything.
-2. Match existing tasks by their Mosaico Outreach purpose and instructions, not name alone.
+2. Match existing tasks by their Mosaico Outreach purpose and instructions, not name alone. An older
+   "Prepare invitations" task matches Source leads. An older "Send approved invitations" task matches
+   Sync data. Only one task may send, so update the old sending task in place or disable it.
 3. If equivalent tasks already exist, do not duplicate them. Report their names, timezone, enabled
    status and next runs.
 4. If matching tasks exist but differ, update them in place while preserving unrelated supported
    metadata and permission settings.
-5. Prefer two active persistent local scheduled tasks:
-   - **Mosaico Outreach — Prepare invitations** — Every day at 8:00 AM local time. Work on today's
-     Outreach day. Use `/mosaico:mosaico-outreach-invite-run` with the already-resolved scope
-     **source Leads and prepare invitation drafts**. Reach exactly 20 qualified invitation Leads
-     counting existing ready Leads, and save missing personalized drafts. Never approve or send.
-     Preserve partial progress and report exact counts and genuine blockers.
-   - **Mosaico Outreach — Send approved invitations** — Every day at 8:00 PM local time. Work only
-     on today's Outreach day. Use `/mosaico:mosaico-outreach-invite-run` with the already-resolved
-     scope **send approved invitations**. Send only exact invitation messages whose current Mosaico
-     status is already Approved. Never approve, rewrite, replace or alter an invitation. Send through
-     the authenticated LinkedIn browser, verify each result and mark it sent in Mosaico only after
-     successful verification. If nothing is approved, send nothing and report that outcome.
-   Each scheduled run must start its own Outreach run (read LinkedIn's Me page, then
-   `outreach_start_run`) through the invite-run skill. If Mosaico returns a blocker, the run stops and
-   reports it; it does not work around it.
-6. If the host supports only one persistent local task, create one with both daily times and explicit
-   time-based morning and evening behavior. Do not weaken either scope.
-7. Do not ask the person to repeat the dates, actions, times, folder or timezone. Ask only when a
+5. If the host supports only one persistent local task, install Sync data alone and tell the person
+   that Source leads is not installed. Do not merge the two schedules or weaken either.
+6. Do not ask the person to repeat the dates, actions, times, folder or timezone. Ask only when a
    host-required human decision cannot be derived from the current context.
-8. Read back the saved task state and confirm names, local timezone, enabled status and next run
-   times. A write attempt without readback is not completion.
+7. Read back the saved task state and confirm names, local timezone, enabled status and next run
+   times. For Source leads, confirm that every time is at least 60 minutes from the Sync time. A
+   write attempt without readback is not completion.

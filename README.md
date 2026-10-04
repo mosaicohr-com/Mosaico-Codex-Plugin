@@ -35,9 +35,12 @@ Complete Mosaico authorization using your own account when prompted.
 
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
-action. The schedule option installs two per-user local-time automations: invitation preparation at
-8:00 AM and delivery of already-approved invitations at 8:00 PM. Plugin installation never creates
-or enables a user's schedules silently.
+action. The schedule option installs two per-user local-time schedules: Sync data (connections and
+messaging, once a day, the only one that sends) and Source leads (every two hours in business hours,
+at least 60 minutes from Sync, never sends). Before installing, the Claude package checks that
+`~/.claude/settings.json` allows the two browser tools scheduled sessions need, and both packages
+refuse while stale `mosaico-outreach-*` skill copies or the old Codex automations exist; Codex installs
+only Source leads. Plugin installation never creates or enables a user's schedules silently.
 
 ## Connection-evidence capability (Claude Code)
 
