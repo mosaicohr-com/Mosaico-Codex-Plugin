@@ -51,26 +51,42 @@ def _normalise(text: str) -> list[str]:
     return [line.rstrip() for line in text.replace("\r\n", "\n").strip("\n").split("\n")]
 
 
-def approved_scripts() -> dict[str, list[str]]:
-    scripts: dict[str, list[str]] = {}
-    if APPROVED_DIR.is_dir():
-        for path in sorted(APPROVED_DIR.glob("*.js")):
-            scripts[path.name] = _normalise(path.read_text(encoding="utf-8"))
-    return scripts
+def _canonical(lines: list[str]) -> list[str] | None:
+    """`lines` with its first line's value replaced by the placeholder's canonical one, or None.
 
-
-def matches_approved(script: str, approved: dict[str, list[str]]) -> str | None:
-    """Return the approved script's name when `script` is it, apart from a permitted first-line value."""
-    lines = _normalise(script)
-    if not lines:
-        return None
-    head = FIRST_LINE.match(lines[0])
+    None means the first line is not a recognised placeholder or its value is not one a run may put there.
+    An approved script is held in this form too, so a template whose first line carries any placeholder
+    value (an empty identifier, a stop marker of 0) is the same script as a run's with a real value.
+    """
+    head = FIRST_LINE.match(lines[0]) if lines else None
     if head is None:
         return None
     placeholder = PLACEHOLDERS.get(head.group("name"))
     if placeholder is None or not placeholder[1].match(head.group("value")):
         return None
-    canonical = [f"const {head.group('name')} = {placeholder[0]};", *lines[1:]]
+    return [f"const {head.group('name')} = {placeholder[0]};", *lines[1:]]
+
+
+def approved_scripts() -> dict[str, list[str]]:
+    """Each approved script, its first line in canonical form."""
+    scripts: dict[str, list[str]] = {}
+    if APPROVED_DIR.is_dir():
+        for path in sorted(APPROVED_DIR.glob("*.js")):
+            lines = _normalise(path.read_text(encoding="utf-8"))
+            head = FIRST_LINE.match(lines[0]) if lines else None
+            placeholder = PLACEHOLDERS.get(head.group("name")) if head else None
+            # A template's own first-line value need not satisfy the run-time pattern (the thread script's is empty).
+            scripts[path.name] = (
+                [f"const {head.group('name')} = {placeholder[0]};", *lines[1:]] if head and placeholder else lines
+            )
+    return scripts
+
+
+def matches_approved(script: str, approved: dict[str, list[str]]) -> str | None:
+    """Return the approved script's name when `script` is it, apart from a permitted first-line value."""
+    canonical = _canonical(_normalise(script))
+    if canonical is None:
+        return None
     for name, body in approved.items():
         if body == canonical:
             return name

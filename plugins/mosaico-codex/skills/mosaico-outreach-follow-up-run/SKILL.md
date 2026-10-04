@@ -57,11 +57,13 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
    conversation) when present, otherwise `navigation.profileUrl`. Do not search LinkedIn lists for
    Leads that carry a URL, and never read a LinkedIn list or button to decide whether a Lead is
    connected.
-3. Inspect each relevant currently visible LinkedIn conversation.
+3. Inspect each relevant currently visible LinkedIn conversation. This is the by-eye form: see
+   **Capture the thread** for why Codex cannot read threads from LinkedIn's data.
 4. Deposit each complete visible conversation oldest to newest through
-   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl` so the next
-   run opens it directly. Do not compare it with stored history or decide which reply is newer;
-   Mosaico owns identity matching, chronology, follow-up state, blockers and allowed actions.
+   `outreach_deposit_conversation` as `messages`, passing the conversation's URL as `linkedInMessageUrl` so
+   the next run opens it directly. Do not compare it with stored history or decide which reply is newer;
+   Mosaico owns identity matching, chronology, follow-up state, blockers and allowed actions. Say in the
+   final report that these threads were read by eye.
 5. Save every missing follow-up reply through `outreach_record_message` as an outbound follow-up
    draft with `sentAt` null.
 6. If the person opted into connected Leads without replies, also save missing follow-up drafts for
@@ -91,6 +93,25 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
    stops the run.
 8. In the final report list recorded outcomes separately from sends and blockers, each with its
    Lead and reason.
+
+## Capture the thread
+
+Whether a person replied, when, and who said what, is a fact in LinkedIn's own messaging data. Mosaico
+reads a thread from that data only when it is carried by the thread script of the Mosaico plugin for Claude
+Code (`linkedin-thread-messages.js`): one approved script, run word for word in the signed-in LinkedIn page
+and enforced by that plugin's browser-script gate. That script runs only in Claude's built-in browser pane.
+Codex's page-script scope is sandboxed (it has no session cookies and cannot make the page's own requests),
+so the Codex package cannot run it, and this run does not capture threads:
+
+1. Never read, copy, export or look for a LinkedIn cookie, token or session: not from the page, browser
+   storage, profile files, DevTools data or the keychain. Never write a script that calls LinkedIn.
+2. Do not pass `threadEvidence` to `outreach_deposit_conversation`; it accepts only what the approved
+   script returns.
+3. Read each thread by eye, as in **Check for new follow-ups** and **One pass per thread**, and deposit it
+   through `outreach_deposit_conversation` as `messages`. Mosaico stores such a thread as a reading, not
+   as evidence.
+4. Say in the final report that the threads were read by eye and that the thread script could not run in
+   Codex. A run in Claude's built-in browser pane reads them from LinkedIn's data instead.
 
 ## Capture connection evidence
 
@@ -147,9 +168,9 @@ handled before anything else is sent.
    `linkedInMessageUrl: null` and `reason: wrong-person`, then open the Lead's profile and use
    Message to find the right thread; if it cannot be found, continue with the next Lead.
 3. Deposit the complete visible conversation oldest to newest through
-   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl`. If
-   Mosaico reports `returnedToDraft`, that Lead's approved follow-up is now a draft because a new
-   reply arrived: do not send it.
+   `outreach_deposit_conversation` as `messages` (the by-eye form; see **Capture the thread**), passing the
+   conversation's URL as `linkedInMessageUrl`. If Mosaico reports `returnedToDraft`, that Lead's approved
+   follow-up is now a draft because a new reply arrived: do not send it.
 4. Reread the Lead's state. If Mosaico still lists an approved outbound follow-up for it, send it
    exactly as approved, verify delivery on LinkedIn and call `outreach_mark_message_sent` only after
    successful verification.

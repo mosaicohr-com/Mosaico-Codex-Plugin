@@ -48,6 +48,7 @@ Treat the answer as an additional drafting scope, not permission to approve or s
    `outreach_record_connections_snapshot`, open the Me page again
    and pass the profile you see then as `observedLinkedInProfile`.
    Or run the whoami script again and pass its output unchanged as `identityEvidence` on the write.
+   A thread deposit needs `identityEvidence`, not a reading: Mosaico takes the owner's member id from it.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
 
@@ -63,15 +64,15 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
    `unverifiedLeads`, each with its profile URL: for each one run **Capture connection evidence**, then
    reread `outreach_get_follow_ups`. Never guess a connection and never skip to drafting for a listed
    Lead.
-2. For each returned Lead, open its pages directly: `navigation.messageUrl` (the stored
-   conversation) when present, otherwise `navigation.profileUrl`. Do not search LinkedIn lists for
-   Leads that carry a URL, and never read a LinkedIn list or button to decide whether a Lead is
-   connected.
-3. Inspect each relevant currently visible LinkedIn conversation.
-4. Deposit each complete visible conversation oldest to newest through
-   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl` so the next
-   run opens it directly. Do not compare it with stored history or decide which reply is newer;
-   Mosaico owns identity matching, chronology, follow-up state, blockers and allowed actions.
+2. For each returned Lead, read its thread from LinkedIn's data: run **Capture the thread** with the
+   Lead's public identifier and pass the output unchanged as `threadEvidence` to
+   `outreach_deposit_conversation`, with fresh `identityEvidence`. The script needs no particular page.
+   Do not search LinkedIn lists for Leads, and never read a LinkedIn list or button to decide whether a
+   Lead is connected.
+3. Only when the script cannot run, use the by-eye fallback in **Capture the thread** for that Lead, and
+   say so in the report.
+4. Do not compare the thread with stored history or decide which reply is newer; Mosaico owns identity
+   matching, chronology, direction, follow-up state, blockers and allowed actions.
 5. Save every missing follow-up reply through `outreach_record_message` as an outbound follow-up
    draft with `sentAt` null.
 6. If the person opted into connected Leads without replies, also save missing follow-up drafts for
@@ -101,6 +102,59 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
    stops the run.
 8. In the final report list recorded outcomes separately from sends and blockers, each with its
    Lead and reason.
+
+## Capture the thread
+
+Whether a person replied, when, and who said what, is a fact in LinkedIn's own messaging data, not on the
+page. This procedure carries that data to Mosaico unchanged; Mosaico reads it, works out each message's
+direction and time itself, and decides what is a reply. Never read a thread by eye when the script can
+run, never type messages next to it, never decide that a reply arrived and never decide a message's
+direction.
+
+The capture is the plugin's thread script: one approved script, shipped at
+`browser/linkedin-thread-messages.js` inside the installed plugin, run word for word in the signed-in
+LinkedIn page by the built-in browser pane, under the same rules as **Capture connection evidence**. It
+sends LinkedIn's own session and CSRF material to LinkedIn only and never returns it. It finds the
+one-to-one conversation between the signed-in account and the Lead among LinkedIn's recent conversations
+and returns the participants' member ids and the messages oldest first, each with only its delivery time,
+its sender and its text. Names and every other field are dropped. It runs in Claude's built-in browser pane
+only: the Chrome extension cannot run it, and Codex cannot either.
+
+Run these steps in order for one Lead:
+
+1. Run the approved whoami script, as in **Start the run**, and keep its output unchanged as
+   `identityEvidence` for the deposit. It goes stale: when the output you hold is older than 8 minutes,
+   run it again.
+2. Print the approved script without changing it:
+
+   ```bash
+   cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-thread-messages.js' -print -quit)")")}/browser/linkedin-thread-messages.js"
+   ```
+
+3. Run the printed script with the browser pane's `javascript_tool` on any linkedin.com page, changing
+   only the value on its first line to the Lead's public identifier (the part of the Lead's
+   `linkedInProfileUrl` after `/in/`, with no trailing slash or query), in quotes. Do not paraphrase,
+   reorder, shorten or extend it: the gate refuses anything else. The queries inside it are the ones known
+   to work today: if LinkedIn stops answering them, stop and report that; do not guess others.
+4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the step and report it. If `status`
+   is not 200 or `state` is `error`, the script could not read the thread: use the by-eye fallback below for
+   this Lead.
+5. Straight away (the capture is refused when it is more than 10 minutes old), call
+   `outreach_deposit_conversation` with `threadEvidence` (the script output exactly as returned),
+   `identityEvidence`, `runId`, `personName`, and `publicLinkedInUrl` (the Lead's profile URL). Never pass
+   `messages` with it; Mosaico ignores them.
+6. Report Mosaico's answer in plain words: stored (with its `threadStatus`), skipped with
+   `no-conversation` (LinkedIn's recent conversations hold none with the person; nothing is concluded about
+   replies; continue with the next Lead), or the blocker code it returned. For a blocker, follow the action
+   Mosaico names (run the script again once, or continue with the next Lead), and do nothing else.
+
+When the script cannot run (the script file is missing, the gate refuses it, the pane cannot be signed in,
+or LinkedIn stops answering it), the by-eye deposit is the fallback for that Lead only: open
+`navigation.messageUrl` (the profile and Message when there is none), deposit the complete visible
+conversation oldest to newest through `outreach_deposit_conversation` as `messages`, with
+`observedLinkedInProfile` or `identityEvidence` and the conversation's URL as `linkedInMessageUrl`, and say
+in the final report which Leads were read by eye and why. Mosaico stores such a thread as a reading, not as
+evidence.
 
 ## Capture connection evidence
 
@@ -233,18 +287,18 @@ handled before anything else is sent.
    returned Lead in order. When the recommended action is `verify_connection`, run **Capture connection evidence** for each Lead in
    `unverifiedLeads` first and reread; never guess a connection and never draft for a Lead Mosaico
    still lists as unverified.
-2. For each Lead, open `navigation.messageUrl` directly (the profile URL when there is no thread
-   yet). If that URL opens a different
-   person's conversation, do not deposit it: call `outreach_update_lead` with
+2. For each Lead, run **Capture the thread** with the Lead's public identifier, in the built-in browser
+   pane, and pass the output unchanged as `threadEvidence` to `outreach_deposit_conversation`, with fresh
+   `identityEvidence`. If Mosaico reports `returnedToDraft`, that Lead's approved follow-up is now a draft
+   because a new reply arrived: do not send it. Use the by-eye fallback in **Capture the thread** only when
+   the script cannot run, and say so in the report.
+3. Reread the Lead's state. If Mosaico still lists an approved outbound follow-up for it, open
+   `navigation.messageUrl` directly (the profile URL when there is no thread yet). If that URL opens a
+   different person's conversation, do not send: call `outreach_update_lead` with
    `linkedInMessageUrl: null` and `reason: wrong-person`, then open the Lead's profile and use
    Message to find the right thread; if it cannot be found, continue with the next Lead.
-3. Deposit the complete visible conversation oldest to newest through
-   `outreach_deposit_conversation`, passing the conversation's URL as `linkedInMessageUrl`. If
-   Mosaico reports `returnedToDraft`, that Lead's approved follow-up is now a draft because a new
-   reply arrived: do not send it.
-4. Reread the Lead's state. If Mosaico still lists an approved outbound follow-up for it, send it
-   exactly as approved, verify delivery on LinkedIn and call `outreach_mark_message_sent` only after
-   successful verification.
+4. Send the approved follow-up exactly as approved, verify delivery on LinkedIn and call
+   `outreach_mark_message_sent` only after successful verification.
 5. If the conversation cannot be opened or the person cannot be messaged, call
    `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next Lead.
 6. Save every missing follow-up draft Mosaico permits through `outreach_record_message` with
