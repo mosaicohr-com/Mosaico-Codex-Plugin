@@ -82,12 +82,13 @@ from that person's account. Nobody's run touches another owner's Leads.
 The Claude Code package verifies LinkedIn connection status through a browser-side capability instead
 of any cookie or session export:
 
-- `plugins/mosaico-claude/browser/` holds the three approved capture scripts. Each runs inside the
+- `plugins/mosaico-claude/browser/` holds the four approved capture scripts. Each runs inside the
   signed-in LinkedIn page in Claude's built-in browser pane, calls one fixed LinkedIn endpoint, uses the
   page's own session and CSRF material without ever returning it, and returns only the fields Mosaico's
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
+- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead among LinkedIn's recent conversations, and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the first line's value may change) and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,
@@ -99,6 +100,24 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.7.0
+
+- New approved script `browser/linkedin-thread-messages.js` reads a Lead's thread from LinkedIn's own
+  messaging data (query 2.4). Its first line holds the Lead's public identifier; the browser-script gate
+  accepts a changed value there and nothing else. It returns `{ status, signedIn, capturedAt, state, source,
+  publicIdentifier, conversationUrn, participants, messages }` with messages oldest first and only each
+  message's id, delivery time, sender and text. With no conversation it says `state: "no-conversation"`; on any
+  error it returns the status and empty lists and never throws. It never returns the session or CSRF token.
+- The Claude follow-up-run skill runs it for each Lead and passes the output unchanged as `threadEvidence` to
+  `outreach_deposit_conversation`, together with fresh `identityEvidence`. Mosaico reads the thread from that
+  data: it refuses a capture it cannot trust with a named code and derives direction and time itself. The
+  by-eye deposit stays only as the fallback for a run that cannot run the script, and the report says so.
+  Mosaico accepts `threadEvidence` as of the application change "Outreach: conversation deposited from
+  LinkedIn thread evidence"; until that is released, older runs keep depositing by eye.
+- The Codex follow-up-run skill says that Codex's page-script scope cannot run the script and keeps the by-eye
+  deposit, reported as such.
+- The other three approved scripts are unchanged.
 
 ### 0.6.1
 
@@ -129,6 +148,9 @@ tools and that every referenced tool exists in the application registry:
 ```bash
 python3 tests/test_outreach_tool_contract.py --app-repo ../mosaico-app
 python3 tests/test_browser_script_gate.py
+python3 tests/test_thread_script.py
+python3 tests/test_schedule_install_skill.py
+python3 tests/test_follow_up_thread_skill.py
 ```
 
 ## License

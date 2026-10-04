@@ -22,6 +22,7 @@ spec.loader.exec_module(gate)
 EVIDENCE = (BROWSER / "linkedin-connection-evidence.js").read_text(encoding="utf-8")
 CONNECTIONS = (BROWSER / "linkedin-recent-connections.js").read_text(encoding="utf-8")
 WHOAMI = (BROWSER / "linkedin-whoami.js").read_text(encoding="utf-8")
+THREAD = (BROWSER / "linkedin-thread-messages.js").read_text(encoding="utf-8")
 TOOL = "mcp__Claude_Browser__javascript_tool"
 CHROME_TOOL = "mcp__claude-in-chrome__javascript_tool"
 
@@ -57,6 +58,26 @@ def main() -> None:
     check(not call(TOOL, {"text": substituted(WHOAMI, '"0"')})[0], "whoami with quoted NOOP passed")
     check(not call(TOOL, {"text": substituted(WHOAMI, "00")})[0], "whoami with NOOP 00 passed")
     check(not call(TOOL, {"text": WHOAMI + "\nconsole.log(document.cookie)"})[0], "whoami with appended line passed")
+
+    # The thread script takes the Lead's public identifier on its first line, like the evidence script.
+    check(THREAD.split("\n", 1)[0] == 'const PUBLIC_IDENTIFIER = "";', "thread script's first line changed")
+    check(call(TOOL, {"text": substituted(THREAD, '"jane-doe_42"')})[0], "thread script with identifier refused")
+    check(call(CHROME_TOOL, {"text": substituted(THREAD, '"Jane-Doe%C3%A9"') + "\n"})[0], "thread script with encoded identifier or trailing newline refused")
+    check(call("mcp__Claude_Browser__browser_batch", {"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "text": substituted(THREAD, '"x"')}}]})[0], "thread script in a batch refused")
+    check(not call(TOOL, {"text": THREAD})[0], "thread script with an empty identifier passed")
+    check(not call(TOOL, {"text": substituted(THREAD, '"a\\" + document.cookie + \\""')})[0], "thread script with unsafe identifier passed")
+    check(not call(TOOL, {"text": substituted(THREAD, "1")})[0], "thread script with a number on its first line passed")
+    check(not call(TOOL, {"text": THREAD.replace("MAX_MESSAGES = 98", "MAX_MESSAGES = 9800")})[0], "edited thread script body passed")
+    check(not call(TOOL, {"text": THREAD.replace("messengerMessages.5846eeb71c981f11e0134cb6626cc314", "messengerMessages.00000000000000000000000000000000")})[0], "thread script with another query passed")
+    check(not call(TOOL, {"text": THREAD + "\nconsole.log(document.cookie)"})[0], "thread script with appended line passed")
+    check(not call(TOOL, {"text": "\n".join(THREAD.split("\n")[1:])})[0], "thread script without its first line passed")
+    check(not call(TOOL, {"text": "const STOP_AT = 0;\n" + THREAD.split("\n", 1)[1]})[0], "thread script under another placeholder passed")
+    # The thread script returns only what the application reads: never the token, and no key is named for it.
+    returned = THREAD.rstrip("\n").split("\n")[-1]
+    check(returned.startswith("({") and returned.endswith("})") and "csrf:" not in returned and "csrf," not in returned,
+          "thread script's last line returns something other than the evidence record")
+    # Only LinkedIn's own Voyager API is called.
+    check(THREAD.count("https://") == 1 and 'const API = "https://www.linkedin.com/voyager/api";' in THREAD, "thread script names another address")
 
     # A changed body, an unsafe first-line value or a stray line is not the approved script.
     check(not call(TOOL, {"text": EVIDENCE.replace("entries })", "entries, csrf })")})[0], "edited body passed")
