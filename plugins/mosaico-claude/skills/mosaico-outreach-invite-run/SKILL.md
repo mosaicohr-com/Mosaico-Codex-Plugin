@@ -115,15 +115,40 @@ each owner's drafts are later written under their own Agent and voice.
    one. If the capture gave Mosaico nothing it could use, do not send: leave the Lead unverified, list
    it as skipped and continue. Never call `outreach_record_delivery_block` with `already-connected` or
    `invite-pending`.
-4. Send through the authenticated LinkedIn browser.
-5. Verify each invitation against LinkedIn rather than trusting the click.
-6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
-   Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
-7. Reread the same day after each send, capture or recorded outcome and continue until Mosaico reports
+4. Send through the authenticated LinkedIn browser: click Connect and type the approved note. Do not
+   judge from the screen whether it worked; LinkedIn's data says so, in the next step.
+5. **Confirm the send from data.** LinkedIn's profile data cannot show a pending invitation; only its
+   Sent invitations list can. Straight away, run the approved sent-invitations script with the Lead's
+   public identifier after the send and pass its output unchanged as `sentInvitationEvidence`
+   (**Capture the sent invitation**) to `outreach_mark_message_sent`, with the exact Lead and Message identities, the exact
+   send time when LinkedIn exposes it, otherwise null, fresh `identityEvidence` (run the whoami script
+   again) and the `runId`. Mosaico reads the capture: it accepts the mark only when the Lead is on the
+   list with a send time after your check before the send, and records the send time as the proof. Report
+   its answer in plain words. Never call `outreach_record_connection_evidence` for this capture. Do not
+   pass `sendEvidence`: it is the connection-evidence script's output and proves only that the person
+   accepted at once, so for anything else Mosaico answers `send-evidence-cannot-prove` and writes nothing.
+6. If Mosaico answers `send-not-confirmed`, LinkedIn's Sent invitations list does not show the invitation:
+   it did not go out. Do not retype the note and do not mark it sent. Retry the send once, run the script
+   again and pass its output again as `sentInvitationEvidence`. If Mosaico answers `send-not-confirmed`
+   again, call `outreach_record_delivery_block` with `reason: cannot-message` and continue with the next
+   invitation. For `send-evidence-stale`, `send-evidence-before-send` or `send-evidence-malformed`, the
+   capture was unusable: run the script again once and pass it again; if it is still refused, leave the
+   invitation Approved, list it as skipped with the code and continue (the next run checks the Lead
+   before sending, so an invitation that did go out is never sent twice). For `send-evidence-lead-mismatch`,
+   the capture was for another profile: run the script for this Lead's own public identifier. For
+   `send-evidence-cannot-prove`, run the sent-invitations script and pass its output as
+   `sentInvitationEvidence`.
+7. Never mark an invitation sent from the screen alone. Only when the script cannot run (the script file
+   is missing, the gate refuses it, or LinkedIn stops answering it), and the Connect click and note
+   visibly went through, call `outreach_mark_message_sent` without `sentInvitationEvidence`: Mosaico
+   records it as a reading of the screen and answers `send-proof-missing`. Say so in the final report,
+   with each Lead.
+8. Reread the same day after each send, capture or recorded outcome and continue until Mosaico reports
    completion or a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
    invited never stops the run.
-8. In the final report list recorded outcomes and Leads left unverified separately from sends and
-   blockers, each with its Lead and reason.
+9. In the final report list recorded outcomes and Leads left unverified separately from sends and
+   blockers, each with its Lead and reason, and count the sends confirmed from data separately from
+   any marked by screen.
 
 ## Capture connection evidence
 
@@ -175,6 +200,39 @@ When the capability is unavailable (the script file is missing, the gate refuses
 signed in), do not work around it. Leave the Lead unverified, note in the report only what the LinkedIn
 page visibly shows (a Message, Connect or Pending button) for the person to read, never record that as a
 connection state, and continue with the next Lead or stop the step and report it.
+
+## Capture the sent invitation
+
+Whether an invitation went out is a fact in LinkedIn's own Sent invitations list. This procedure carries
+that data to Mosaico unchanged; Mosaico reads it and decides. Never judge from the screen whether a send
+worked.
+
+The capture is the plugin's sent-invitations script: one approved script, shipped at
+`browser/linkedin-sent-invitations.js` inside the installed plugin, run word for word in the signed-in
+LinkedIn page by the built-in browser pane. It sends LinkedIn's own session and CSRF material to LinkedIn
+only and never returns it; it looks for the one Lead on the Sent invitations list (up to five pages of a
+hundred) and returns only whether it was found, when it was sent and the two URNs. The endpoint it calls
+has not been validated against a live account yet: if it stops answering, stop and report that, and do not
+guess another. The plugin's browser-script gate refuses any other script that touches LinkedIn or a
+credential store, and the capture does not work through the Chrome extension.
+
+Run these steps right after the send, for the Lead you just sent to:
+
+1. Print the approved script without changing it:
+
+   ```bash
+   cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-sent-invitations.js' -print -quit)")")}/browser/linkedin-sent-invitations.js"
+   ```
+
+   Run the printed script with the browser pane's `javascript_tool` from any linkedin.com page, changing
+   only the value on its first line to the Lead's public identifier (the last segment of the profile URL's
+   path, the part after `/in/`, with no trailing slash or query), in quotes. Do not paraphrase, reorder,
+   shorten or extend it: the gate refuses anything else.
+2. If `signedIn` is false, the pane is not signed in to LinkedIn: stop and report it. If `state` is
+   `error`, pass it anyway: Mosaico answers `send-evidence-malformed` and tells you to run it again.
+3. Pass the script's whole output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`.
+
+When the script is unavailable, do not work around it: see step 7 of **Send approved invitations**.
 
 ## Both
 

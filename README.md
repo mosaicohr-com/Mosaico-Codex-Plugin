@@ -82,13 +82,14 @@ from that person's account. Nobody's run touches another owner's Leads.
 The Claude Code package verifies LinkedIn connection status through a browser-side capability instead
 of any cookie or session export:
 
-- `plugins/mosaico-claude/browser/` holds the four approved capture scripts. Each runs inside the
+- `plugins/mosaico-claude/browser/` holds the five approved capture scripts. Each runs inside the
   signed-in LinkedIn page in Claude's built-in browser pane, calls one fixed LinkedIn endpoint, uses the
   page's own session and CSRF material without ever returning it, and returns only the fields Mosaico's
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
 - `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead among LinkedIn's recent conversations, and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
+- `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the first line's value may change) and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,
@@ -100,6 +101,38 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.8.0
+
+- A send is confirmed from LinkedIn's data, not from the screen. After the Connect click (invitations) or the
+  send (follow-ups), the Claude invite-run and follow-up-run skills run an approved script for that Lead and
+  pass its output unchanged to `outreach_mark_message_sent`, together with fresh `identityEvidence`.
+  - Invitations: LinkedIn's profile data cannot show a pending invitation (a Lead invited on 5 October
+    answered `noInvitation: null`), so pending is proven only by LinkedIn's Sent invitations list. The run
+    runs the approved sent-invitations script with the Lead's public identifier after the send and passes its
+    output unchanged as `sentInvitationEvidence`. Mosaico marks the invitation sent only when the Lead is on
+    the list with a send time after the check before the send. A `sendEvidence` capture from the
+    connection-evidence script is accepted only when it shows the person connected; any other is answered
+    `send-evidence-cannot-prove`.
+  - Follow-ups stay as built: the thread script output as `threadEvidence`; Mosaico marks the message sent
+    only when the newest message in the thread is the approved one.
+  - New approved script `browser/linkedin-sent-invitations.js`; the gate picks it up from the browser folder
+    with no rule change. It calls `GET /voyager/api/relationships/sentInvitationViewsV2` and has not been
+    validated against a live account yet (validated: pending).
+- If Mosaico answers `send-not-confirmed`, the run does not retype the note or message: it retries the send
+  once, runs the script again, and if it is still not confirmed calls `outreach_record_delivery_block` with
+  `reason: cannot-message`. A run never marks a send from the screen alone unless the script cannot run, and
+  then the report says so; Mosaico records that as a reading and answers `send-proof-missing` (a declared
+  fallback until the next release removes it).
+- Codex cannot run page scripts, so its sends stay by screen and declared as such in its report. Sync data
+  is installed from Claude.
+- The Claude schedule installer's Sync data text requires plugin 0.8.0 or later, names the sent-invitations
+  script among the approved scripts, uses the post-send check in Steps 2 and 3 (the sent-invitations script
+  for invitations, the thread script for follow-ups), and its Step 4 report counts sends confirmed from data
+  versus by screen. Reinstall or repair
+  the Sync data schedule to pick it up. Needs the application changes "Outreach: a send is marked only when
+  LinkedIn data confirms it (w8pg)" and "Outreach: invitation send proof from LinkedIn's sent invitations list
+  (w8pg, part 2)".
 
 ### 0.7.1
 
