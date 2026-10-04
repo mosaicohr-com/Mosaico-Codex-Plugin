@@ -23,6 +23,7 @@ EVIDENCE = (BROWSER / "linkedin-connection-evidence.js").read_text(encoding="utf
 CONNECTIONS = (BROWSER / "linkedin-recent-connections.js").read_text(encoding="utf-8")
 WHOAMI = (BROWSER / "linkedin-whoami.js").read_text(encoding="utf-8")
 THREAD = (BROWSER / "linkedin-thread-messages.js").read_text(encoding="utf-8")
+SENT = (BROWSER / "linkedin-sent-invitations.js").read_text(encoding="utf-8")
 TOOL = "mcp__Claude_Browser__javascript_tool"
 CHROME_TOOL = "mcp__claude-in-chrome__javascript_tool"
 
@@ -78,6 +79,25 @@ def main() -> None:
           "thread script's last line returns something other than the evidence record")
     # Only LinkedIn's own Voyager API is called.
     check(THREAD.count("https://") == 1 and 'const API = "https://www.linkedin.com/voyager/api";' in THREAD, "thread script names another address")
+
+    # The sent-invitations script reuses the thread script's PUBLIC_IDENTIFIER placeholder and nothing else.
+    check(SENT.split("\n", 1)[0] == 'const PUBLIC_IDENTIFIER = "";', "sent-invitations script's first line changed")
+    check("linkedin-sent-invitations.js" in gate.approved_scripts(), "the gate does not enumerate the sent-invitations script")
+    check(sorted(gate.approved_scripts()) == sorted(path.name for path in BROWSER.glob("*.js")), "the gate's approved scripts are not the browser folder")
+    check(call(TOOL, {"text": substituted(SENT, '"jane-doe_42"')})[0], "sent-invitations script with identifier refused")
+    check(call(CHROME_TOOL, {"text": substituted(SENT, '"Jane-Doe%C3%A9"') + "\n"})[0], "sent-invitations script with encoded identifier or trailing newline refused")
+    check(call("mcp__Claude_Browser__browser_batch", {"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "text": substituted(SENT, '"x"')}}]})[0], "sent-invitations script in a batch refused")
+    check(not call(TOOL, {"text": SENT})[0], "sent-invitations script with an empty identifier passed")
+    check(not call(TOOL, {"text": substituted(SENT, '"a\\" + document.cookie + \\""')})[0], "sent-invitations script with unsafe identifier passed")
+    check(not call(TOOL, {"text": SENT.replace("MAX_PAGES = 5", "MAX_PAGES = 500")})[0], "edited sent-invitations script body passed")
+    check(not call(TOOL, {"text": SENT.replace("sentInvitationViewsV2", "invitationViews")})[0], "sent-invitations script with another endpoint passed")
+    check(not call(TOOL, {"text": SENT + "\nconsole.log(document.cookie)"})[0], "sent-invitations script with appended line passed")
+    check(not call(TOOL, {"text": THREAD.split("\n", 1)[0] + "\n" + SENT.split("\n", 1)[1]})[0], "sent-invitations body under the thread script's name passed")
+    returned = SENT.rstrip("\n").split("\n")[-1]
+    check(returned.startswith("({") and returned.endswith("})") and "csrf:" not in returned and "csrf," not in returned,
+          "sent-invitations script's last line returns something other than the record")
+    check(SENT.count("https://") == 1 and 'const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";' in SENT, "sent-invitations script names another address")
+    check("validated: pending" in SENT, "sent-invitations script does not say its endpoint is not validated")
 
     # A changed body, an unsafe first-line value or a stray line is not the approved script.
     check(not call(TOOL, {"text": EVIDENCE.replace("entries })", "entries, csrf })")})[0], "edited body passed")

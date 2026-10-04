@@ -109,9 +109,9 @@ each owner's drafts are later written under their own Agent and voice.
 5. Verify each invitation against LinkedIn rather than trusting the click.
 6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
    Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
-   Codex cannot run the approved connection-evidence script, so it cannot pass `sendEvidence`: Mosaico
+   Codex cannot run the approved sent-invitations script, so it cannot pass `sentInvitationEvidence`: Mosaico
    records the mark as a reading of the screen and answers `send-proof-missing`. Say so in the final
-   report, with each Lead. A Claude run, which runs the script again after the send, confirms a send from
+   report, with each Lead. A Claude run, which runs the sent-invitations script after the send, confirms a send from
    LinkedIn's data and is the one to send invitations. If Mosaico answers `send-not-confirmed` it did
    not go out: do not retype it and do not mark it sent; call `outreach_record_delivery_block` with
    `reason: cannot-message` and continue.
