@@ -13,9 +13,10 @@ browser session. This action configures personal schedule state; it does not cha
 
 Do these checks first. If one fails, install nothing and tell the person what to do.
 
-1. **Browser permissions.** Read `~/.claude/settings.json`. Both `"mcp__Claude_Browser__javascript_tool"`
-   and `"mcp__Claude_Browser__computer"` must be in `permissions.allow`. If the file is missing or
-   either rule is absent, do not install. Print this snippet for the person to add, merged into any
+1. **Browser permissions.** Read `~/.claude/settings.json`. All three of
+   `"mcp__Claude_Browser__javascript_tool"`, `"mcp__Claude_Browser__computer"` and
+   `"mcp__Claude_Browser__browser_batch"` must be in `permissions.allow`. If the file is missing or
+   any rule is absent, do not install. Print this snippet for the person to add, merged into any
    existing `permissions.allow` list:
 
    ```json
@@ -23,14 +24,17 @@ Do these checks first. If one fails, install nothing and tell the person what to
      "permissions": {
        "allow": [
          "mcp__Claude_Browser__javascript_tool",
-         "mcp__Claude_Browser__computer"
+         "mcp__Claude_Browser__computer",
+         "mcp__Claude_Browser__browser_batch"
        ]
      }
    }
    ```
 
-   Say in two sentences: scheduled sessions ignore project-level rules, so without these two user-level
-   rules every browser step waits for a person who is not there. Once they exist, the plugin's
+   Say in three sentences: scheduled sessions ignore project-level rules, so without these three
+   user-level rules every browser step waits for a person who is not there. The browser pane batches a
+   click with a wait and a screenshot through the `browser_batch` tool, so without that rule every
+   Connect or Send click is blocked. Once the rules exist, the plugin's
    browser-script gate stays the safety net, because it still refuses any script that is not an
    approved capture script. The plugin cannot write that file; the person must edit it. Offer to
    continue once they have.
@@ -50,6 +54,46 @@ Do these checks first. If one fails, install nothing and tell the person what to
    `status = "ACTIVE"`, tell the person to disable it. Codex cannot run the connection check, and a
    parallel run would send invitations twice. Do not install the Sync data schedule while one is active.
 
+## Set up a second person
+
+Use this when another person, for example a colleague who sources and delivers for herself, wants her own
+schedules. Everything below happens on her own Mac. Go through the steps in order and stop at the first
+one that fails.
+
+1. **Claude desktop app and plugin.** The Claude desktop app is installed on her Mac, with the Mosaico
+   plugin installed from the marketplace, version 0.6.1 or later.
+2. **Her Mosaico account.** The Mosaico connector is signed in as her own Mosaico account, not anyone
+   else's. She must be an active member of the organisation. An Owner or Admin can check this in
+   Outreach, Agent tab.
+3. **Her LinkedIn.** Her LinkedIn is signed in inside Claude's built-in browser pane, not in Chrome or
+   any other browser.
+4. **The three allow rules.** The three rules are in her own `~/.claude/settings.json`. Run the
+   **Browser permissions** check above on her Mac and, if a rule is missing, print the snippet for her:
+
+   ```json
+   {
+     "permissions": {
+       "allow": [
+         "mcp__Claude_Browser__javascript_tool",
+         "mcp__Claude_Browser__computer",
+         "mcp__Claude_Browser__browser_batch"
+       ]
+     }
+   }
+   ```
+
+5. **Her LinkedIn profile is registered in Mosaico.** It must be registered in Mosaico Outreach, Agent
+   tab, "LinkedIn profile". Check it yourself: open LinkedIn's Me page in the pane, read her public
+   identifier, and call `outreach_start_run` with intent `inspect_day` and that identifier. If Mosaico
+   answers `linkedin_identity_not_registered`, tell her to register the profile there, or to ask an
+   Owner to do it, and check again after she says it is done. Do not install anything until the check
+   passes.
+6. **Run this installer.** It installs her Sync data schedule. Ask once whether she sources Leads
+   herself; only if she does, also install her Source leads schedule.
+
+Each person's Sync data schedule runs on that person's own Mac, in that person's own browser pane, and
+sends only from that person's account. Nobody's run touches another owner's Leads.
+
 ## The two schedules
 
 Install two active persistent local scheduled tasks. Each scheduled run starts its own Outreach run
@@ -65,7 +109,7 @@ the person chose another time. This is the only schedule that clicks Connect or 
 text is:
 
 ```text
-Use the installed mosaico:mosaico-outreach-follow-up-run and mosaico:mosaico-outreach-invite-run skills (plugin mosaico, 0.5.0 or later). This is the Sync data flow of Mosaico Outreach: connections and messaging. It does not source, transfer or draft invitations; the Source leads schedule does that.
+Use the installed mosaico:mosaico-outreach-follow-up-run and mosaico:mosaico-outreach-invite-run skills (plugin mosaico, 0.6.1 or later). This is the Sync data flow of Mosaico Outreach: connections and messaging. It does not source, transfer or draft invitations; the Source leads schedule does that.
 
 Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
 
@@ -73,7 +117,7 @@ Do every LinkedIn step in Claude's built-in browser pane, which is signed in to 
 
 Step 1. Open https://www.linkedin.com/feed/ once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope and pass its runId on every read and write; before each send-evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it.
 
-Step 2. Run the mosaico:mosaico-outreach-follow-up-run skill across all dates with the selected action "one pass per thread". Follow workflowStatus.recommendedAction from outreach_get_follow_ups. When Mosaico recommends capture_connections, run the approved recent-connections script once and pass its output unchanged to outreach_record_connections_snapshot, then reread. For each Lead Mosaico returns, open its navigation.messageUrl (its profile URL when there is no thread yet). Deposit the complete visible conversation oldest-to-newest with outreach_deposit_conversation, passing the conversation URL as linkedInMessageUrl. If Mosaico still lists an approved outbound Follow-up for that Lead as deliverable, send it exactly as approved, verify delivery on LinkedIn, and mark it sent with outreach_mark_message_sent only after successful verification. If the conversation cannot be opened, call outreach_record_delivery_block with reason cannot-message and continue. Save every missing outbound follow-up draft Mosaico permits with sentAt null. If Mosaico lists a Lead as connection unverified, do not draft or send for it: open its profile, run the approved connection-evidence script, pass the result to outreach_record_connection_evidence, and continue only if Mosaico then lists the Lead as connected. Never approve, rewrite, replace or substitute a message.
+Step 2. Run the mosaico:mosaico-outreach-follow-up-run skill across all dates with the selected action "one pass per thread". Follow workflowStatus.recommendedAction from outreach_get_follow_ups. When Mosaico recommends capture_connections, run the approved recent-connections script once, save its output as returned, submit its pages to outreach_record_connections_snapshot one call per page in index order exactly as the follow-up-run skill describes (submit any pages Mosaico lists as missing, and first any pages left over from an earlier capture), then reread. For each Lead Mosaico returns, open its navigation.messageUrl (its profile URL when there is no thread yet). Deposit the complete visible conversation oldest-to-newest with outreach_deposit_conversation, passing the conversation URL as linkedInMessageUrl. If Mosaico still lists an approved outbound Follow-up for that Lead as deliverable, send it exactly as approved, verify delivery on LinkedIn, and mark it sent with outreach_mark_message_sent only after successful verification. If the conversation cannot be opened, call outreach_record_delivery_block with reason cannot-message and continue. Save every missing outbound follow-up draft Mosaico permits with sentAt null. If Mosaico lists a Lead as connection unverified, do not draft or send for it: open its profile, run the approved connection-evidence script, pass the result to outreach_record_connection_evidence, and continue only if Mosaico then lists the Lead as connected. Never approve, rewrite, replace or substitute a message.
 
 Step 3. Run the mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected action "send approved invitations". Work only on today and send only exact outbound Invite messages whose current Mosaico status is already Approved. Before each one, open the Lead's linkedInProfileUrl, wait until the page has loaded, run the approved connection-evidence script, and pass the result unchanged to outreach_record_connection_evidence together with fresh identityEvidence. Mosaico answers connected, invite pending or not connected and records it. Send only when Mosaico answers not connected and still lists the invitation as Approved. If Mosaico answers connected or invite pending, continue with the next invitation; Mosaico has already taken that invitation off the send list. Verify each sent invitation on LinkedIn and mark it sent in Mosaico only after successful verification. A recorded or skipped Lead is not a blocker. Reread the day after every write and continue until Mosaico reports completion (no-approved-invitations-remain) or a genuine blocker (Mosaico, sign-in or LinkedIn failure).
 

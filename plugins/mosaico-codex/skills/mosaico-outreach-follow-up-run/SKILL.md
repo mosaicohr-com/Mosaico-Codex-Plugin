@@ -118,7 +118,8 @@ the connection-evidence capability of the Mosaico plugin for Claude Code, under 
 **Capture connection evidence**. The Codex package has no such capability, so when the read of
 `outreach_get_follow_ups` returns the recommended action `capture_connections`:
 
-1. Do not call `outreach_record_connections_snapshot`; it accepts only what the approved script returns.
+1. Do not call `outreach_record_connections_snapshot`; it accepts only what the approved script returns,
+   one page per call, and Codex cannot run that script.
 2. Never compare names or decide who accepted yourself.
 3. Report that the connections list was not captured, record nothing, continue with the rest of the run
    and reread `outreach_get_follow_ups`.

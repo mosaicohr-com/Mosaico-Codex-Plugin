@@ -190,10 +190,28 @@ Run these steps in order:
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the capture and report it. If
    `status` is not 200 or `pages` is empty, report that the connections list could not be read and
    continue with the rest of the run. Never guess.
-5. Call `outreach_record_connections_snapshot` with `runId`, `observedLinkedInProfile`, `capturedAt` and
-   `pages` exactly as the script returned them. Report Mosaico's answer in plain words: how many Leads it
-   matched. If Mosaico refused, report the blocker it returned, change nothing and continue with the rest
+5. Save the script output exactly as returned (for example to a file in a temporary folder), so a page
+   can be sent again unchanged. The script still returns every page in one output; Mosaico takes them one
+   page per call. Call `outreach_record_connections_snapshot` once per page, in index order, with
+   `runId`, `identityEvidence` (or `observedLinkedInProfile`), `capturedAt`, `snapshotId` (the script's
+   `capturedAt` string, the same on every call), `pageIndex` (0-based), `pageCount` (`pages.length`)
+   and `page` (that one entry of `pages`, exactly one `{elements, entries}` object, unchanged). Never
+   merge, trim, reorder or edit a page. The identity evidence goes stale: when the whoami output you hold
+   is older than 8 minutes, run the whoami script again before the next call and pass the new output.
+   The one-call form (`capturedAt` and the whole `pages` list in a single call) is still accepted, but use
+   it only for a short list that fits in one call.
+6. Read each answer. `page_recorded` means Mosaico has that page; if it lists `missing` indexes, submit
+   exactly those pages next, in index order, from the saved output. The last page ends with
+   `connections_recorded`: report in plain words how many Leads Mosaico matched. If Mosaico refused with
+   `snapshot-expired`, run the script again (step 3) and submit the new output from page 0. If it refused
+   for any other reason, report the blocker it returned, change nothing more and continue with the rest
    of the run. Then reread `outreach_get_follow_ups`.
+
+If a run stops half-way, Mosaico keeps the pages it already has. When `outreach_get_follow_ups` returns
+`connectionsCapture.pending`, it names the half-submitted snapshot (its `snapshotId`, `pageCount` and
+missing page indexes). Submit its missing pages first, in index order, from the saved output of that capture
+(same `snapshotId`, same `pageCount`). If that output is no longer available, run the script again and
+submit the new output as a new snapshot.
 
 When the capability is unavailable, do not work around it: report that the connections list was not
 captured, record nothing, continue with the rest of the run and reread `outreach_get_follow_ups`.

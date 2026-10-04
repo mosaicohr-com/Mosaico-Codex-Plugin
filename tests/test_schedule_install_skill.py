@@ -26,7 +26,11 @@ OUTREACH_SKILLS = (
     "mosaico-outreach-agent-management",
 )
 FORBIDDEN = ("Connect means", "Message means", "Pending means", "already-connected", "invite-pending")
-ALLOW_RULES = ("mcp__Claude_Browser__javascript_tool", "mcp__Claude_Browser__computer")
+ALLOW_RULES = (
+    "mcp__Claude_Browser__javascript_tool",
+    "mcp__Claude_Browser__computer",
+    "mcp__Claude_Browser__browser_batch",
+)
 OLD_AUTOMATIONS = (
     "~/.codex/automations/daily-approved-outreach-sends",
     "~/.codex/automations/mosaico-lead-preparation",
@@ -61,11 +65,39 @@ def main() -> None:
     claude = SKILLS["Claude"]
     for rule in ALLOW_RULES:
         check(rule in claude, f"Claude skill does not name the allow rule {rule}")
+    snippet = claude[claude.index("```json") :]
+    snippet = snippet[: snippet.index("```", 7)]
+    for rule in ALLOW_RULES:
+        check(rule in snippet, f"Claude skill's printed JSON snippet does not include {rule}")
+    check("three" in claude and "blocked" in claude, "Claude skill does not explain why browser_batch is required")
     check("permissions.allow" in claude and "~/.claude/settings.json" in claude, "Claude skill does not name the settings file")
     check("cannot write that file" in claude, "Claude skill does not say the plugin cannot write the settings file")
     for script in SCRIPTS:
         check(script in claude, f"Claude skill does not name the approved script {script}")
+    check("## Set up a second person" in claude, "Claude skill is missing the Set up a second person section")
+    second = claude[claude.index("## Set up a second person") :]
+    second = second[: second.index("\n## ", 5)]
+    check("outreach_start_run" in second and "inspect_day" in second, "Second-person section does not name the identity check")
+    check("linkedin_identity_not_registered" in second, "Second-person section does not handle linkedin_identity_not_registered")
+    for rule in ALLOW_RULES:
+        check(rule in second, f"Second-person section does not name the allow rule {rule}")
+    check("0.6.1" in second and "own Mac" in second, "Second-person section does not name 0.6.1 or her own Mac")
+    check("Nobody's run touches another owner's Leads" in second, "Second-person section does not state the isolation rule")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    check("## Set up a second person" in readme, "README is missing the Set up a second person section")
+    for rule in ALLOW_RULES:
+        check(rule in readme, f"README does not name the allow rule {rule}")
     check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
+    sync = claude[claude.index("Mosaico Outreach — Sync data") : claude.index("Mosaico Outreach — Source leads")]
+    check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
+    check("0.6.1 or later" in sync, "Sync data schedule text does not require plugin 0.6.1")
+
+    for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
+        follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
+        check("one page per call" in follow, f"{provider} follow-up-run skill does not describe one page per call")
+    follow = " ".join((CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
+    for word in ("snapshotId", "pageIndex", "pageCount", "page_recorded", "connections_recorded", "connectionsCapture.pending", "8 minutes", "one-call form"):
+        check(word in follow, f"Claude follow-up-run skill does not mention {word}")
 
     codex = SKILLS["Codex"]
     check("cannot capture connection evidence" in codex, "Codex skill does not say it cannot capture connection evidence")
@@ -82,7 +114,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.6.0", f"{manifest.name} is not at 0.6.0")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.6.1", f"{manifest.name} is not at 0.6.1")
     print("PASS: both schedule-install skills describe the two schedules, qualified skill names and the stale-copy checks.")
 
 
