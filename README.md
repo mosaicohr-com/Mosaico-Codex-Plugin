@@ -103,6 +103,19 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.8.2
+
+- The thread script now reads older conversations. 0.8.1 sent the `lastUpdatedBefore` cursor to the first-page
+  query, which ignores it, so a second page repeated the first and a thread that had slid off the first page was
+  reported as not found. Page 1 is unchanged; pages 2 to 8 use LinkedIn's own paged conversation query
+  (`messengerConversations.9501074288a12f3ae9e3c7ea243bccbf`, the call the inbox makes when it scrolls) with
+  `count:20` and `lastUpdatedBefore` set to the smallest `lastActivityAt` seen so far. It stops when the Lead's
+  conversation is found, when a page has no conversations (coverage `complete`), or when the cursor does not move
+  or 8 pages are read (coverage `page-limit`). Only the primary inbox is searched: message requests and the Other
+  tab are not. The paging call was observed on live LinkedIn on 6 Oct 2026. Output shape, coverage, `pagesRead`
+  and the `integrity` seal are unchanged. The Sync data schedule text is unchanged (0.8.1 or later still works);
+  update the plugin to get the fix. Needs no application change.
+
 ### 0.8.1
 
 - The thread script pages LinkedIn's conversation list instead of reading one page. It reads up to 8 pages

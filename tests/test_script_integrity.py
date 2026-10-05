@@ -76,7 +76,7 @@ const message = (at, text, sender) => ({ entityUrn: 'urn:li:msg_message:(' + at 
 const threadRoute = (url) => {
   if (url.includes('/voyager/api/me')) return ok({ included: [{ $type: 'x.MiniProfile', dashEntityUrn: OWNER }] });
   if (url.includes('voyagerIdentityDashProfiles')) return ok({ included: [{ $type: 'x.profile.Profile', publicIdentifier: 'jane-doe', entityUrn: LEAD }] });
-  if (url.includes('messengerConversations')) return ok({ data: { messengerConversationsBySyncToken: { elements: /lastUpdatedBefore/.test(url) ? [] : [
+  if (url.includes('messengerConversations')) return ok({ data: { messengerConversationsBySyncToken: { elements: /messengerConversations\.9501074288a12f3ae9e3c7ea243bccbf/.test(url) ? [] : [
     { entityUrn: 'urn:li:msg_conversation:(a,B)', conversationParticipants: [{ hostIdentityUrn: OWNER }, { hostIdentityUrn: LEAD }], lastActivityAt: 7 }] } } });
   if (url.includes('messengerMessages')) return ok({ data: { messengerMessagesBySyncToken: { elements: [message(2000, ODD, LEAD), message(1000, 'hello', OWNER)] } } });
   return bad(404);

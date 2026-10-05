@@ -107,6 +107,10 @@ def main() -> None:
 
     # Paging, coverage and the integrity digest are part of the approved text: change one word and the script is refused.
     check("const MAX_CONVERSATION_PAGES = 8;" in THREAD and "lastUpdatedBefore:" in THREAD, "thread script lost its page limit or its cursor")
+    check("messengerConversations.9501074288a12f3ae9e3c7ea243bccbf" in THREAD and "(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:" in THREAD
+          and "validated: paging call observed 6 Oct 2026" in THREAD, "thread script lost LinkedIn's paged query")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, "messengerConversations.9501074288a12f3ae9e3c7ea243bccbf", "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48"), '"x"')})[0], "thread script with another paged query id passed")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, "category:PRIMARY_INBOX", "category:OTHER"), '"x"')})[0], "thread script with another category passed")
     check(not call(TOOL, {"text": substituted(edited(THREAD, "MAX_CONVERSATION_PAGES = 8", "MAX_CONVERSATION_PAGES = 800"), '"x"')})[0], "thread script with another page limit passed")
     check(not call(TOOL, {"text": substituted(edited(THREAD, "lastUpdatedBefore:", "lastUpdatedAfter:"), '"x"')})[0], "thread script with another cursor name passed")
     check(not call(TOOL, {"text": substituted(edited(THREAD, 'coverage = best !== null || exhausted ? "complete" : "page-limit";', 'coverage = "complete";'), '"x"')})[0], "thread script that always claims complete coverage passed")

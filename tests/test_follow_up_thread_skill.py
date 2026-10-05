@@ -122,14 +122,19 @@ def main() -> None:
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.1", f"{manifest.name} is not at 0.8.1")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.2", f"{manifest.name} is not at 0.8.2")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    check("### 0.7.0" in readme and readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
+    check("### 0.7.0" in readme and readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
     entry = flat(readme[readme.index("### 0.8.1") : readme.index("### 0.8.0")])
     for needle in ("up to 8 pages", "`coverage`", "`outcome`", "no-pressure", "awaiting", "`draftsDiscarded`", "`repair_drafts`", "`integrity`", "`evidence-altered`"):
         check(needle in entry, f"README 0.8.1 entry lacks: {needle}")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.8.1.")
+    entry2 = flat(readme[readme.index("### 0.8.2") : readme.index("### 0.8.1")])
+    for needle in ("messengerConversations.9501074288a12f3ae9e3c7ea243bccbf", "`lastUpdatedBefore`", "primary inbox", "6 Oct 2026"):
+        check(needle in entry2, f"README 0.8.2 entry lacks: {needle}")
+    skill = flat(claude)
+    check("primary-inbox conversation list" in skill and "Other tab are not searched" in skill, "the Claude follow-up skill does not describe the paged primary-inbox search")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.8.2.")
 
 
 if __name__ == "__main__":
