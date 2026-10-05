@@ -103,6 +103,19 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.8.3
+
+- The thread script now reports `complete` coverage when the conversation list ends. In 0.8.2 a profile with no
+  conversation read 3 pages and answered `page-limit`, because the smallest `lastActivityAt` stopped decreasing;
+  but that is the end of the list (LinkedIn returns the tail again, or an empty tail, for a cursor older than every
+  conversation), not a limit, and the application then wrongly blocked first follow-ups for people with no
+  conversation. After each page the script keeps only the new elements (`lastActivityAt` strictly older than the
+  cursor) and searches the Lead among them. The list is exhausted, coverage `complete`, when a page has no
+  elements, no new elements, or fewer than 20 elements. Only reaching 8 pages with new elements still arriving
+  gives `page-limit`. Query ids, paged variables, the `integrity` seal and the safety rules are unchanged. The
+  Sync data schedule text is unchanged (0.8.1 or later still works); update the plugin to get the fix. Needs no
+  application change.
+
 ### 0.8.2
 
 - The thread script now reads older conversations. 0.8.1 sent the `lastUpdatedBefore` cursor to the first-page
