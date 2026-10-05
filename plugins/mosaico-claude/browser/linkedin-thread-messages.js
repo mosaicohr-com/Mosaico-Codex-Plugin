@@ -4,18 +4,34 @@ const PUBLIC_IDENTIFIER = "";
 // first line's value changed to the Lead's public identifier (the part of the profile address after /in/).
 // It runs inside the signed-in LinkedIn page: the CSRF token is read here, sent only to LinkedIn's own
 // who-am-I, profile and messaging calls, and never returned. It finds the one-to-one conversation between
-// the signed-in account and the Lead among LinkedIn's recent conversations, and returns that conversation's
+// the signed-in account and the Lead by paging LinkedIn's conversation list, and returns that conversation's
 // participants (member URNs) and its messages oldest first, each with only its delivery time, its sender's
 // member URN and its text. Names, pictures, reactions, attachments and every other field are dropped before
-// anything leaves the page. When none of the recent conversations is with the Lead, state is
-// "no-conversation" and the lists are empty. Any error returns the status, state "error" and empty lists:
-// the script never throws.
+// anything leaves the page. Any error returns the status, state "error" and empty lists: the script never throws.
+// Paging: the first request asks for the owner's mailbox as is (about 20 conversations, the page size seen in
+// the 4 Oct probe). Each later request adds the cursor lastUpdatedBefore:<ms>, where <ms> is the OLDEST
+// lastActivityAt (epoch milliseconds) among the conversations of the page just read. It reads at most
+// MAX_CONVERSATION_PAGES pages (about 160 conversations) and stops at the first page that holds the
+// one-to-one conversation. coverage says what a "no-conversation" proves: "complete" when the conversation was
+// found or when LinkedIn's list was positively exhausted (an empty page) without it; "page-limit" when
+// reading stopped at MAX_CONVERSATION_PAGES, when a request made no progress (the page's oldest
+// lastActivityAt could not be read or was not older than the cursor just used), or on an error. pagesRead is
+// the number of conversation-list pages read. state "no-conversation" means "not found in the pages read":
+// only coverage "complete" makes it mean that LinkedIn holds none. The lastUpdatedBefore cursor form follows
+// the documented messenger query 2.4 variables pattern but is NOT yet validated against live LinkedIn; a
+// response that ignores it makes no progress and is reported as "page-limit", never as proof of no conversation.
+// Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
+// the canonical JSON (keys sorted, no spaces) of everything else the script returns, as 8 lowercase hex characters.
+// Pass the whole result to Mosaico exactly as returned: Mosaico recomputes the digest and refuses an altered copy.
 const API = "https://www.linkedin.com/voyager/api";
 const PROFILE_QUERY_ID = "voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a";
 const CONVERSATIONS_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48";
 const MESSAGES_QUERY_ID = "messengerMessages.5846eeb71c981f11e0134cb6626cc314";
 const MAX_MESSAGES = 98;
+const MAX_CONVERSATION_PAGES = 8;
 const isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const canonical = (v) => (Array.isArray(v) ? "[" + v.map((x) => (x === undefined ? "null" : canonical(x))).join(",") + "]" : isObj(v) ? "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}" : JSON.stringify(v));
+const fnv1a32 = (s) => { let h = 0x811c9dc5; for (const b of new TextEncoder().encode(s)) { h = Math.imul(h ^ b, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
 const typeOf = (e) => (isObj(e) && typeof e["$type"] === "string" ? e["$type"] : "");
 const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1] || "";
 const capturedAt = new Date().toISOString();
@@ -31,6 +47,8 @@ let state = "error";
 let conversationUrn = null;
 let participants = [];
 let messages = [];
+let coverage = "page-limit";
+let pagesRead = 0;
 try {
   if (csrf !== "" && PUBLIC_IDENTIFIER !== "") {
     const me = await getJson(API + "/me", NORMALIZED);
@@ -42,17 +60,34 @@ try {
       if (isObj(e) && /profile\.Profile$/.test(typeOf(e)) && typeof e.publicIdentifier === "string" && e.publicIdentifier.toLowerCase() === PUBLIC_IDENTIFIER.toLowerCase()) leadUrn = memberUrn(e.entityUrn);
     }
     if (ownerUrn === null || leadUrn === null || ownerUrn === leadUrn) throw 0;
-    const conversations = await getJson(API + "/voyagerMessagingGraphQL/graphql?queryId=" + CONVERSATIONS_QUERY_ID + "&variables=(mailboxUrn:" + encodeURIComponent(ownerUrn) + ")", GRAPHQL);
-    const listNode = isObj(conversations && conversations.data) ? conversations.data.messengerConversationsBySyncToken : null;
     let best = null;
-    for (const c of listOf(isObj(listNode) ? listNode.elements : null)) {
-      if (!isObj(c) || typeof c.entityUrn !== "string") continue;
-      const urns = listOf(c.conversationParticipants !== undefined ? c.conversationParticipants : c.participants).map(participantUrn);
-      const unique = urns.filter((u, i) => u !== null && urns.indexOf(u) === i);
-      if (unique.length !== 2 || urns.length !== 2 || !unique.includes(ownerUrn) || !unique.includes(leadUrn)) continue;
-      const activity = typeof c.lastActivityAt === "number" ? c.lastActivityAt : 0;
-      if (best === null || activity > best.activity) best = { urn: c.entityUrn, urns: unique, activity };
+    let cursor = null;
+    let exhausted = false;
+    let stalled = false;
+    while (best === null && !exhausted && !stalled && pagesRead < MAX_CONVERSATION_PAGES) {
+      const variables = "(mailboxUrn:" + encodeURIComponent(ownerUrn) + (cursor === null ? "" : ",lastUpdatedBefore:" + cursor) + ")";
+      const conversations = await getJson(API + "/voyagerMessagingGraphQL/graphql?queryId=" + CONVERSATIONS_QUERY_ID + "&variables=" + variables, GRAPHQL);
+      pagesRead++;
+      const listNode = isObj(conversations && conversations.data) ? conversations.data.messengerConversationsBySyncToken : null;
+      const page = listOf(isObj(listNode) ? listNode.elements : null);
+      if (page.length === 0) { exhausted = true; break; }
+      let oldest = null;
+      for (const c of page) {
+        if (!isObj(c)) continue;
+        const activity = typeof c.lastActivityAt === "number" ? c.lastActivityAt : 0;
+        if (Number.isSafeInteger(activity) && activity > 0 && (oldest === null || activity < oldest)) oldest = activity;
+        if (typeof c.entityUrn !== "string") continue;
+        const urns = listOf(c.conversationParticipants !== undefined ? c.conversationParticipants : c.participants).map(participantUrn);
+        const unique = urns.filter((u, i) => u !== null && urns.indexOf(u) === i);
+        if (unique.length !== 2 || urns.length !== 2 || !unique.includes(ownerUrn) || !unique.includes(leadUrn)) continue;
+        if (best === null || activity > best.activity) best = { urn: c.entityUrn, urns: unique, activity };
+      }
+      if (best === null) {
+        if (oldest === null || (cursor !== null && oldest >= cursor)) stalled = true;
+        else cursor = oldest;
+      }
     }
+    coverage = best !== null || exhausted ? "complete" : "page-limit";
     if (best === null) {
       state = "no-conversation";
     } else {
@@ -74,5 +109,6 @@ try {
     }
     status = 200;
   }
-} catch (e) { status = typeof e === "number" ? e : 0; state = "error"; conversationUrn = null; participants = []; messages = []; }
-({ status, signedIn: csrf !== "", capturedAt, state, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, conversationUrn, participants, messages })
+} catch (e) { status = typeof e === "number" ? e : 0; state = "error"; conversationUrn = null; participants = []; messages = []; coverage = "page-limit"; }
+const payload = { status, signedIn: csrf !== "", capturedAt, state, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, conversationUrn, participants, messages, coverage, pagesRead };
+({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

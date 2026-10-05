@@ -13,10 +13,15 @@ const PUBLIC_IDENTIFIER = "";
 // dropped before anything leaves the page. state is "found" when the Lead is on the list, "not-found" when
 // the pages read do not hold the Lead, and "error" when LinkedIn did not answer or nobody is signed in.
 // Any error returns the status, state "error" and no invitation: the script never throws.
+// Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
+// the canonical JSON (keys sorted, no spaces) of everything else the script returns, as 8 lowercase hex characters.
+// Pass the whole result to Mosaico exactly as returned: Mosaico recomputes the digest and refuses an altered copy.
 const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 const isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const canonical = (v) => (Array.isArray(v) ? "[" + v.map((x) => (x === undefined ? "null" : canonical(x))).join(",") + "]" : isObj(v) ? "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}" : JSON.stringify(v));
+const fnv1a32 = (s) => { let h = 0x811c9dc5; for (const b of new TextEncoder().encode(s)) { h = Math.imul(h ^ b, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
 const typeOf = (e) => (isObj(e) && typeof e["$type"] === "string" ? e["$type"] : "");
 const listOf = (v) => (Array.isArray(v) ? v : []);
 const text = (v) => (typeof v === "string" && v !== "" ? v : null);
@@ -72,4 +77,5 @@ try {
     status = 200;
   }
 } catch (e) { status = typeof e === "number" ? e : 0; state = "error"; invitation = null; }
-({ status, signedIn: csrf !== "", capturedAt, state, publicIdentifier: PUBLIC_IDENTIFIER, invitation, pagesRead })
+const payload = { status, signedIn: csrf !== "", capturedAt, state, publicIdentifier: PUBLIC_IDENTIFIER, invitation, pagesRead };
+({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

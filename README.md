@@ -88,7 +88,8 @@ of any cookie or session export:
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
-- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead among LinkedIn's recent conversations, and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
+- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`) and `pagesRead`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
+- Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the first line's value may change) and refuses any other script
@@ -101,6 +102,40 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.8.1
+
+- The thread script pages LinkedIn's conversation list instead of reading one page. It reads up to 8 pages
+  (about 160 conversations) with the `lastUpdatedBefore` cursor, stops at the first page that holds the Lead's
+  one-to-one conversation, and returns `coverage` (`complete` when the conversation was found or the list was
+  exhausted, `page-limit` when it stopped at 8 pages, made no progress, or failed) and `pagesRead`. A run passes
+  the output unchanged; Mosaico answers `no-conversation` only when coverage is complete and
+  `thread-not-found-in-window` otherwise. A Lead whose thread was not found in the window is reported as such,
+  never as having no conversation, and is not read by eye unless the person asks. The cursor form follows the
+  documented query pattern and is not yet validated against live LinkedIn; a response that ignores it is
+  handled as `page-limit`.
+- Outcome judgment and the no-pressure rule. Every thread deposit that holds a message from the Lead carries
+  `outcome` (`declined`, `interested` or `neutral`), the run's judgment of the Lead's latest message under a
+  written checklist; without it Mosaico answers `outcome-required` and stores nothing. A no ends the Lead:
+  Mosaico moves it to Drop, discards its unsent drafts and refuses new ones (`follow-up-declined`); an
+  interested Lead is marked Warm.
+- Awaiting reply. Mosaico refuses a follow-up draft when the latest sent message is ours and is not the
+  invitation note (`follow-up-awaiting-reply`); our own unanswered message blocks a new one.
+  `connection-accepted-no-reply` now means only that the invitation note is the last message or nothing has been sent.
+- Repair of unsent drafts. After it stores a thread or an outcome, Mosaico re-checks every unsent draft on the
+  Lead and lists the ones it discarded as `draftsDiscarded`. When `outreach_get_follow_ups` recommends
+  `repair_drafts`, a run visits each Lead in `repairSuggestions` (capture the thread, deposit with `outcome`)
+  before drafting or sending anything, and the report lists the discarded drafts with their Leads and reasons.
+- Integrity digests. All five approved scripts return an `integrity` field; the connections script also seals
+  each page. Output goes to Mosaico exactly as returned, and Mosaico refuses an altered copy with
+  `evidence-altered` (nothing stored; recommended action `recapture`: run the script again).
+  `outreach_record_connection_evidence` now takes the script's whole output plus `profileUrl`, `leadId`,
+  `runId` and the identity evidence.
+- The Claude schedule installer's Sync data text requires plugin 0.8.1 or later, adds the outcome and
+  no-pressure sentence and the unchanged-output rule, and its Step 4 report lists `draftsDiscarded` and the
+  Leads whose thread was not found in the window. Reinstall or repair the Sync data schedule to pick it up.
+  Codex follows the outcome, awaiting-reply and repair rules in its by-eye deposits. Needs the matching
+  application release.
 
 ### 0.8.0
 

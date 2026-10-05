@@ -37,7 +37,7 @@ def read(root: Path, skill: str) -> str:
 def main() -> None:
     invite = flat(section(read(CLAUDE, "mosaico-outreach-invite-run"), "Send approved invitations"))
     for needle in (
-        "run the approved sent-invitations script with the Lead's public identifier after the send and pass its output unchanged as `sentInvitationEvidence`",
+        "run the approved sent-invitations script with the Lead's public identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`",
         "only its Sent invitations list can",
         "`send-evidence-cannot-prove`",
         "fresh `identityEvidence`",
@@ -66,6 +66,7 @@ def main() -> None:
     for needle in (
         "run the approved thread script again",
         "`threadEvidence`",
+        "the script's output exactly as returned (`integrity` included) as `threadEvidence`",
         "fresh `identityEvidence`",
         "`send-not-confirmed`",
         "Do not retype it",
@@ -95,14 +96,15 @@ def main() -> None:
     check("by screen" in flat(section(read(CODEX, "mosaico-outreach-follow-up-run"), "One pass per thread")),
           "Codex one pass per thread does not name its sends as by screen")
 
-    # The gate itself and the four earlier scripts must not change in this release; the sent-invitations script is new.
+    # The gate itself must not change in this release; the five approved scripts changed (integrity digest, thread paging).
     changed = subprocess.run(
         ["git", "diff", "--name-only", "origin/main", "--", "plugins/mosaico-claude/browser", "plugins/mosaico-claude/hooks"],
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     if changed.returncode == 0:
         files = set(changed.stdout.split())
-        check(files <= {"plugins/mosaico-claude/browser/linkedin-sent-invitations.js"}, f"the gate or an earlier script changed: {sorted(files)}")
+        scripts = {f"plugins/mosaico-claude/browser/{path.name}" for path in (ROOT / "plugins" / "mosaico-claude" / "browser").glob("*.js")}
+        check(files <= scripts, f"the gate or a file other than the five approved scripts changed: {sorted(files - scripts)}")
     print("PASS: both invite-run and follow-up-run skills confirm a send from LinkedIn's data (Claude) or declare it by screen (Codex).")
 
 
