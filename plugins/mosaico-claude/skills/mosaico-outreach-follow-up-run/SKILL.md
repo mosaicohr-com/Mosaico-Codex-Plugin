@@ -184,8 +184,9 @@ The capture is the plugin's thread script: one approved script, shipped at
 `browser/linkedin-thread-messages.js` inside the installed plugin, run word for word in the signed-in
 LinkedIn page by the built-in browser pane, under the same rules as **Capture connection evidence**. It
 sends LinkedIn's own session and CSRF material to LinkedIn only and never returns it. It finds the
-one-to-one conversation between the signed-in account and the Lead by paging LinkedIn's conversation list
-(up to 8 pages, about 160 conversations) and returns the participants' member ids and the messages oldest
+one-to-one conversation between the signed-in account and the Lead by paging LinkedIn's primary-inbox
+conversation list with LinkedIn's own paged query (up to 8 pages, about 160 conversations; message requests
+and the Other tab are not searched) and returns the participants' member ids and the messages oldest
 first, each with only its delivery time, its sender and its text, plus `coverage` (`complete` or
 `page-limit`), `pagesRead` and the `integrity` seal. Names and every other field are dropped. It runs in
 Claude's built-in browser pane only: the Chrome extension cannot run it, and Codex cannot either.
@@ -219,7 +220,7 @@ Run these steps in order for one Lead:
      final report);
    - blocked `outcome-required`: the thread holds a message from the Lead and no outcome was given. Nothing
      was stored. Add the outcome and deposit again;
-   - skipped `no-conversation`: LinkedIn's whole conversation list held none with this person (`coverage`
+   - skipped `no-conversation`: LinkedIn's primary inbox held no conversation with this person (`coverage`
      was `complete`); nothing is concluded about replies; continue with the next Lead;
    - skipped `thread-not-found-in-window`: the 8 pages did not reach this person's conversation, so nothing
      is concluded. Mosaico marks the Lead's thread as unread, refuses drafts for it (`follow-up-thread-unread`)

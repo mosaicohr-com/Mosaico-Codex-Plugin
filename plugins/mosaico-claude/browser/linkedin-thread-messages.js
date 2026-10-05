@@ -8,24 +8,27 @@ const PUBLIC_IDENTIFIER = "";
 // participants (member URNs) and its messages oldest first, each with only its delivery time, its sender's
 // member URN and its text. Names, pictures, reactions, attachments and every other field are dropped before
 // anything leaves the page. Any error returns the status, state "error" and empty lists: the script never throws.
-// Paging: the first request asks for the owner's mailbox as is (about 20 conversations, the page size seen in
-// the 4 Oct probe). Each later request adds the cursor lastUpdatedBefore:<ms>, where <ms> is the OLDEST
-// lastActivityAt (epoch milliseconds) among the conversations of the page just read. It reads at most
-// MAX_CONVERSATION_PAGES pages (about 160 conversations) and stops at the first page that holds the
-// one-to-one conversation. coverage says what a "no-conversation" proves: "complete" when the conversation was
-// found or when LinkedIn's list was positively exhausted (an empty page) without it; "page-limit" when
-// reading stopped at MAX_CONVERSATION_PAGES, when a request made no progress (the page's oldest
-// lastActivityAt could not be read or was not older than the cursor just used), or on an error. pagesRead is
-// the number of conversation-list pages read. state "no-conversation" means "not found in the pages read":
-// only coverage "complete" makes it mean that LinkedIn holds none. The lastUpdatedBefore cursor form follows
-// the documented messenger query 2.4 variables pattern but is NOT yet validated against live LinkedIn; a
-// response that ignores it makes no progress and is reported as "page-limit", never as proof of no conversation.
+// Paging (validated: paging call observed 6 Oct 2026): page 1 is the owner's mailbox query as is (messengerConversations
+// with only mailboxUrn, about 20 conversations), which ignores any cursor. Pages 2 to MAX_CONVERSATION_PAGES use
+// LinkedIn's DIFFERENT paged query id, with the exact variables form LinkedIn's own inbox sends when it scrolls:
+// (query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:<owner URN>,
+// lastUpdatedBefore:<ms>). The cursor <ms> is the smallest lastActivityAt (epoch milliseconds) seen so far, used as is:
+// LinkedIn treats it as strictly before. The script reads at most MAX_CONVERSATION_PAGES pages (about 160
+// conversations) and stops when the one-to-one conversation is found, when a page holds no elements, or when the
+// smallest lastActivityAt does not decrease (no progress). Only the PRIMARY_INBOX category is searched: message
+// requests and the Other tab are NOT searched. coverage says what a "no-conversation" proves: "complete" when the
+// conversation was found or when the list was positively exhausted (a page without elements) without it; "page-limit"
+// when reading stopped at MAX_CONVERSATION_PAGES, when no progress was made (the page's oldest lastActivityAt could not
+// be read or was not older than the cursor), or on an error. pagesRead is the number of conversation-list pages read.
+// state "no-conversation" means "not found in the pages read": only coverage "complete" makes it mean that the
+// PRIMARY_INBOX holds none. The list is read from whichever single value of the response's data holds an elements array.
 // Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
 // the canonical JSON (keys sorted, no spaces) of everything else the script returns, as 8 lowercase hex characters.
 // Pass the whole result to Mosaico exactly as returned: Mosaico recomputes the digest and refuses an altered copy.
 const API = "https://www.linkedin.com/voyager/api";
 const PROFILE_QUERY_ID = "voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a";
 const CONVERSATIONS_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48";
+const CONVERSATIONS_PAGED_QUERY_ID = "messengerConversations.9501074288a12f3ae9e3c7ea243bccbf";
 const MESSAGES_QUERY_ID = "messengerMessages.5846eeb71c981f11e0134cb6626cc314";
 const MAX_MESSAGES = 98;
 const MAX_CONVERSATION_PAGES = 8;
@@ -42,6 +45,7 @@ const memberUrn = (v) => (typeof v === "string" && /^urn:li:fsd_profile:[A-Za-z0
 const participantUrn = (p) => memberUrn(typeof p === "string" ? p : isObj(p) ? p.hostIdentityUrn : null);
 const isoOf = (ms) => (typeof ms === "number" && ms > 0 && ms < 8.64e15 ? new Date(ms).toISOString() : null);
 const listOf = (v) => (Array.isArray(v) ? v : []);
+const elementsIn = (data) => { for (const v of isObj(data) ? Object.values(data) : []) { if (isObj(v) && Array.isArray(v.elements)) return v.elements; } return []; };
 let status = 0;
 let state = "error";
 let conversationUrn = null;
@@ -65,11 +69,13 @@ try {
     let exhausted = false;
     let stalled = false;
     while (best === null && !exhausted && !stalled && pagesRead < MAX_CONVERSATION_PAGES) {
-      const variables = "(mailboxUrn:" + encodeURIComponent(ownerUrn) + (cursor === null ? "" : ",lastUpdatedBefore:" + cursor) + ")";
-      const conversations = await getJson(API + "/voyagerMessagingGraphQL/graphql?queryId=" + CONVERSATIONS_QUERY_ID + "&variables=" + variables, GRAPHQL);
+      const mailbox = encodeURIComponent(ownerUrn);
+      const request = cursor === null
+        ? "queryId=" + CONVERSATIONS_QUERY_ID + "&variables=(mailboxUrn:" + mailbox + ")"
+        : "queryId=" + CONVERSATIONS_PAGED_QUERY_ID + "&variables=(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:" + mailbox + ",lastUpdatedBefore:" + cursor + ")";
+      const conversations = await getJson(API + "/voyagerMessagingGraphQL/graphql?" + request, GRAPHQL);
       pagesRead++;
-      const listNode = isObj(conversations && conversations.data) ? conversations.data.messengerConversationsBySyncToken : null;
-      const page = listOf(isObj(listNode) ? listNode.elements : null);
+      const page = elementsIn(conversations && conversations.data);
       if (page.length === 0) { exhausted = true; break; }
       let oldest = null;
       for (const c of page) {

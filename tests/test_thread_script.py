@@ -35,17 +35,22 @@ const bad = (s) => ({ ok: false, status: s, json: async () => ({}) });
 const me = ok({ included: [{ $type: 'com.linkedin.voyager.identity.shared.MiniProfile', dashEntityUrn: OWNER, firstName: 'Owner' }] });
 const profile = ok({ included: [{ $type: 'com.linkedin.voyager.dash.identity.profile.Profile', publicIdentifier: 'Jane-Doe', entityUrn: LEAD, firstName: 'Jane' }] });
 const PAGE = 20;
-// A fake conversation list that honours lastUpdatedBefore: newest first, PAGE conversations a page, an empty page at the end.
-// With ignoreCursor it answers the first page every time, as LinkedIn would if it did not understand the cursor.
+// A fake conversation list like LinkedIn's: the first-page query id ignores any cursor; only the PAGED query id (with its
+// predicate, count and lastUpdatedBefore) pages: newest first, PAGE conversations a page, an empty page at the end.
+// With ignoreCursor it answers the first page every time, as a server that did not move the cursor would.
+const FIRST_ID = 'messengerConversations.0d5e6781bbee71c3e51c8843c6519f48', PAGED_ID = 'messengerConversations.9501074288a12f3ae9e3c7ea243bccbf';
 const route = (conversations, messages, options = {}) => (url) => {
   if (url.includes('/voyager/api/me')) return me;
   if (url.includes('voyagerIdentityDashProfiles')) return profile;
   if (url.includes('messengerConversations')) {
-    const m = /lastUpdatedBefore:(\d+)/.exec(url);
+    const paged = url.includes('queryId=' + PAGED_ID) && url.includes('(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:');
+    if (!paged && !url.includes('queryId=' + FIRST_ID)) return bad(400);
+    const m = paged ? /lastUpdatedBefore:(\d+)/.exec(url) : null;
     let list = conversations.slice().sort((a, b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0));
     if (m && !options.ignoreCursor) list = list.filter((c) => (c.lastActivityAt || 0) < Number(m[1]));
     if (options.failFrom !== undefined && m && !options.ignoreCursor && options.failFrom <= (options.counter.n = (options.counter.n || 0) + 1)) return bad(500);
-    return ok({ data: { messengerConversationsBySyncToken: { elements: options.unpaged ? conversations : list.slice(0, PAGE) } } });
+    const node = { elements: options.unpaged ? conversations : list.slice(0, PAGE) };
+    return ok({ data: paged && options.pagedKey ? { [options.pagedKey]: node } : { messengerConversationsBySyncToken: node } });
   }
   if (url.includes('messengerMessages')) return options.failMessages ? bad(500) : ok({ data: { messengerMessagesBySyncToken: { elements: messages } } });
   return bad(404);
@@ -85,6 +90,9 @@ const elsewhere = { entityUrn: 'urn:li:msg_conversation:(x,E)', conversationPart
   out.page3 = r.result; out.page3Urls = strip(r);
   r = await run('jane-doe', route([...fillers(20), deep], [message(1000, 'hi', OWNER)]));
   out.page2 = r.result; out.page2Urls = strip(r);
+  out.page2Raw = r.calls.map((c) => c.url);
+  r = await run('jane-doe', route([...fillers(20), deep], [message(1000, 'hi', OWNER)], { pagedKey: 'messengerConversationsByCategory' }));
+  out.altKey = r.result;
   r = await run('jane-doe', route(fillers(25), []));
   out.exhausted = r.result; out.exhaustedUrls = strip(r);
   r = await run('jane-doe', route([], []));
@@ -139,6 +147,11 @@ KEYS = ["status", "signedIn", "capturedAt", "state", "source", "publicIdentifier
 FILLER_ACTIVITY = lambda i: 1000000 - i * 1000  # noqa: E731 - mirrors the harness
 
 
+def PAGED_VARIABLES(cursor: int) -> str:
+    return ("(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,"
+            f"mailboxUrn:urn:li:fsd_profile:OWNERID1,lastUpdatedBefore:{cursor})")
+
+
 def conversation_urls(urls: list[str]) -> list[str]:
     return [u for u in urls if "messengerConversations" in u]
 
@@ -179,9 +192,16 @@ def main() -> None:
     urls = conversation_urls(out["page3Urls"])
     check(page3["state"] == "ok" and page3["coverage"] == "complete" and page3["pagesRead"] == 3 and len(urls) == 3, "conversation on page 3 not found after three pages")
     check("lastUpdatedBefore" not in urls[0], "first page carried a cursor")
-    check(urls[1].endswith(f"variables=(mailboxUrn:urn:li:fsd_profile:OWNERID1,lastUpdatedBefore:{FILLER_ACTIVITY(19)})"), f"page 2 cursor wrong: {urls[1]}")
-    check(urls[2].endswith(f"variables=(mailboxUrn:urn:li:fsd_profile:OWNERID1,lastUpdatedBefore:{FILLER_ACTIVITY(39)})"), f"page 3 cursor wrong: {urls[2]}")
+    check(urls[1].endswith(f"variables={PAGED_VARIABLES(FILLER_ACTIVITY(19))}"), f"page 2 variables wrong: {urls[1]}")
+    check(urls[2].endswith(f"variables={PAGED_VARIABLES(FILLER_ACTIVITY(39))}"), f"page 3 variables wrong: {urls[2]}")
+    check("queryId=messengerConversations.0d5e6781bbee71c3e51c8843c6519f48&" in urls[0] and all("queryId=messengerConversations.9501074288a12f3ae9e3c7ea243bccbf&" in u for u in urls[1:]),
+          "page 1 must use the first-page query id and pages 2 and up the paged one")
+    raw = conversation_urls(out["page2Raw"])
+    check(raw[1].endswith("&variables=(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,"
+                          f"mailboxUrn:urn%3Ali%3Afsd_profile%3AOWNERID1,lastUpdatedBefore:{FILLER_ACTIVITY(19)})"), f"page 2 address not exactly LinkedIn's form: {raw[1]}")
     check(out["page3Urls"][-1].count("messengerMessages") == 1, "messages not read after the conversation was found")
+    check(out["altKey"]["state"] == "ok" and out["altKey"]["pagesRead"] == 2 and out["altKey"]["coverage"] == "complete",
+          "a paged answer under another top-level key was not read")
     page2 = out["page2"]
     check(page2["state"] == "ok" and page2["pagesRead"] == 2 and page2["coverage"] == "complete", "conversation on page 2 not found after two pages")
 
