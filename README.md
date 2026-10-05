@@ -92,7 +92,8 @@ of any cookie or session export:
 - Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
-  an approved script word for word (only the first line's value may change) and refuses any other script
+  an approved script word for word (only the first line's value may change), expands a one-line run
+  directive (0.8.4, below) into the approved script, and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,
   cookie or response.
 - When the capability is unavailable, the skills leave the Lead unverified, report only what the LinkedIn
@@ -102,6 +103,29 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.8.4
+
+- Run directive. A run no longer retypes a long approved script into the browser javascript tool (in
+  production the model retyped the 125-line thread script, changed one line, and the gate rightly refused
+  it). It now sends one line as the whole script, alone or as a javascript item inside a `browser_batch`:
+  `// mosaico run <script>.js [<PLACEHOLDER>=<value>]`, for example
+  `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe`,
+  `// mosaico run linkedin-recent-connections.js STOP_AT=1759400000000` or
+  `// mosaico run linkedin-whoami.js`. `<script>.js` is a file in the plugin's `browser/` folder; the optional
+  assignment names that script's first-line constant (`PUBLIC_IDENTIFIER` for the evidence, thread and
+  sent-invitations scripts, `STOP_AT` for the connections script, none for whoami) with a value that satisfies
+  the existing placeholder pattern (an identifier may be bare or in quotes). The thread and sent-invitations
+  scripts need the identifier. The gate replaces the call's `text` with the approved script, its first line set,
+  and allows it, using Claude Code's PreToolUse output (`hookSpecificOutput` with `hookEventName`
+  `PreToolUse`, `permissionDecision` `allow` and `updatedInput`, the full replacement input; every other input
+  field is kept). An invalid directive (unknown script, wrong placeholder, bad value, extra lines) is refused
+  with the list of valid directives and never echoes what was sent. Word-for-word scripts are still allowed
+  exactly as before and everything else that touches LinkedIn or a credential store is still refused. The Claude
+  skills now tell a run to send the directive and keep word for word as the fallback. The browser scripts
+  themselves are unchanged. The Sync data and Source leads schedule texts now describe the directive but still
+  say 0.8.1 or later: on an older plugin the gate refuses the directive and the fallback runs the script word
+  for word, so no run depends on 0.8.4. The Codex skills are unchanged.
 
 ### 0.8.3
 

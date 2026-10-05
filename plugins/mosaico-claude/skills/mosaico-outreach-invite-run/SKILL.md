@@ -18,15 +18,18 @@ throughout the run. Accept one action and run only the selected scope.
 
 1. Open LinkedIn's Me page in the authenticated browser and read the profile URL of the signed-in
    account. Report what you see; do not decide or correct it.
-   Or run the approved whoami script instead: print it without changing it,
+   Or run the approved whoami script instead: send the browser pane's `javascript_tool` the one line
+   `// mosaico run linkedin-whoami.js` as the whole script. The plugin's gate inserts the approved script, so
+   never retype it. Pass its output exactly as returned (every field, `integrity` included) as
+   `identityEvidence` to `outreach_start_run`. Mosaico compares the identifiers from the record. If the script
+   is unavailable, read the Me page as above. Fallback, only when the gate refuses the directive: print the
+   approved script without changing it,
 
    ```bash
    cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-whoami.js' -print -quit)")")}/browser/linkedin-whoami.js"
    ```
 
-   run it word for word with the browser pane's `javascript_tool`, and pass its output exactly as returned
-   (every field, `integrity` included) as `identityEvidence` to `outreach_start_run`. Mosaico compares the
-   identifiers from the record. If the script is unavailable, read the Me page as above.
+   and run it word for word with the browser pane's `javascript_tool`.
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `source_invitation_leads` for sourcing, `send_approved_invitations` for sending. When doing both, start a separate run for each scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
@@ -168,7 +171,7 @@ Connect or Pending button as a connection state, never choose a field by what it
 the relationship yourself.
 
 The capture is the plugin's connection-evidence capability: one approved script, shipped at
-`browser/linkedin-connection-evidence.js` inside the installed plugin, run word for word in the signed-in
+`browser/linkedin-connection-evidence.js` inside the installed plugin, run through a one-line run directive in the signed-in
 LinkedIn page by the built-in browser pane. It sends LinkedIn's own session and CSRF material to LinkedIn
 only and never returns it; it returns only LinkedIn's relationship fields for the one profile, with names
 and every other field dropped. The plugin's browser-script gate refuses any other script that touches
@@ -185,17 +188,21 @@ Run these steps in order for one Lead:
    Or run the approved whoami script, as in **Start the run**, and pass its output exactly as returned as
    `identityEvidence` to `outreach_start_run`. If the script is unavailable, read the Me page.
 2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane. No reload is needed.
-3. Print the approved script without changing it:
+3. Run the script with the browser pane's `javascript_tool` by sending one line as the whole script:
+   `// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<public identifier>`, where the identifier
+   is the last segment of the profile URL's path (the part after `/in/`, with no trailing slash or query),
+   without quotes. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
+   shorten or extend it. The query inside it is the one known to work today: if LinkedIn stops answering it,
+   stop and report that; do not guess another.
+   Fallback, only when the gate refuses the directive: print the approved script without changing it,
 
    ```bash
    cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-connection-evidence.js' -print -quit)")")}/browser/linkedin-connection-evidence.js"
    ```
 
-   Run the printed script with the browser pane's `javascript_tool`, changing only the value on its first
-   line to the last segment of the profile URL's path (the part after `/in/`, with no trailing slash or
-   query), in quotes. Do not paraphrase, reorder, shorten or extend it: the gate refuses anything else. The
-   query inside it is the one known to work today: if LinkedIn stops answering it, stop and report that; do
-   not guess another.
+   then run the printed script with the browser pane's `javascript_tool`, changing only the value on its first
+   line to that last segment, in quotes. Do not paraphrase, reorder, shorten or extend it: the gate refuses
+   anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the capture and report it. If
    `status` is not 200 or `entries` is empty, stop: leave the Lead unverified, list it as skipped and
    continue with the next Lead.
@@ -219,7 +226,7 @@ that data to Mosaico unchanged; Mosaico reads it and decides. Never judge from t
 worked.
 
 The capture is the plugin's sent-invitations script: one approved script, shipped at
-`browser/linkedin-sent-invitations.js` inside the installed plugin, run word for word in the signed-in
+`browser/linkedin-sent-invitations.js` inside the installed plugin, run through a one-line run directive in the signed-in
 LinkedIn page by the built-in browser pane. It sends LinkedIn's own session and CSRF material to LinkedIn
 only and never returns it; it looks for the one Lead on the Sent invitations list (up to five pages of a
 hundred) and returns only whether it was found, when it was sent and the two URNs. The endpoint it calls
@@ -229,15 +236,19 @@ credential store, and the capture does not work through the Chrome extension.
 
 Run these steps right after the send, for the Lead you just sent to:
 
-1. Print the approved script without changing it:
+1. Run the script with the browser pane's `javascript_tool` from any linkedin.com page by sending one line as the
+   whole script: `// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=<public identifier>`, where the
+   identifier is the Lead's public identifier (the last segment of the profile URL's path, the part after
+   `/in/`, with no trailing slash or query), without quotes. The plugin's gate inserts the approved script;
+   never print, retype, paraphrase, reorder, shorten or extend it.
+   Fallback, only when the gate refuses the directive: print the approved script without changing it,
 
    ```bash
    cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-sent-invitations.js' -print -quit)")")}/browser/linkedin-sent-invitations.js"
    ```
 
-   Run the printed script with the browser pane's `javascript_tool` from any linkedin.com page, changing
-   only the value on its first line to the Lead's public identifier (the last segment of the profile URL's
-   path, the part after `/in/`, with no trailing slash or query), in quotes. Do not paraphrase, reorder,
+   then run the printed script with the browser pane's `javascript_tool` from any linkedin.com page, changing
+   only the value on its first line to the Lead's public identifier, in quotes. Do not paraphrase, reorder,
    shorten or extend it: the gate refuses anything else.
 2. If `signedIn` is false, the pane is not signed in to LinkedIn: stop and report it. If `state` is
    `error`, pass it anyway: Mosaico answers `send-evidence-malformed` and tells you to run it again.
