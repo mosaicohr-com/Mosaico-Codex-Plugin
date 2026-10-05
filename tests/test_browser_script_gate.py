@@ -163,6 +163,84 @@ def main() -> None:
     check(call("mcp__Claude_Browser__browser_batch", batch_ok)[0], "approved batch refused")
     check(not call("mcp__Claude_Browser__browser_batch", batch_bad)[0], "batch with cookie read passed")
 
+    # The run directive: one line stands for an approved script, and the hook rewrites the call to it.
+    def expand(tool_name: str, tool_input: object) -> tuple[bool, str, object]:
+        return gate.evaluate({"tool_name": tool_name, "tool_input": tool_input})
+
+    def replaced(script: str, first: str) -> str:
+        return first + "\n" + script.split("\n", 1)[1]
+
+    directives = (
+        ("linkedin-whoami.js", "// mosaico run linkedin-whoami.js", WHOAMI),
+        ("linkedin-connection-evidence.js", "// mosaico run linkedin-connection-evidence.js", EVIDENCE),
+        ("linkedin-connection-evidence.js", "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=jane-doe_42",
+         replaced(EVIDENCE, 'const PUBLIC_IDENTIFIER = "jane-doe_42";')),
+        ("linkedin-recent-connections.js", "// mosaico run linkedin-recent-connections.js", CONNECTIONS),
+        ("linkedin-recent-connections.js", "// mosaico run linkedin-recent-connections.js STOP_AT=1759400000000",
+         replaced(CONNECTIONS, "const STOP_AT = 1759400000000;")),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=Jane-Doe%C3%A9",
+         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "Jane-Doe%C3%A9";')),
+        ("linkedin-thread-messages.js", '// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER="jane-doe"\n',
+         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
+        ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=jane-doe",
+         replaced(SENT, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
+    )
+    check({name for name, _, _ in directives} == set(gate.approved_scripts()), "the directive checks do not cover every approved script")
+    for name, directive, expected in directives:
+        for tool in (TOOL, CHROME_TOOL):
+            allowed, reason, updated = expand(tool, {"action": "javascript_exec", "text": directive, "tabId": 7})
+            check(allowed and reason == "", f"directive refused: {directive}")
+            check(updated == {"action": "javascript_exec", "text": expected, "tabId": 7}, f"directive did not expand to the approved script with every other field kept: {directive}")
+            check(call(tool, {"text": updated["text"]})[0], f"the expanded script is not itself approved: {directive}")
+        batch = {"actions": [{"name": "navigate", "input": {"url": "https://www.linkedin.com/in/x"}},
+                             {"name": "javascript_tool", "input": {"action": "javascript_exec", "text": directive}},
+                             {"name": "javascript_tool", "input": {"action": "javascript_exec", "text": "document.title"}}], "other": 1}
+        allowed, _, updated = expand("mcp__Claude_Browser__browser_batch", batch)
+        check(allowed and updated is not None, f"directive in a batch refused: {directive}")
+        check(updated["actions"][1]["input"] == {"action": "javascript_exec", "text": expected}
+              and updated["actions"][0] == batch["actions"][0] and updated["actions"][2] == batch["actions"][2] and updated["other"] == 1,
+              f"batch directive expanded wrongly or touched another item: {directive}")
+        check(batch["actions"][1]["input"]["text"] == directive, "the submitted call was modified in place")
+    # Word for word stays allowed and is not rewritten.
+    for script in (EVIDENCE, WHOAMI, substituted(THREAD, '"x"')):
+        allowed, _, updated = expand(TOOL, {"text": script})
+        check(allowed and updated is None, "a word-for-word script was rewritten or refused")
+
+    # An invalid directive is refused, naming the valid directives and never echoing what was sent.
+    invalid = (
+        "// mosaico run linkedin-unknown.js",
+        "// mosaico run ../browser/linkedin-whoami.js",
+        "// mosaico run linkedin-whoami.js NOOP=0",
+        "// mosaico run linkedin-whoami.js PUBLIC_IDENTIFIER=x",
+        "// mosaico run linkedin-connection-evidence.js STOP_AT=1",
+        "// mosaico run linkedin-recent-connections.js PUBLIC_IDENTIFIER=x",
+        "// mosaico run linkedin-recent-connections.js STOP_AT=-1",
+        "// mosaico run linkedin-recent-connections.js STOP_AT=abc",
+        "// mosaico run linkedin-thread-messages.js",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=a\"+document.cookie+\"",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=a b",
+        "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=" + "a" * 121,
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=x\nconsole.log(document.cookie)",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=x; fetch('https://www.linkedin.com/voyager/api/me')",
+        "// mosaico run",
+        "//mosaico run linkedin-whoami.js",
+    )
+    for directive in invalid:
+        for tool_input, tool in (({"text": directive}, TOOL),
+                                 ({"actions": [{"name": "javascript_tool", "input": {"text": directive}}]}, "mcp__Claude_Browser__browser_batch")):
+            allowed, reason, updated = expand(tool, tool_input)
+            check(not allowed and updated is None, f"invalid directive passed: {directive!r}")
+            check("// mosaico run linkedin-whoami.js" in reason and "PUBLIC_IDENTIFIER=<public identifier>" in reason and "STOP_AT=<whole number>" in reason,
+                  "the refusal does not name the valid directives")
+            check("unknown" not in reason and "cookie" not in reason.replace("credential", "") and "fetch" not in reason, "the refusal echoed the submitted directive")
+    # One bad directive refuses a whole batch, and a directive plus another script is judged item by item.
+    mixed = {"actions": [{"name": "javascript_tool", "input": {"text": "// mosaico run linkedin-whoami.js"}},
+                         {"name": "javascript_tool", "input": {"text": "document.cookie"}}]}
+    check(not call("mcp__Claude_Browser__browser_batch", mixed)[0], "batch with a directive and a cookie read passed")
+    # Retyped with a change is still refused.
+    check(not call(TOOL, {"text": edited(substituted(THREAD, '"x"'), "MAX_MESSAGES = 98", "MAX_MESSAGES = 99")})[0], "a retyped script with one changed line passed")
+
     # Unreadable calls fail closed.
     check(not call(TOOL, {})[0], "script call without text passed")
     check(not gate.decide({"tool_input": {"text": "1"}})[0], "call without a tool name passed")
@@ -176,6 +254,17 @@ def main() -> None:
     bad = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": "document.cookie"}}),
                          capture_output=True, text=True, env=env, check=False)
     check(bad.returncode == 2 and "refused" in bad.stderr and "document.cookie" not in bad.stderr, "hook did not refuse cleanly")
+    directive = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"action": "javascript_exec", "text": "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe", "tabId": 3}}),
+                               capture_output=True, text=True, env=env, check=False)
+    out = json.loads(directive.stdout) if directive.returncode == 0 else {}
+    specific = out.get("hookSpecificOutput", {})
+    check(directive.returncode == 0 and set(out) == {"hookSpecificOutput"} and specific.get("hookEventName") == "PreToolUse"
+          and specific.get("permissionDecision") == "allow"
+          and specific.get("updatedInput") == {"action": "javascript_exec", "text": substituted(THREAD, '"jane-doe"'), "tabId": 3},
+          "hook did not print the PreToolUse allow decision with updatedInput for a directive")
+    refused = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": "// mosaico run linkedin-whoami.js X=1"}}),
+                             capture_output=True, text=True, env=env, check=False)
+    check(refused.returncode == 2 and refused.stdout == "" and "X=1" not in refused.stderr and "linkedin-thread-messages.js" in refused.stderr, "hook did not refuse an invalid directive cleanly")
     broken = subprocess.run([sys.executable, str(GATE)], input="not json", capture_output=True, text=True, env=env, check=False)
     check(broken.returncode == 2, "hook did not fail closed on unreadable input")
 
