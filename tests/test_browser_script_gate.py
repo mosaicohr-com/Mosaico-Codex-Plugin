@@ -43,6 +43,12 @@ def check(condition: bool, message: str) -> None:
         raise SystemExit(f"FAIL: {message}")
 
 
+def edited(script: str, old: str, new: str) -> str:
+    """`script` with `old` replaced by `new`; fails when `old` is absent, so an edit check can never pass vacuously."""
+    check(old in script, f"the text {old!r} is no longer in the script, so this edit check would prove nothing")
+    return script.replace(old, new)
+
+
 def main() -> None:
     # Approved scripts pass, with and without a substituted first line, on either browser.
     check(call(TOOL, {"text": EVIDENCE})[0], "approved evidence script refused")
@@ -53,8 +59,8 @@ def main() -> None:
     # The whoami script takes no variable: it passes word for word, and nothing else in its place does.
     check(call(TOOL, {"text": WHOAMI})[0], "approved whoami script refused")
     check(call(CHROME_TOOL, {"text": WHOAMI + "\n"})[0], "whoami script with trailing newline refused")
-    check(not call(TOOL, {"text": WHOAMI.replace("plainId, entries })", "plainId, entries, csrf })")})[0], "edited whoami body passed")
-    check(not call(TOOL, {"text": WHOAMI.replace("/voyager/api/me", "/voyager/api/mex")})[0], "one-character change to whoami passed")
+    check(not call(TOOL, {"text": edited(WHOAMI, "plainId, entries };", "plainId, entries, csrf };")})[0], "edited whoami body passed")
+    check(not call(TOOL, {"text": edited(WHOAMI, "/voyager/api/me", "/voyager/api/mex")})[0], "one-character change to whoami passed")
     check(not call(TOOL, {"text": substituted(WHOAMI, "1")})[0], "whoami with NOOP other than 0 passed")
     check(not call(TOOL, {"text": substituted(WHOAMI, '"0"')})[0], "whoami with quoted NOOP passed")
     check(not call(TOOL, {"text": substituted(WHOAMI, "00")})[0], "whoami with NOOP 00 passed")
@@ -68,8 +74,8 @@ def main() -> None:
     check(not call(TOOL, {"text": THREAD})[0], "thread script with an empty identifier passed")
     check(not call(TOOL, {"text": substituted(THREAD, '"a\\" + document.cookie + \\""')})[0], "thread script with unsafe identifier passed")
     check(not call(TOOL, {"text": substituted(THREAD, "1")})[0], "thread script with a number on its first line passed")
-    check(not call(TOOL, {"text": THREAD.replace("MAX_MESSAGES = 98", "MAX_MESSAGES = 9800")})[0], "edited thread script body passed")
-    check(not call(TOOL, {"text": THREAD.replace("messengerMessages.5846eeb71c981f11e0134cb6626cc314", "messengerMessages.00000000000000000000000000000000")})[0], "thread script with another query passed")
+    check(not call(TOOL, {"text": edited(THREAD, "MAX_MESSAGES = 98", "MAX_MESSAGES = 9800")})[0], "edited thread script body passed")
+    check(not call(TOOL, {"text": edited(THREAD, "messengerMessages.5846eeb71c981f11e0134cb6626cc314", "messengerMessages.00000000000000000000000000000000")})[0], "thread script with another query passed")
     check(not call(TOOL, {"text": THREAD + "\nconsole.log(document.cookie)"})[0], "thread script with appended line passed")
     check(not call(TOOL, {"text": "\n".join(THREAD.split("\n")[1:])})[0], "thread script without its first line passed")
     check(not call(TOOL, {"text": "const STOP_AT = 0;\n" + THREAD.split("\n", 1)[1]})[0], "thread script under another placeholder passed")
@@ -89,8 +95,8 @@ def main() -> None:
     check(call("mcp__Claude_Browser__browser_batch", {"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "text": substituted(SENT, '"x"')}}]})[0], "sent-invitations script in a batch refused")
     check(not call(TOOL, {"text": SENT})[0], "sent-invitations script with an empty identifier passed")
     check(not call(TOOL, {"text": substituted(SENT, '"a\\" + document.cookie + \\""')})[0], "sent-invitations script with unsafe identifier passed")
-    check(not call(TOOL, {"text": SENT.replace("MAX_PAGES = 5", "MAX_PAGES = 500")})[0], "edited sent-invitations script body passed")
-    check(not call(TOOL, {"text": SENT.replace("sentInvitationViewsV2", "invitationViews")})[0], "sent-invitations script with another endpoint passed")
+    check(not call(TOOL, {"text": edited(SENT, "MAX_PAGES = 5", "MAX_PAGES = 500")})[0], "edited sent-invitations script body passed")
+    check(not call(TOOL, {"text": edited(SENT, "sentInvitationViewsV2", "invitationViews")})[0], "sent-invitations script with another endpoint passed")
     check(not call(TOOL, {"text": SENT + "\nconsole.log(document.cookie)"})[0], "sent-invitations script with appended line passed")
     check(not call(TOOL, {"text": THREAD.split("\n", 1)[0] + "\n" + SENT.split("\n", 1)[1]})[0], "sent-invitations body under the thread script's name passed")
     returned = SENT.rstrip("\n").split("\n")[-1]
@@ -99,8 +105,30 @@ def main() -> None:
     check(SENT.count("https://") == 1 and 'const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";' in SENT, "sent-invitations script names another address")
     check("validated: pending" in SENT, "sent-invitations script does not say its endpoint is not validated")
 
+    # Paging, coverage and the integrity digest are part of the approved text: change one word and the script is refused.
+    check("const MAX_CONVERSATION_PAGES = 8;" in THREAD and "lastUpdatedBefore:" in THREAD, "thread script lost its page limit or its cursor")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, "MAX_CONVERSATION_PAGES = 8", "MAX_CONVERSATION_PAGES = 800"), '"x"')})[0], "thread script with another page limit passed")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, "lastUpdatedBefore:", "lastUpdatedAfter:"), '"x"')})[0], "thread script with another cursor name passed")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, 'coverage = best !== null || exhausted ? "complete" : "page-limit";', 'coverage = "complete";'), '"x"')})[0], "thread script that always claims complete coverage passed")
+    for label, script, first in (("whoami", WHOAMI, None), ("evidence", EVIDENCE, '"x"'), ("connections", CONNECTIONS, "1"), ("thread", THREAD, '"x"'), ("sent", SENT, '"x"')):
+        body = script if first is None else substituted(script, first)
+        check(call(TOOL, {"text": body})[0], f"{label} script with the integrity digest refused")
+        check(call(CHROME_TOOL, {"text": body + "\n"})[0], f"{label} script with trailing newline refused")
+        check("const canonical = " in script and "const fnv1a32 = " in script, f"{label} script has no digest helpers")
+        check(not call(TOOL, {"text": edited(body, "0x01000193", "0x01000194")})[0], f"{label} script with an altered digest constant passed")
+        check(not call(TOOL, {"text": edited(body, ".sort()", ".reverse()")})[0], f"{label} script with an altered canonical form passed")
+        check(not call(TOOL, {"text": edited(body, '"fnv1a32", digest', '"fnv1a32", digest: "00000000", x')})[0], f"{label} script with a forged digest passed")
+        last = script.rstrip("\n").split("\n")[-1]
+        check(last.startswith("({") and last.endswith("})") and "csrf" not in last, f"{label} script's last line is not a single record expression without the token")
+        check(last == '({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })', f"{label} script's last line is not the sealed payload")
+        check(script.count("https://") == 1, f"{label} script names more than one address")
+    check(call(TOOL, {"text": substituted(CONNECTIONS, "0")})[0] and "pages.push(sealed({ elements, entries }));" in CONNECTIONS, "connections script does not seal each page")
+    check(not call(TOOL, {"text": edited(CONNECTIONS, "pages.push(sealed({ elements, entries }));", "pages.push({ elements, entries });")})[0], "connections script without page seals passed")
+    check(sorted(gate.approved_scripts()) == sorted(path.name for path in BROWSER.glob("*.js")) and len(gate.approved_scripts()) == 5, "the gate's approved scripts are not the five scripts in the browser folder")
+    check(not call(TOOL, {"text": EVIDENCE + "\nfetch('https://www.linkedin.com/voyager/api/me')"})[0], "evidence script with a second LinkedIn call passed")
+
     # A changed body, an unsafe first-line value or a stray line is not the approved script.
-    check(not call(TOOL, {"text": EVIDENCE.replace("entries })", "entries, csrf })")})[0], "edited body passed")
+    check(not call(TOOL, {"text": edited(EVIDENCE, "entries };", "entries, csrf };")})[0], "edited body passed")
     check(not call(TOOL, {"text": substituted(EVIDENCE, '"a\\" + document.cookie + \\""')})[0], "unsafe identifier passed")
     check(not call(TOOL, {"text": substituted(CONNECTIONS, "-1")})[0], "negative stop marker passed")
     check(not call(TOOL, {"text": EVIDENCE + "\nconsole.log(document.cookie)"})[0], "appended line passed")

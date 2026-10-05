@@ -5,9 +5,14 @@ const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";
 // sent only to LinkedIn's own profile query, and never returned. The result carries only the fields
 // Mosaico's evidence parser reads (type, URN, public identifier, relationship state); names, headlines
 // and every other field are dropped before anything leaves the page.
+// Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
+// the canonical JSON (keys sorted, no spaces) of everything else the script returns, as 8 lowercase hex characters.
+// Pass the whole result to Mosaico exactly as returned: Mosaico recomputes the digest and refuses an altered copy.
 const ENDPOINT = "https://www.linkedin.com/voyager/api/graphql";
 const QUERY_ID = "voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a";
 const isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const canonical = (v) => (Array.isArray(v) ? "[" + v.map((x) => (x === undefined ? "null" : canonical(x))).join(",") + "]" : isObj(v) ? "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}" : JSON.stringify(v));
+const fnv1a32 = (s) => { let h = 0x811c9dc5; for (const b of new TextEncoder().encode(s)) { h = Math.imul(h ^ b, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
 const typeOf = (e) => (isObj(e) && typeof e["$type"] === "string" ? e["$type"] : "");
 const keep = (src, keys) => { const out = {}; for (const k of keys) { if (src[k] !== undefined) out[k] = src[k]; } return out; };
 const marker = (v) => (isObj(v) ? {} : v);
@@ -52,4 +57,5 @@ for (const e of included) {
   if (/MemberRelationship$/.test(typeOf(e))) entries.push(reduceRelationship(e));
   else if (e.publicIdentifier === PUBLIC_IDENTIFIER && /profile\.Profile$/.test(typeOf(e))) entries.push(reduceProfile(e));
 }
-({ status, signedIn: csrf !== "", capturedAt, profileIdentifier: PUBLIC_IDENTIFIER, entries })
+const payload = { status, signedIn: csrf !== "", capturedAt, profileIdentifier: PUBLIC_IDENTIFIER, entries };
+({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

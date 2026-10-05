@@ -129,8 +129,9 @@ def check_gate() -> None:
     check(not call(TOOL, {"text": SOURCE + "\nconsole.log(document.cookie)"})[0], "script with an appended line passed")
     # It returns only the record: never the token, and the only address it names is LinkedIn's sent-invitations list.
     returned = SOURCE.rstrip("\n").split("\n")[-1]
-    check(returned == '({ status, signedIn: csrf !== "", capturedAt, state, publicIdentifier: PUBLIC_IDENTIFIER, invitation, pagesRead })',
-          "script's last line returns something other than the record")
+    check(returned == '({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })'
+          and 'const payload = { status, signedIn: csrf !== "", capturedAt, state, publicIdentifier: PUBLIC_IDENTIFIER, invitation, pagesRead };' in SOURCE,
+          "script's last line returns something other than the record sealed with its digest")
     check("csrf:" not in returned and "csrf," not in returned, "script returns the token")
     check(SOURCE.count("https://") == 1 and 'const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";' in SOURCE,
           "script names another address")
@@ -149,7 +150,8 @@ def main() -> None:
     out = json.loads(done.stdout)
 
     found = out["found"]
-    check(list(found) == ["status", "signedIn", "capturedAt", "state", "publicIdentifier", "invitation", "pagesRead"], f"unexpected keys {list(found)}")
+    check(list(found) == ["status", "signedIn", "capturedAt", "state", "publicIdentifier", "invitation", "pagesRead", "integrity"], f"unexpected keys {list(found)}")
+    check(found["integrity"]["algorithm"] == "fnv1a32" and len(found["integrity"]["digest"]) == 8, "the record is not sealed with an fnv1a32 digest")
     check(found["status"] == 200 and found["signedIn"] is True and found["state"] == "found", "found invitation not reported")
     check(found["publicIdentifier"] == "jane-doe" and found["pagesRead"] == 1, "identifier or pages read wrong")
     check(list(found["invitation"]) == ["sentTime", "inviteeUrn", "invitationUrn"], "invitation carries fields other than the three")
