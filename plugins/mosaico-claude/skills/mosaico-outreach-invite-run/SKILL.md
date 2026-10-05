@@ -24,9 +24,9 @@ throughout the run. Accept one action and run only the selected scope.
    cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-whoami.js' -print -quit)")")}/browser/linkedin-whoami.js"
    ```
 
-   run it word for word with the browser pane's `javascript_tool`, and pass its output unchanged as
-   `identityEvidence` to `outreach_start_run`. Mosaico compares the identifiers from the record. If the
-   script is unavailable, read the Me page as above.
+   run it word for word with the browser pane's `javascript_tool`, and pass its output exactly as returned
+   (every field, `integrity` included) as `identityEvidence` to `outreach_start_run`. Mosaico compares the
+   identifiers from the record. If the script is unavailable, read the Me page as above.
 2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `source_invitation_leads` for sourcing, `send_approved_invitations` for sending. When doing both, start a separate run for each scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
@@ -44,7 +44,7 @@ throughout the run. Accept one action and run only the selected scope.
 5. Before `outreach_deposit_conversation`, `outreach_mark_message_sent`,
    `outreach_record_delivery_block` and `outreach_record_connection_evidence`, open the Me page again
    and pass the profile you see then as `observedLinkedInProfile`.
-   Or run the whoami script again and pass its output unchanged as `identityEvidence` on the write.
+   Or run the whoami script again and pass its output exactly as returned as `identityEvidence` on the write.
 6. If an Owner or Admin asks to run for a colleague, pass that member's id as `onBehalfOfMemberId` on
    `outreach_start_run` only. The LinkedIn account must then be that colleague's.
 
@@ -56,6 +56,16 @@ when Mosaico returns a blocker, `human_decision_required` or `stop_run`; then sh
 owner, Lead and status it returned. `outreach_deposit_conversation` returns such a blocker for a new
 Lead. Re-send with `acknowledgeProfileOnOtherOwner: true` only after the person decides to; never
 set it yourself.
+
+## Script output goes to Mosaico exactly as returned
+
+Every approved script returns an `integrity` field, `{ algorithm: "fnv1a32", digest }`, computed in the
+page over everything else it returns. Wherever a script's output goes to Mosaico (`identityEvidence` from
+the whoami script, the connection evidence, `sentInvitationEvidence`), pass it exactly as returned: every
+field, `integrity` included, never retyped, trimmed, reformatted, translated or "fixed". Mosaico recomputes
+the digest and refuses an altered copy with `evidence-altered`: nothing is stored, and the recommended
+action is `recapture`. Then run the approved script again and pass the new output unchanged. Never edit
+the copy to make it pass.
 
 ## Source Leads and prepare drafts
 
@@ -119,7 +129,7 @@ each owner's drafts are later written under their own Agent and voice.
    judge from the screen whether it worked; LinkedIn's data says so, in the next step.
 5. **Confirm the send from data.** LinkedIn's profile data cannot show a pending invitation; only its
    Sent invitations list can. Straight away, run the approved sent-invitations script with the Lead's
-   public identifier after the send and pass its output unchanged as `sentInvitationEvidence`
+   public identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`
    (**Capture the sent invitation**) to `outreach_mark_message_sent`, with the exact Lead and Message identities, the exact
    send time when LinkedIn exposes it, otherwise null, fresh `identityEvidence` (run the whoami script
    again) and the `runId`. Mosaico reads the capture: it accepts the mark only when the Lead is on the
@@ -172,7 +182,7 @@ Run these steps in order for one Lead:
 
 1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
    `observedLinkedInProfile`.
-   Or run the approved whoami script, as in **Start the run**, and pass its output unchanged as
+   Or run the approved whoami script, as in **Start the run**, and pass its output exactly as returned as
    `identityEvidence` to `outreach_start_run`. If the script is unavailable, read the Me page.
 2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane. No reload is needed.
 3. Print the approved script without changing it:
@@ -189,9 +199,10 @@ Run these steps in order for one Lead:
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the capture and report it. If
    `status` is not 200 or `entries` is empty, stop: leave the Lead unverified, list it as skipped and
    continue with the next Lead.
-5. Call `outreach_record_connection_evidence` with `leadId`, `profileUrl` (the Lead's
-   `linkedInProfileUrl`), `capturedAt` and `entries` exactly as the script returned them, the `runId`
-   and `observedLinkedInProfile`. Report Mosaico's answer in plain words: connected, invite-pending,
+5. Call `outreach_record_connection_evidence` with the script's whole output exactly as returned
+   (`status`, `signedIn`, `capturedAt`, `profileIdentifier`, `entries` and `integrity`), plus `profileUrl`
+   (the Lead's `linkedInProfileUrl`), `leadId`, the `runId` and the identity evidence (`identityEvidence`
+   from the whoami script, or `observedLinkedInProfile`). Report Mosaico's answer in plain words: connected, invite-pending,
    not-connected, or the blocker it returned. If Mosaico refused or the capture gave it nothing usable,
    leave the Lead unverified, list it as skipped and continue; follow any action Mosaico names, and do
    nothing else.
@@ -230,7 +241,9 @@ Run these steps right after the send, for the Lead you just sent to:
    shorten or extend it: the gate refuses anything else.
 2. If `signedIn` is false, the pane is not signed in to LinkedIn: stop and report it. If `state` is
    `error`, pass it anyway: Mosaico answers `send-evidence-malformed` and tells you to run it again.
-3. Pass the script's whole output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`.
+3. Pass the script's whole output exactly as returned (every field, `integrity` included) as
+   `sentInvitationEvidence` to `outreach_mark_message_sent`. If Mosaico answers `evidence-altered`, run the
+   script again and pass the new output unchanged.
 
 When the script is unavailable, do not work around it: see step 7 of **Send approved invitations**.
 

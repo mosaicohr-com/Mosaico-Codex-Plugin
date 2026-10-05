@@ -90,7 +90,19 @@ def main() -> None:
     check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
     sync = claude[claude.index("Mosaico Outreach — Sync data") : claude.index("Mosaico Outreach — Source leads")]
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
-    check("0.8.0 or later" in sync, "Sync data schedule text does not require plugin 0.8.0")
+    check("0.8.1 or later" in sync and "0.8.0 or later" not in sync, "Sync data schedule text does not require plugin 0.8.1")
+    flat_sync = " ".join(sync.split())
+    for needle in (
+        "outcome of the Lead's latest message (declined, interested or neutral)",
+        "a no ends the Lead",
+        "exactly as returned, every field including integrity",
+        "evidence-altered",
+        "thread-not-found-in-window",
+        "repair_drafts",
+        "drafts Mosaico discarded (draftsDiscarded)",
+        "Leads whose thread was not found in the window",
+    ):
+        check(needle in flat_sync, f"Sync data schedule text lacks: {needle}")
     check("browser/linkedin-thread-messages.js" in sync, "Sync data schedule text does not name the thread script")
     check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Sync data schedule text does not deposit through the thread script")
     check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Sync data schedule text does not keep the by-eye deposit as the fallback only")
@@ -133,7 +145,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.0", f"{manifest.name} is not at 0.8.0")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.1", f"{manifest.name} is not at 0.8.1")
     print("PASS: both schedule-install skills describe the two schedules, qualified skill names, the post-send check and the stale-copy checks.")
 
 
