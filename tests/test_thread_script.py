@@ -47,7 +47,9 @@ const route = (conversations, messages, options = {}) => (url) => {
     if (!paged && !url.includes('queryId=' + FIRST_ID)) return bad(400);
     const m = paged ? /lastUpdatedBefore:(\d+)/.exec(url) : null;
     let list = conversations.slice().sort((a, b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0));
+    const all = list;
     if (m && !options.ignoreCursor) list = list.filter((c) => (c.lastActivityAt || 0) < Number(m[1]));
+    if (m && options.tailRepeat && list.length === 0) list = all.slice(-PAGE);
     if (options.failFrom !== undefined && m && !options.ignoreCursor && options.failFrom <= (options.counter.n = (options.counter.n || 0) + 1)) return bad(500);
     const node = { elements: options.unpaged ? conversations : list.slice(0, PAGE) };
     return ok({ data: paged && options.pagedKey ? { [options.pagedKey]: node } : { messengerConversationsBySyncToken: node } });
@@ -101,6 +103,12 @@ const elsewhere = { entityUrn: 'urn:li:msg_conversation:(x,E)', conversationPart
   out.limit = r.result; out.limitUrls = strip(r);
   r = await run('jane-doe', route(fillers(30), [], { ignoreCursor: true }));
   out.stalled = r.result; out.stalledUrls = strip(r);
+  r = await run('jane-doe', route(fillers(20), [], { tailRepeat: true }));
+  out.tailRepeat = r.result; out.tailRepeatUrls = strip(r);
+  r = await run('jane-doe', route([...fillers(20), { ...deep, lastActivityAt: 1 }], [], { ignoreCursor: true }));
+  out.repeatHidesLead = r.result;
+  r = await run('jane-doe', route(fillers(20).map((c) => ({ ...c, lastActivityAt: undefined })), []));
+  out.fullNoActivity = r.result; out.fullNoActivityCalls = strip(r).length;
   r = await run('jane-doe', route(fillers(5).map((c) => ({ ...c, lastActivityAt: undefined })), []));
   out.noActivity = r.result; out.noActivityCalls = strip(r).length;
   r = await run('jane-doe', route([...fillers(45), deep], [], { failFrom: 1, counter: {} }));
@@ -208,10 +216,10 @@ def main() -> None:
     none = out["none"]
     check(none["state"] == "no-conversation" and none["status"] == 200 and none["conversationUrn"] is None
           and none["participants"] == [] and none["messages"] == [], "no-conversation not reported")
-    check(none["coverage"] == "complete" and none["pagesRead"] == 2, "an exhausted list is not complete (page of two, then the empty page)")
+    check(none["coverage"] == "complete" and none["pagesRead"] == 1, "a short page (2 conversations) is not complete after one page")
     exhausted = out["exhausted"]
-    check(exhausted["state"] == "no-conversation" and exhausted["coverage"] == "complete" and exhausted["pagesRead"] == 3
-          and len(conversation_urls(out["exhaustedUrls"])) == 3, "an exhausted list (20, 5, empty) is not complete after three pages")
+    check(exhausted["state"] == "no-conversation" and exhausted["coverage"] == "complete" and exhausted["pagesRead"] == 2
+          and len(conversation_urls(out["exhaustedUrls"])) == 2, "a short last page (20, then 5) is not complete after two pages")
     check(out["emptyList"]["state"] == "no-conversation" and out["emptyList"]["coverage"] == "complete" and out["emptyList"]["pagesRead"] == 1
           and out["emptyListCalls"] == 3, "an empty list is not complete after one page")
     limit = out["limit"]
@@ -220,10 +228,17 @@ def main() -> None:
           "not found after eight full pages is not no-conversation with page-limit and exactly eight conversation calls")
     check(limit["participants"] == [] and limit["messages"] == [] and limit["conversationUrn"] is None, "page-limit result carries a thread")
     stalled = out["stalled"]
-    check(stalled["state"] == "no-conversation" and stalled["coverage"] == "page-limit" and stalled["pagesRead"] == 2
-          and len(conversation_urls(out["stalledUrls"])) == 2, "a cursor that makes no progress is not page-limit after the repeated page")
-    check(out["noActivity"]["coverage"] == "page-limit" and out["noActivity"]["pagesRead"] == 1 and out["noActivity"]["state"] == "no-conversation"
-          and out["noActivityCalls"] == 3, "a page without readable lastActivityAt was not treated as no progress")
+    check(stalled["state"] == "no-conversation" and stalled["coverage"] == "complete" and stalled["pagesRead"] == 2
+          and len(conversation_urls(out["stalledUrls"])) == 2, "a repeated page (no new elements) is not the end of the list, complete")
+    tail = out["tailRepeat"]
+    check(tail["state"] == "no-conversation" and tail["coverage"] == "complete" and tail["pagesRead"] == 2
+          and len(conversation_urls(out["tailRepeatUrls"])) == 2, "the tail repeated for an older cursor is not complete after two pages")
+    check(out["repeatHidesLead"]["state"] == "no-conversation" and out["repeatHidesLead"]["coverage"] == "complete",
+          "the Lead was searched among elements that are not new")
+    check(out["noActivity"]["coverage"] == "complete" and out["noActivity"]["pagesRead"] == 1 and out["noActivity"]["state"] == "no-conversation"
+          and out["noActivityCalls"] == 3, "a short page without readable lastActivityAt is not the end of the list")
+    check(out["fullNoActivity"]["coverage"] == "page-limit" and out["fullNoActivity"]["pagesRead"] == 1 and out["fullNoActivity"]["state"] == "no-conversation"
+          and out["fullNoActivityCalls"] == 3, "a full page without readable lastActivityAt must stop as page-limit, since the cursor cannot move")
 
     for name, status, pages in (("forbidden", 403, 0), ("network", 0, 0), ("sameMember", 0, 0), ("laterPageFails", 500, 1), ("messagesFail", 500, 2)):
         record = out[name]

@@ -14,12 +14,16 @@ const PUBLIC_IDENTIFIER = "";
 // (query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:<owner URN>,
 // lastUpdatedBefore:<ms>). The cursor <ms> is the smallest lastActivityAt (epoch milliseconds) seen so far, used as is:
 // LinkedIn treats it as strictly before. The script reads at most MAX_CONVERSATION_PAGES pages (about 160
-// conversations) and stops when the one-to-one conversation is found, when a page holds no elements, or when the
-// smallest lastActivityAt does not decrease (no progress). Only the PRIMARY_INBOX category is searched: message
-// requests and the Other tab are NOT searched. coverage says what a "no-conversation" proves: "complete" when the
-// conversation was found or when the list was positively exhausted (a page without elements) without it; "page-limit"
-// when reading stopped at MAX_CONVERSATION_PAGES, when no progress was made (the page's oldest lastActivityAt could not
-// be read or was not older than the cursor), or on an error. pagesRead is the number of conversation-list pages read.
+// conversations). After each page it keeps only the NEW elements, those whose lastActivityAt is strictly older than the
+// cursor (every element of page 1), and searches the Lead among the new elements only. Only the PRIMARY_INBOX category is
+// searched: message requests and the Other tab are NOT searched.
+// Coverage semantics corrected 6 Oct 2026: a list that does not move on is the END of the list, not a limit. LinkedIn
+// answers a cursor older than every conversation with the tail again or with an empty tail. So the list is exhausted, and
+// coverage is "complete", when a page returns no elements, or no new elements, or fewer than 20 elements in total.
+// coverage says what a "no-conversation" proves: "complete" when the conversation was found or the list was exhausted
+// without it; "page-limit" only when reading stopped at MAX_CONVERSATION_PAGES with new elements still arriving, when a
+// full page held no readable lastActivityAt so the cursor could not move, or on an error. pagesRead is the number of
+// conversation-list pages read.
 // state "no-conversation" means "not found in the pages read": only coverage "complete" makes it mean that the
 // PRIMARY_INBOX holds none. The list is read from whichever single value of the response's data holds an elements array.
 // Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
@@ -76,9 +80,10 @@ try {
       const conversations = await getJson(API + "/voyagerMessagingGraphQL/graphql?" + request, GRAPHQL);
       pagesRead++;
       const page = elementsIn(conversations && conversations.data);
-      if (page.length === 0) { exhausted = true; break; }
+      const fresh = cursor === null ? page : page.filter((c) => isObj(c) && typeof c.lastActivityAt === "number" && c.lastActivityAt < cursor);
+      if (fresh.length === 0 || page.length < 20) exhausted = true;
       let oldest = null;
-      for (const c of page) {
+      for (const c of fresh) {
         if (!isObj(c)) continue;
         const activity = typeof c.lastActivityAt === "number" ? c.lastActivityAt : 0;
         if (Number.isSafeInteger(activity) && activity > 0 && (oldest === null || activity < oldest)) oldest = activity;
@@ -88,8 +93,8 @@ try {
         if (unique.length !== 2 || urns.length !== 2 || !unique.includes(ownerUrn) || !unique.includes(leadUrn)) continue;
         if (best === null || activity > best.activity) best = { urn: c.entityUrn, urns: unique, activity };
       }
-      if (best === null) {
-        if (oldest === null || (cursor !== null && oldest >= cursor)) stalled = true;
+      if (best === null && !exhausted) {
+        if (oldest === null) stalled = true;
         else cursor = oldest;
       }
     }
