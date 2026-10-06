@@ -28,11 +28,15 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    - **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
    - **Manage Outreach Agents** — Review, create, or update owned Agents.
    - **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
+   - **Repair the Outreach backlog** — List the repair queue Mosaico keeps behind the daily Sync data
+     run and what a person should do. Read-only here; the repair itself runs from Claude.
    - **Install the Outreach schedules** — Idempotently create the Source leads schedule (every two
      hours in business hours). Sync data (connections and messaging, once a day, the only one that
-     sends) is installed from Claude, because Codex cannot capture connection evidence.
+     sends) and Repair (once a week) are installed from Claude, because Codex cannot capture
+     connection evidence.
    Route Agent management to `$mosaico:mosaico-outreach-agent-management`, Lead management to
-   `$mosaico:mosaico-outreach-lead-management`, and schedule installation to
+   `$mosaico:mosaico-outreach-lead-management`, the read-only repair queue to
+   `$mosaico:mosaico-outreach-repair-run`, and schedule installation to
    `$mosaico:mosaico-outreach-schedule-install`.
 3. Use the current application-owned read for the resolved intent. Before any of
    these reads, open LinkedIn's Me page, report the profile URL you see to `outreach_start_run` with

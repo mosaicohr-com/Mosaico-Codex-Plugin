@@ -1,6 +1,6 @@
 ---
 name: mosaico-outreach-schedule-install
-description: Install or repair the two Mosaico Outreach schedules, Sync data and Source leads, in the user's local timezone.
+description: Install or repair the three Mosaico Outreach schedules, Sync data, Source leads and Repair, in the user's local timezone.
 ---
 
 # Install the Mosaico Outreach schedules
@@ -88,17 +88,18 @@ one that fails.
    answers `linkedin_identity_not_registered`, tell her to register the profile there, or to ask an
    Owner to do it, and check again after she says it is done. Do not install anything until the check
    passes.
-6. **Run this installer.** It installs her Sync data schedule. Ask once whether she sources Leads
-   herself; only if she does, also install her Source leads schedule.
+6. **Run this installer.** It installs her Sync data schedule and her Repair schedule. Ask once whether
+   she sources Leads herself; only if she does, also install her Source leads schedule.
 
 Each person's Sync data schedule runs on that person's own Mac, in that person's own browser pane, and
-sends only from that person's account. Nobody's run touches another owner's Leads.
+sends only from that person's account. Her Repair schedule works only her own backlog and never sends.
+Nobody's run touches another owner's Leads.
 
-## The two schedules
+## The three schedules
 
-Install two active persistent local scheduled tasks. Each scheduled run starts its own Outreach run
-through the invite-run or follow-up-run skill. If Mosaico returns a blocker, the run stops and reports
-it; it does not work around it.
+Install three active persistent local scheduled tasks. Each scheduled run starts its own Outreach run
+through the invite-run, follow-up-run or repair-run skill. If Mosaico returns a blocker, the run stops and
+reports it; it does not work around it.
 
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<public identifier>` is the last part of the person's LinkedIn profile address (the part after
@@ -121,7 +122,7 @@ Step 2. Run the mosaico:mosaico-outreach-follow-up-run skill across all dates wi
 
 Step 3. Run the mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected action "send approved invitations". Work only on today and send only exact outbound Invite messages whose current Mosaico status is already Approved. Before each one, open the Lead's linkedInProfileUrl, wait until the page has loaded, run the approved connection-evidence script, and pass the result unchanged to outreach_record_connection_evidence together with fresh identityEvidence. Mosaico answers connected, invite pending or not connected and records it. Send only when Mosaico answers not connected and still lists the invitation as Approved. If Mosaico answers connected or invite pending, continue with the next invitation; Mosaico has already taken that invitation off the send list. After each send, run the approved sent-invitations script with the Lead's script identifier as the first-line value and pass its output unchanged as sentInvitationEvidence to outreach_mark_message_sent together with fresh identityEvidence; Mosaico marks the invitation sent only when LinkedIn's Sent invitations list shows it, because the profile call cannot show a pending invitation. If Mosaico answers send-not-confirmed, do not retype the note: retry the send once, run the script again, and if it is still not confirmed call outreach_record_delivery_block with reason cannot-message and continue with the next Lead. Never mark an invitation sent from the screen alone unless the script cannot run, and then say so in the report. A recorded or skipped Lead is not a blocker. Reread the day after every write and continue until Mosaico reports completion (no-approved-invitations-remain) or a genuine blocker (Mosaico, sign-in or LinkedIn failure).
 
-Step 4. Report separately, using Mosaico's counts, not memory: how identity was established (whoami evidence or Me page); approved follow-up sends; follow-ups recorded as cannot-message; new follow-up drafts written; drafts Mosaico discarded (draftsDiscarded), each with its Lead and reason; outcomes recorded (declined, interested, neutral); Leads whose thread was not found in the window; whether the connections list was captured and how many Leads it marked connected; today's invitation sends; sends confirmed from data versus by screen; invitations where Mosaico answered connected or invite pending; Leads left unverified; threads read from data versus by eye; skipped Leads with reasons; blockers. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+Step 4. Report separately, using Mosaico's counts, not memory: how identity was established (whoami evidence or Me page); approved follow-up sends; follow-ups recorded as cannot-message; new follow-up drafts written; drafts Mosaico discarded (draftsDiscarded), each with its Lead and reason; outcomes recorded (declined, interested, neutral); Leads whose thread was not found in the window; whether the connections list was captured and how many Leads it marked connected; today's invitation sends; sends confirmed from data versus by screen; invitations where Mosaico answered connected or invite pending; Leads left unverified; threads read from data versus by eye; skipped Leads with reasons; blockers. Nothing merely drafted may be described as approved or sent. When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run (it is the Repair routine's work) and end the report with the line "Repair needed: n items, run the Repair routine", using Mosaico's repairNeeded total for n. Preserve Mosaico as workflow authority and never modify another owner's records.
 
 Guards: pacing between page loads, the weekly invitation ceiling and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
 ```
@@ -150,12 +151,39 @@ Step 5. Report separately, using Mosaico's counts, not memory: Leads saved, draf
 Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
 ```
 
-## Keep the two schedules apart
+**Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
+`0 10 * * 0`) unless the person chose another day or time, and also whenever the person asks for it. It
+works the backlog Mosaico lists in its repair queue, up to the cap Mosaico sets for one run. It never
+approves, sends or messages; the Sync data schedule does that. Its text is:
+
+```text
+Use the installed mosaico:mosaico-outreach-repair-run skill and the procedures it names from mosaico:mosaico-outreach-follow-up-run (plugin mosaico, 0.9.0 or later). This is the Repair flow of Mosaico Outreach. It works the backlog Mosaico lists in its repair queue: Leads whose connection nobody verified, drafts that break a rule, addresses LinkedIn redirected, one person held under two Leads, and declines nobody applied. It never sends a message or an invitation, never approves, rewrites or replaces a draft, never sets a connection state and never reads a thread by eye; the Sync data schedule does the daily sending.
+
+Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, signed in to my LinkedIn (<public identifier>). Obtain connection evidence, threads and identity only through the plugin's approved capture scripts, run by sending the browser javascript tool the one-line directive `// mosaico run <script>.js <PLACEHOLDER>=<value>` (the plugin's gate inserts the approved script; never retype a script), exactly as the skills describe; if the gate refuses the directive, run the approved script word for word with only the first line's value changed. The first-line value for every per-Lead script is the item's scriptIdentifier from the Mosaico repair queue (a member id or a public identifier, whatever Mosaico supplies). The approved scripts are browser/linkedin-whoami.js, browser/linkedin-connection-evidence.js, browser/linkedin-recent-connections.js and browser/linkedin-thread-messages.js; read each from the installed plugin. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that item undone, list it as skipped, and continue.
+
+Step 1. Open https://www.linkedin.com/feed/ once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run with intent repair (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Pass its runId on every read and write; before each write that carries LinkedIn data, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it.
+
+Step 2. Read outreach_get_repair_queue with the runId. When Mosaico recommends capture_connections, run the approved recent-connections script once and submit its pages to outreach_record_connections_snapshot one call per page in index order exactly as the follow-up-run skill describes, then reread. Work the items in the order Mosaico gives them, group by group: for each item make exactly its recommendedCall (the tool and arguments Mosaico gives, unchanged, plus what supplyAlso names), after running the approved script the item needs: the connection-evidence script for a connection to verify, the thread script for a thread to read. Every thread deposit carries the outcome of the Lead's latest message (declined, interested or neutral), judged as the follow-up-run skill describes; a decline found while reading a thread is recorded with outcome declined, also for a Lead flagged history-mismatch, and a no ends the Lead. Link duplicate Leads, fix addresses and drop declined Leads with the calls Mosaico lists, without visiting LinkedIn. Pass every script's output exactly as returned, every field including integrity, never retyped or edited; if Mosaico answers evidence-altered, run the script again and pass the new output unchanged. If a script cannot run, or Mosaico refuses one item, list that item as skipped with Mosaico's reason and continue; never attempt the same item twice. Reread the queue after each group. The cap is Mosaico's: stop only when completion.mustContinue is false (run-cap-reached, queue-empty or end-of-queue) or on a genuine blocker (Mosaico, sign-in or LinkedIn failure), never earlier for volume and never later by starting another run.
+
+Step 3. Report separately, using Mosaico's counts from the queue summary and outreach_get_run, not memory: why the run stopped; items worked per group and what remains per group; duplicates linked (canonical and alias, drafts moved or discarded, any decline carried over); addresses fixed; Leads dropped as declined; outcomes recorded (declined, interested, neutral); drafts Mosaico discarded (draftsDiscarded), each with its Lead and reason; connections verified and Leads left unverified; Leads whose thread was not found in the window; items skipped with reasons; items that need a person; blockers. Say that nothing was sent and nothing was approved. Preserve Mosaico as workflow authority and never modify another owner's records.
+
+Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
+```
+
+## Keep the schedules apart
 
 The schedules must not overlap. Place every Source leads time at least 60 minutes before or after the
 Sync data time. With the default 1:00 PM Sync, the default Source leads times are 8:00 AM, 10:00 AM,
 12:00 PM, 2:00 PM, 4:00 PM and 6:00 PM. If the person moves the Sync time, move or drop any Source
 leads time that falls closer than 60 minutes to it. Say in the readback that you did this.
+
+Repair runs once a week, and its default is Sunday at 10:00 AM. On the day Repair runs, keep every Sync
+data and Source leads time at least 60 minutes from the Repair time too: if either schedule also runs on
+that day and a time falls closer than 60 minutes, move or drop that Sync data or Source leads time, never
+the Repair time the person chose, and say so in the readback. Repair never sends, so it never takes the
+place of Sync data.
 
 ## Install
 
@@ -163,15 +191,18 @@ leads time that falls closer than 60 minutes to it. Say in the readback that you
    before writing anything.
 2. Match existing tasks by their Mosaico Outreach purpose and instructions, not name alone. An older
    "Prepare invitations" task matches Source leads. An older "Send approved invitations" task matches
-   Sync data. Only one task may send, so update the old sending task in place or disable it.
+   Sync data. A task that works the repair queue matches Repair. Only one task may send, so update the old
+   sending task in place or disable it.
 3. If equivalent tasks already exist, do not duplicate them. Report their names, timezone, enabled
    status and next runs.
 4. If matching tasks exist but differ, update them in place while preserving unrelated supported
    metadata and permission settings.
 5. If the host supports only one persistent local task, install Sync data alone and tell the person
-   that Source leads is not installed. Do not merge the two schedules or weaken either.
+   that Source leads and Repair are not installed. Do not merge the schedules or weaken any of them.
 6. Do not ask the person to repeat the dates, actions, times, folder or timezone. Ask only when a
    host-required human decision cannot be derived from the current context.
 7. Read back the saved task state and confirm names, local timezone, enabled status and next run
-   times. For Source leads, confirm that every time is at least 60 minutes from the Sync time. A
-   write attempt without readback is not completion.
+   times. For Source leads, confirm that every time is at least 60 minutes from the Sync time. For Repair,
+   confirm the cron `0 10 * * 0` (or the person's own day and time), and that Repair is also available on
+   demand through `/mosaico:mosaico-outreach-repair-run`. A write attempt without readback is not
+   completion.

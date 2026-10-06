@@ -23,19 +23,24 @@ all-dates follow-up actions:
 - **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
 - **Manage Outreach Agents** — Review, create, or update owned Agents.
 - **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
-- **Install the Outreach schedules** — Idempotently create two local-time schedules: Sync data
-  (connections and messaging, once a day) and Source leads (every two hours in business hours, at
-  least 60 minutes from Sync). Only Sync data sends.
+- **Repair the Outreach backlog** — Work the repair queue Mosaico keeps behind the daily Sync data
+  run: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
+  declines nobody applied. Up to the cap Mosaico sets for one run. Never approve or send.
+- **Install the Outreach schedules** — Idempotently create three local-time schedules: Sync data
+  (connections and messaging, once a day), Source leads (every two hours in business hours, at
+  least 60 minutes from Sync) and Repair (once a week, Sunday 10:00 AM by default, also on demand).
+  Only Sync data sends.
 
 Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
-`/mosaico:mosaico-outreach-lead-management`, and schedule installation to
-`/mosaico:mosaico-outreach-schedule-install`.
+`/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
+schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
 
 Use the current application-owned read for the resolved intent. For invitation sourcing call
 `outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
 `targetCount` (20 for the standard run). For approved invitation delivery use
 `intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
-checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. Before any of
+checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. For repair start the run with
+`intent: repair` and read `outreach_get_repair_queue`. Before any of
 those reads, open LinkedIn's Me page, report the profile URL you see to `outreach_start_run` with the
 matching intent (`inspect_day` for inspection), keep the `runId`, pass it on every Outreach read and
 write, and stop and tell the person on any blocker. Never pass `ownerUserId` on a write. Never read a Message, Connect or Pending button as a connection state: the invite and follow-up skills carry LinkedIn's own profile data to Mosaico, which decides. Run an approved script by sending the browser javascript tool its one-line directive, `// mosaico run <script>.js <PLACEHOLDER>=<value>`, as the whole script: the plugin's gate inserts the approved script, so never retype one (word for word with only the first line's value changed remains a fallback). The value for every per-Lead script is the Lead's `scriptIdentifier` from the Mosaico read when present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its profile URL after `/in/`. Every approved script's output (identity, connection evidence, connections pages, thread, sent invitations) goes to Mosaico exactly as returned, every field including `integrity`, never retyped, trimmed, reformatted, translated or "fixed"; Mosaico refuses an altered copy with `evidence-altered` and recommends `recapture`: run the script again and pass the new output unchanged. The invite
