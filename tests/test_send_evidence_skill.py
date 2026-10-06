@@ -37,7 +37,7 @@ def read(root: Path, skill: str) -> str:
 def main() -> None:
     invite = flat(section(read(CLAUDE, "mosaico-outreach-invite-run"), "Send approved invitations"))
     for needle in (
-        "run the approved sent-invitations script with the Lead's public identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`",
+        "run the approved sent-invitations script with the Lead's script identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`",
         "only its Sent invitations list can",
         "`send-evidence-cannot-prove`",
         "fresh `identityEvidence`",

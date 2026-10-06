@@ -113,7 +113,7 @@ Leads and for which reasons.
    reread `outreach_get_follow_ups`. When it is `repair_drafts`, do **Repair drafts first**, then reread.
    Never guess a connection and never skip to drafting for a listed Lead.
 2. For each returned Lead, read its thread from LinkedIn's data: run **Capture the thread** with the
-   Lead's public identifier and pass the output exactly as returned as `threadEvidence` to
+   Lead's script identifier and pass the output exactly as returned as `threadEvidence` to
    `outreach_deposit_conversation`, with fresh `identityEvidence` and the `outcome` of the Lead's latest
    message. The script needs no particular page.
    Do not search LinkedIn lists for Leads, and never read a LinkedIn list or button to decide whether a
@@ -203,7 +203,7 @@ Run these steps in order for one Lead:
    run it again.
 2. Run the script with the browser pane's `javascript_tool` on any linkedin.com page by sending one line as the
    whole script: `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<public identifier>`, where the
-   identifier is the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
+   identifier is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
    without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The queries inside it are the ones known to work today: if LinkedIn stops
    answering them, stop and report that; do not guess others.
@@ -214,7 +214,7 @@ Run these steps in order for one Lead:
    ```
 
    then run the printed script with the browser pane's `javascript_tool` on any linkedin.com page, changing
-   only the value on its first line to the Lead's public identifier, in quotes. Do not paraphrase, reorder,
+   only the value on its first line to the same identifier, in quotes. Do not paraphrase, reorder,
    shorten or extend it: the gate refuses anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the step and report it. If `status`
    is not 200 or `state` is `error`, the script could not read the thread: its `errorStep` (`me`, `profile`,
@@ -305,7 +305,7 @@ Run these steps in order for one Lead:
 2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane. No reload is needed.
 3. Run the script with the browser pane's `javascript_tool` by sending one line as the whole script:
    `// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<public identifier>`, where the identifier
-   is the last segment of the profile URL's path (the part after `/in/`, with no trailing slash or query),
+   is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
    without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The query inside it is the one known to work today: if LinkedIn stops answering it,
    stop and report that; do not guess another.
@@ -420,7 +420,7 @@ handled before anything else is sent.
    returned Lead in order. When the recommended action is `verify_connection`, run **Capture connection evidence** for each Lead in
    `unverifiedLeads` first and reread; never guess a connection and never draft for a Lead Mosaico
    still lists as unverified. When it is `repair_drafts`, do **Repair drafts first** and reread.
-2. For each Lead, run **Capture the thread** with the Lead's public identifier, in the built-in browser
+2. For each Lead, run **Capture the thread** with the Lead's script identifier, in the built-in browser
    pane, and pass the output exactly as returned as `threadEvidence` to `outreach_deposit_conversation`,
    with fresh `identityEvidence` and the `outcome` of the Lead's latest message. If Mosaico reports
    `returnedToDraft`, that Lead's approved follow-up is now a draft because a new reply arrived: do not

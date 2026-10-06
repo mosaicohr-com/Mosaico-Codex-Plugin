@@ -166,11 +166,29 @@ const elsewhere = { entityUrn: 'urn:li:msg_conversation:(x,E)', conversationPart
   r = await run('jane-doe', route([one], [message(1000, odd, LEAD)]));
   out.odd = r.result; out.oddText = odd;
 
-  // Identifier forms (0.8.6). An opaque member id builds the member URN itself and skips the vanity lookup; no name is known, so no search.
+  // Identifier forms (0.8.7). An opaque member id builds the member URN itself and is looked up by id (the profile query with the id as vanityName,
+  // accepted only for a Profile whose entityUrn carries the same id); its names are the search keywords. When that lookup fails the list path runs.
   const OPAQUE = 'ACoAAB1x_y-Z', OPAQUE_URN = 'urn:li:fsd_profile:' + OPAQUE;
   const oneWith = (urn) => ({ ...one, conversationParticipants: [{ hostIdentityUrn: OWNER }, { hostIdentityUrn: urn }] });
   r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { search: [oneWith(OPAQUE_URN)] }));
   out.opaque = r.result; out.opaqueUrls = strip(r);
+  const byId = (names) => ok({ included: [{ $type: 'com.linkedin.voyager.dash.identity.profile.Profile', publicIdentifier: 'jane-doe', entityUrn: OPAQUE_URN, ...names }] });
+  const NAMES = { firstName: 'Jane', lastName: 'Doe' };
+  // By-id lookup succeeds: the search path runs first and finds the conversation; no list call.
+  r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { profileResponse: byId(NAMES), search: [oneWith(OPAQUE_URN)] }));
+  out.opaqueSearch = r.result; out.opaqueSearchUrls = strip(r); out.opaqueSearchRaw = raw(r);
+  // By-id lookup succeeds, the search finds nothing, the list does: lookup list, one search page read.
+  r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { profileResponse: byId(NAMES), search: [] }));
+  out.opaqueSearchEmptyList = r.result;
+  // By-id lookup succeeds, the search finds nothing, the list is exhausted without it: complete.
+  r = await run(OPAQUE, route([one], [], { profileResponse: byId(NAMES), search: [] }));
+  out.opaqueSearchEmptyExhausted = r.result;
+  // By-id lookup fails (HTTP error): the run goes on with the list path, no search.
+  r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { profileResponse: bad(429), search: [oneWith(OPAQUE_URN)] }));
+  out.opaqueLookupFails = r.result; out.opaqueLookupFailsUrls = strip(r);
+  // By-id answer holds no Profile with that id, or one without names: no keywords, no search.
+  r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { profileResponse: byId({}), search: [oneWith(OPAQUE_URN)] }));
+  out.opaqueNoNames = r.result; out.opaqueNoNamesUrls = strip(r);
   r = await run(OPAQUE, route([...fillers(20), { ...oneWith(OPAQUE_URN), lastActivityAt: 500000 }], [message(1000, 'hi', OWNER)]));
   out.opaquePage2 = r.result;
   r = await run(OPAQUE, route([group, elsewhere, one], []));
@@ -408,8 +426,29 @@ def main() -> None:
           and opaque["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z" and opaque["errorStep"] is None, f"opaque id not resolved to its member URN: {opaque}")
     check(opaque["participants"] == ["urn:li:fsd_profile:OWNERID1", "urn:li:fsd_profile:ACoAAB1x_y-Z"] and opaque["lookup"] == "list" and opaque["searchPagesRead"] == 0,
           "the conversation was not matched by the opaque id's member URN, or a search ran without a name")
-    check(not any("voyagerIdentityDashProfiles" in u for u in out["opaqueUrls"]) and len(search_urls(out["opaqueUrls"])) == 0 and out["opaqueUrls"][0] == "/me",
-          "an opaque id still looked up the profile or searched")
+    check(any("voyagerIdentityDashProfiles" in u and "vanityName:ACoAAB1x_y-Z)" in u for u in out["opaqueUrls"]) and len(search_urls(out["opaqueUrls"])) == 0 and out["opaqueUrls"][0] == "/me",
+          "an opaque id was not looked up by id, or a search ran although the lookup returned another member's Profile")
+    # By-id lookup succeeds: search first, names stay in the page.
+    os_ = out["opaqueSearch"]
+    check(os_["state"] == "ok" and os_["lookup"] == "search" and os_["coverage"] == "complete" and os_["pagesRead"] == 0 and os_["searchPagesRead"] == 1
+          and os_["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z" and os_["resolvedIdentifier"] == "ACoAAB1x_y-Z" and os_["requestedIdentifier"] == "ACoAAB1x_y-Z",
+          f"an opaque id with a by-id lookup was not found by the search: {os_}")
+    check(len(conversation_urls(out["opaqueSearchUrls"])) == 0 and out["opaqueSearchUrls"][0] == "/me" and "voyagerIdentityDashProfiles" in out["opaqueSearchUrls"][1],
+          "an opaque id did not look up by id before the search, or paged the list although the search found it")
+    check(search_urls(out["opaqueSearchRaw"])[0].endswith(f"queryId={SEARCH_ID}&variables={SEARCH_VARIABLES('Jane%20Doe')}"), "the by-id names were not the search keywords")
+    visible = json.dumps(os_).replace("jane-doe", "").replace("Jane-Doe", "")
+    check("Doe" not in visible and "Jane" not in visible and sealed_correctly(os_), "the by-id name reached the result, or the result is not sealed correctly")
+    ol = out["opaqueSearchEmptyList"]
+    check(ol["state"] == "ok" and ol["lookup"] == "list" and ol["searchPagesRead"] == 1 and ol["pagesRead"] == 1 and ol["coverage"] == "complete", f"search miss then list hit wrong for an opaque id: {ol}")
+    oe = out["opaqueSearchEmptyExhausted"]
+    check(oe["state"] == "no-conversation" and oe["coverage"] == "complete" and oe["searchPagesRead"] == 1 and oe["lookup"] == "none", f"an opaque id with a clean search and an exhausted list must be complete: {oe}")
+    # By-id lookup fails: list path only, searchPagesRead 0, never an error by itself.
+    lf = out["opaqueLookupFails"]
+    check(lf["state"] == "ok" and lf["errorStep"] is None and lf["lookup"] == "list" and lf["searchPagesRead"] == 0 and lf["pagesRead"] == 1 and lf["coverage"] == "complete"
+          and lf["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z" and len(search_urls(out["opaqueLookupFailsUrls"])) == 0,
+          f"a failed by-id lookup did not fall back to the list path: {lf}")
+    nn2 = out["opaqueNoNames"]
+    check(nn2["state"] == "ok" and nn2["lookup"] == "list" and nn2["searchPagesRead"] == 0 and len(search_urls(out["opaqueNoNamesUrls"])) == 0, "an opaque id whose Profile has no names must use the list path")
     check(out["opaquePage2"]["state"] == "ok" and out["opaquePage2"]["pagesRead"] == 2 and out["opaquePage2"]["coverage"] == "complete", "an opaque id's conversation on list page 2 was not found")
     check(out["opaqueMiss"]["state"] == "no-conversation" and out["opaqueMiss"]["coverage"] == "page-limit" and out["opaqueMiss"]["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z",
           "an opaque id with no search and a list miss must read page-limit")
