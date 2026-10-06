@@ -132,7 +132,7 @@ each owner's drafts are later written under their own Agent and voice.
    judge from the screen whether it worked; LinkedIn's data says so, in the next step.
 5. **Confirm the send from data.** LinkedIn's profile data cannot show a pending invitation; only its
    Sent invitations list can. Straight away, run the approved sent-invitations script with the Lead's
-   public identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`
+   script identifier after the send and pass its output exactly as returned as `sentInvitationEvidence`
    (**Capture the sent invitation**) to `outreach_mark_message_sent`, with the exact Lead and Message identities, the exact
    send time when LinkedIn exposes it, otherwise null, fresh `identityEvidence` (run the whoami script
    again) and the `runId`. Mosaico reads the capture: it accepts the mark only when the Lead is on the
@@ -148,7 +148,7 @@ each owner's drafts are later written under their own Agent and voice.
    capture was unusable: run the script again once and pass it again; if it is still refused, leave the
    invitation Approved, list it as skipped with the code and continue (the next run checks the Lead
    before sending, so an invitation that did go out is never sent twice). For `send-evidence-lead-mismatch`,
-   the capture was for another profile: run the script for this Lead's own public identifier. For
+   the capture was for another profile: run the script for this Lead's own script identifier. For
    `send-evidence-cannot-prove`, run the sent-invitations script and pass its output as
    `sentInvitationEvidence`.
 7. Never mark an invitation sent from the screen alone. Only when the script cannot run (the script file
@@ -190,7 +190,7 @@ Run these steps in order for one Lead:
 2. Open the Lead's `linkedInProfileUrl` in the built-in browser pane. No reload is needed.
 3. Run the script with the browser pane's `javascript_tool` by sending one line as the whole script:
    `// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<public identifier>`, where the identifier
-   is the last segment of the profile URL's path (the part after `/in/`, with no trailing slash or query),
+   is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
    without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The query inside it is the one known to work today: if LinkedIn stops answering it,
    stop and report that; do not guess another.
@@ -239,8 +239,7 @@ Run these steps right after the send, for the Lead you just sent to:
 
 1. Run the script with the browser pane's `javascript_tool` from any linkedin.com page by sending one line as the
    whole script: `// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=<public identifier>`, where the
-   identifier is the Lead's public identifier (the last segment of the profile URL's path, the part after
-   `/in/`, with no trailing slash or query), without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script;
+   identifier is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query, without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script;
    never print, retype, paraphrase, reorder, shorten or extend it.
    Fallback, only when the gate refuses the directive: print the approved script without changing it,
 
@@ -249,7 +248,7 @@ Run these steps right after the send, for the Lead you just sent to:
    ```
 
    then run the printed script with the browser pane's `javascript_tool` from any linkedin.com page, changing
-   only the value on its first line to the Lead's public identifier, in quotes. Do not paraphrase, reorder,
+   only the value on its first line to the same identifier, in quotes. Do not paraphrase, reorder,
    shorten or extend it: the gate refuses anything else.
 2. If `signedIn` is false, the pane is not signed in to LinkedIn: stop and report it. If `state` is
    `error`, pass it anyway: Mosaico answers `send-evidence-malformed` and tells you to run it again. Its

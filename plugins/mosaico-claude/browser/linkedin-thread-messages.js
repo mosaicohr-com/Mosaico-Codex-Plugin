@@ -2,10 +2,14 @@ const PUBLIC_IDENTIFIER = "";
 // Mosaico Outreach: the conversation thread with one Lead, read from LinkedIn's own messaging data.
 // Approved capture script. The plugin's browser-script gate allows it only word for word, with the
 // first line's value changed to the Lead's public identifier (the part of the profile address after /in/).
-// Identifier forms (0.8.6): the first line's value is either a vanity (jane-doe) or an opaque member id (ACoAA...; matched by
+// Identifier forms (0.8.7): the first line's value is either a vanity (jane-doe) or an opaque member id (ACoAA...; matched by
 // ^ACoAA[A-Za-z0-9_-]+$, the id part of urn:li:fsd_profile:<id>). An opaque id builds the member URN directly
-// (urn:li:fsd_profile:<id>) and skips the vanity lookup, so no name is known and the search path is not used (the list path
-// runs; a miss then reads page-limit unless the list is exhausted). A vanity is looked up with the profile query: when the
+// (urn:li:fsd_profile:<id>) and is then looked up the way linkedin-connection-evidence.js does it: the profile query with the id
+// as its vanityName, accepted only when the id of the returned Profile's entityUrn equals the requested id. That Profile's first
+// and last name become the search keywords, so the search path runs before the list path exactly as for a vanity. When that
+// lookup fails (any error, or no matching Profile) no name is known: the search path is skipped (searchPagesRead 0), the list
+// path runs, and a miss then reads page-limit unless the list is exhausted. The lookup never ends the run by itself.
+// A vanity is looked up with the profile query: when the
 // response holds a Profile whose publicIdentifier equals the vanity (any case) that one is used; otherwise, when the response
 // holds exactly one Profile entity, it is taken as the redirect target (LinkedIn answers an old vanity with the person's new
 // one); any other answer is an error with errorStep "profile". Every output carries requestedIdentifier (the value as given),
@@ -118,6 +122,11 @@ try {
     if (OPAQUE_ID.test(PUBLIC_IDENTIFIER)) {
       leadUrn = "urn:li:fsd_profile:" + PUBLIC_IDENTIFIER;
       resolvedIdentifier = PUBLIC_IDENTIFIER;
+      try {
+        const byId = await getJson(API + "/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + PROFILE_QUERY_ID, NORMALIZED);
+        const own = listOf(byId && byId.included).filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e)) && memberUrn(e.entityUrn) === leadUrn);
+        if (own.length > 0) keywords = normalizeText([own[own.length - 1].firstName, own[own.length - 1].lastName].filter((n) => typeof n === "string").join(" ")).trim();
+      } catch (e) { keywords = ""; }
     } else {
       const profile = await getJson(API + "/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + PROFILE_QUERY_ID, NORMALIZED);
       const profiles = listOf(profile && profile.included).filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e)));

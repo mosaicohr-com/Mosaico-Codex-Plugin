@@ -115,7 +115,7 @@ def main() -> None:
     check("send-not-confirmed" in step2 and "retry the send once" in step2 and "outreach_record_delivery_block with reason cannot-message" in step2, "Sync data Step 2 does not say what to do on send-not-confirmed")
     check("verify delivery on LinkedIn" not in step2, "Sync data Step 2 still marks a follow-up from a screen check")
     check("browser/linkedin-sent-invitations.js" in sync.split("Step 1.")[0], "Sync data approved-scripts sentence does not name the sent-invitations script")
-    check("run the approved sent-invitations script with the Lead's public identifier" in step3 and "sentInvitationEvidence to outreach_mark_message_sent" in step3 and "fresh identityEvidence" in step3, "Sync data Step 3 does not confirm an invitation send from the sent-invitations script")
+    check("run the approved sent-invitations script with the Lead's script identifier" in step3 and "sentInvitationEvidence to outreach_mark_message_sent" in step3 and "fresh identityEvidence" in step3, "Sync data Step 3 does not confirm an invitation send from the sent-invitations script")
     check("run the approved connection-evidence script again" not in step3 and "sendEvidence" not in step3.replace("sentInvitationEvidence", ""), "Sync data Step 3 still passes the connection-evidence script as send evidence")
     check("cannot show a pending invitation" in step3, "Sync data Step 3 does not say why the Sent invitations list is used")
     check("send-not-confirmed" in step3 and "retry the send once" in step3 and "do not retype" in step3, "Sync data Step 3 does not say what to do on send-not-confirmed")
@@ -145,7 +145,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.6", f"{manifest.name} is not at 0.8.6")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.7", f"{manifest.name} is not at 0.8.7")
     print("PASS: both schedule-install skills describe the two schedules, qualified skill names, the post-send check and the stale-copy checks.")
 
 

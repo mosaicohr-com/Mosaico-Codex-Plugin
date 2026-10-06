@@ -104,6 +104,24 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.8.7
+
+- The thread script now searches by name for an opaque member id. For a first-line value that matches
+  `^ACoAA[A-Za-z0-9_-]+$` it builds the member URN as before, then looks the profile up by id the way the
+  connection-evidence script does (the profile query with the id as `vanityName`, accepted only when the returned
+  Profile's `entityUrn` carries the same id). That Profile's first and last name are used inside the page as the search
+  keywords and are never returned, so the search path runs before the list path exactly as for a vanity. Coverage rules
+  are unchanged. If the by-id lookup fails, no name is known: the script uses the list path only (`searchPagesRead` 0,
+  `lookup` `list` or `none`) and a miss reads `page-limit`, as in 0.8.6. The lookup alone never turns the result into
+  an error. Every other script is unchanged.
+- The follow-up-run, invite-run, mosaico-outreach and schedule-install skills say the first-line value for every
+  per-Lead script is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public
+  identifier, whatever Mosaico supplies), otherwise the part of the profile address after `/in/`. This lets the
+  application hand the scripts a member id for an old vanity LinkedIn no longer resolves. The directive form is
+  unchanged.
+- No run depends on 0.8.7: the directive and the fields are additive, so the Sync data and Source leads schedule
+  texts still say 0.8.1 or later. Update the plugin to get the name search for member ids.
+
 ### 0.8.6
 
 - The thread, connection-evidence and sent-invitations scripts accept an opaque member id as well as a vanity.
