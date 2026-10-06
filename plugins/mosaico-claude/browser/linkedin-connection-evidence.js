@@ -5,6 +5,16 @@ const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";
 // sent only to LinkedIn's own profile query, and never returned. The result carries only the fields
 // Mosaico's evidence parser reads (type, URN, public identifier, relationship state); names, headlines
 // and every other field are dropped before anything leaves the page.
+// Identifier forms (0.8.6): the first line's value is either a vanity (jane-doe) or an opaque member id (ACoAA...; matched by
+// ^ACoAA[A-Za-z0-9_-]+$, the id part of urn:li:fsd_profile:<id>). The profile query takes the value as its vanityName in both
+// cases (the Voyager document documents no URN form of this query; LinkedIn accepts a member id there). For an opaque id the
+// Profile entity is accepted only when the id of its entityUrn equals the requested id. For a vanity, the Profile entity whose
+// publicIdentifier equals the vanity (any case) is used; otherwise, when the response holds exactly one Profile entity, it is
+// taken as the redirect target (LinkedIn answers an old vanity with the person's new one); any other answer is an error.
+// Output (0.8.6): state "ok" or "error"; errorStep "profile" when state is "error" (null otherwise); requestedIdentifier (the value
+// as given), resolvedIdentifier (the response's publicIdentifier, or the opaque id) and memberUrn (urn:li:fsd_profile:<id>); all
+// three are null when the Profile was not resolved. status is the HTTP status LinkedIn answered, or 0 when the call itself failed.
+// On "error", entries is empty: the script never throws and never returns relationship entries it could not tie to the Profile.
 // Text normalisation (0.8.5; the application mirrors this rule): every free-text field that leaves the page is normalised with
 // normalizeText before it is hashed and returned, in this order: (1) Unicode NFC; (2) every space separator (U+00A0, U+1680,
 // U+2000-U+200A, U+202F, U+205F, U+3000) becomes a plain space; (3) zero-width characters (U+200B-U+200D, U+2060, U+FEFF) are
@@ -50,6 +60,14 @@ const reduceRelationship = (e) => {
   return out;
 };
 const reduceProfile = (e) => keep(e, ["$type", "publicIdentifier", "entityUrn"]);
+const OPAQUE_ID = /^ACoAA[A-Za-z0-9_-]+$/;
+const memberUrn = (v) => (typeof v === "string" && /^urn:li:fsd_profile:[A-Za-z0-9_-]+$/.test(v) ? v : null);
+const resolveProfile = (profiles, requested) => {
+  if (OPAQUE_ID.test(requested)) return profiles.find((e) => memberUrn(e.entityUrn) === "urn:li:fsd_profile:" + requested) || null;
+  const exact = profiles.filter((e) => typeof e.publicIdentifier === "string" && e.publicIdentifier.toLowerCase() === requested.toLowerCase());
+  if (exact.length > 0) return exact[exact.length - 1];
+  return profiles.length === 1 && typeof profiles[0].publicIdentifier === "string" ? profiles[0] : null;
+};
 const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1] || "";
 const capturedAt = new Date().toISOString();
 let status = 0;
@@ -58,12 +76,17 @@ try {
   const r = await fetch(ENDPOINT + "?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + QUERY_ID, { credentials: "include", headers: { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" } });
   status = r.status;
   if (r.ok) { const j = await r.json(); included = Array.isArray(j && j.included) ? j.included : []; }
-} catch (e) { status = 0; }
+} catch (e) { status = typeof e === "number" ? e : 0; included = []; }
+const resolved = status >= 200 && status < 300 ? resolveProfile(included.filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e))), PUBLIC_IDENTIFIER) : null;
+const leadUrn = resolved === null ? null : memberUrn(resolved.entityUrn);
 const entries = [];
-for (const e of included) {
-  if (!isObj(e)) continue;
-  if (/MemberRelationship$/.test(typeOf(e))) entries.push(reduceRelationship(e));
-  else if (e.publicIdentifier === PUBLIC_IDENTIFIER && /profile\.Profile$/.test(typeOf(e))) entries.push(reduceProfile(e));
+if (resolved !== null && leadUrn !== null) {
+  for (const e of included) {
+    if (!isObj(e)) continue;
+    if (/MemberRelationship$/.test(typeOf(e))) entries.push(reduceRelationship(e));
+    else if (e === resolved) entries.push(reduceProfile(e));
+  }
 }
-const payload = { status, signedIn: csrf !== "", capturedAt, profileIdentifier: PUBLIC_IDENTIFIER, entries };
+const ok = resolved !== null && leadUrn !== null;
+const payload = { status, signedIn: csrf !== "", capturedAt, state: ok ? "ok" : "error", errorStep: ok ? null : "profile", profileIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, resolvedIdentifier: ok ? (OPAQUE_ID.test(PUBLIC_IDENTIFIER) ? PUBLIC_IDENTIFIER : resolved.publicIdentifier) : null, memberUrn: ok ? leadUrn : null, entries };
 ({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

@@ -204,7 +204,7 @@ Run these steps in order for one Lead:
 2. Run the script with the browser pane's `javascript_tool` on any linkedin.com page by sending one line as the
    whole script: `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<public identifier>`, where the
    identifier is the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
-   without quotes. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
+   without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The queries inside it are the ones known to work today: if LinkedIn stops
    answering them, stop and report that; do not guess others.
    Fallback, only when the gate refuses the directive: print the approved script without changing it,
@@ -217,12 +217,14 @@ Run these steps in order for one Lead:
    only the value on its first line to the Lead's public identifier, in quotes. Do not paraphrase, reorder,
    shorten or extend it: the gate refuses anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the step and report it. If `status`
-   is not 200 or `state` is `error`, the script could not read the thread: use the by-eye fallback below for
-   this Lead.
+   is not 200 or `state` is `error`, the script could not read the thread: its `errorStep` (`me`, `profile`,
+   `conversations` or `messages`) and `status` say why, so name them in the report for this Lead, then use the
+   by-eye fallback below.
 5. Judge the outcome of the Lead's latest message with **Judge the Lead's latest message** below.
 6. Straight away (the capture is refused when it is more than 10 minutes old), call
    `outreach_deposit_conversation` with `threadEvidence` (the script output exactly as returned, `integrity`
-   included, `coverage` and `pagesRead` too), `identityEvidence`, `runId`, `personName`, `publicLinkedInUrl`
+   included, `coverage`, `pagesRead`, `requestedIdentifier`, `resolvedIdentifier` and `memberUrn` too, all
+   unchanged), `identityEvidence`, `runId`, `personName`, `publicLinkedInUrl`
    (the Lead's profile URL) and `outcome`. Never pass `messages` with it; Mosaico ignores them.
 7. Report Mosaico's answer in plain words:
    - stored, with its `threadStatus`, the outcome it recorded and any `draftsDiscarded` (count them for the
@@ -304,7 +306,7 @@ Run these steps in order for one Lead:
 3. Run the script with the browser pane's `javascript_tool` by sending one line as the whole script:
    `// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<public identifier>`, where the identifier
    is the last segment of the profile URL's path (the part after `/in/`, with no trailing slash or query),
-   without quotes. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
+   without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The query inside it is the one known to work today: if LinkedIn stops answering it,
    stop and report that; do not guess another.
    Fallback, only when the gate refuses the directive: print the approved script without changing it,
@@ -317,10 +319,11 @@ Run these steps in order for one Lead:
    line to that last segment, in quotes. Do not paraphrase, reorder, shorten or extend it: the gate refuses
    anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the capture and report it. If
-   `status` is not 200 or `entries` is empty, stop: leave the Lead unverified, list it as skipped and
-   continue with the next Lead.
+   `status` is not 200, `state` is `error` or `entries` is empty, stop: leave the Lead unverified, list it as
+   skipped with the script's `errorStep` and `status` (they say why) and continue with the next Lead.
 5. Call `outreach_record_connection_evidence` with the script's whole output exactly as returned
-   (`status`, `signedIn`, `capturedAt`, `profileIdentifier`, `entries` and `integrity`), plus `profileUrl`
+   (`status`, `signedIn`, `capturedAt`, `state`, `errorStep`, `profileIdentifier`, `requestedIdentifier`,
+   `resolvedIdentifier`, `memberUrn`, `entries` and `integrity`; none of them changed), plus `profileUrl`
    (the Lead's `linkedInProfileUrl`), `leadId`, the `runId` and the identity evidence (`identityEvidence`
    from the whoami script, or `observedLinkedInProfile`). Report Mosaico's answer in plain words: connected, invite-pending,
    not-connected, or the blocker it returned. If Mosaico refused or the capture gave it nothing usable,

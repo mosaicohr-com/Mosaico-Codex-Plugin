@@ -145,7 +145,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.5", f"{manifest.name} is not at 0.8.5")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.6", f"{manifest.name} is not at 0.8.6")
     print("PASS: both schedule-install skills describe the two schedules, qualified skill names, the post-send check and the stale-copy checks.")
 
 

@@ -80,7 +80,7 @@ def main() -> None:
         "`follow-up-declined`", "`follow-up-awaiting-reply`", "`follow-up-thread-unread`", "`awaiting-reply`", "`connection-accepted-no-reply`",
         "`repair_drafts`", "`repairSuggestions`", "`draftsDiscarded: [{ messageId, reason }]`", "Before drafting anything new",
         "never work around it", "`recapture`", "exactly as returned", "`integrity` included", "never retyped, trimmed, reformatted, translated or \"fixed\"",
-        "`evidence-altered`", "(`status`, `signedIn`, `capturedAt`, `profileIdentifier`, `entries` and `integrity`)", "`{elements, entries, integrity}`",
+        "`evidence-altered`", "(`status`, `signedIn`, `capturedAt`, `state`, `errorStep`, `profileIdentifier`, `requestedIdentifier`, `resolvedIdentifier`, `memberUrn`, `entries` and `integrity`; none of them changed)", "`{elements, entries, integrity}`",
         "how many drafts Mosaico discarded",
     ):
         check(needle in whole_claude, f"Claude follow-up-run skill lacks: {needle}")
@@ -92,7 +92,14 @@ def main() -> None:
         text = flat((CLAUDE / f"skills/{name}/SKILL.md").read_text(encoding="utf-8"))
         check("exactly as returned" in text and "`integrity`" in text and "`evidence-altered`" in text, f"Claude {name} skill does not say to pass script output exactly as returned")
     invite = flat((CLAUDE / "skills/mosaico-outreach-invite-run/SKILL.md").read_text(encoding="utf-8"))
-    check("(`status`, `signedIn`, `capturedAt`, `profileIdentifier`, `entries` and `integrity`)" in invite and "`recapture`" in invite, "Claude invite-run does not pass the whole connection evidence")
+    check("(`status`, `signedIn`, `capturedAt`, `state`, `errorStep`, `profileIdentifier`, `requestedIdentifier`, `resolvedIdentifier`, `memberUrn`, `entries` and `integrity`; none of them changed)" in invite and "`recapture`" in invite, "Claude invite-run does not pass the whole connection evidence")
+
+    # 0.8.6: the first-line value is whatever follows /in/ (a name or an ACoAA... id), and the new identifier fields travel unchanged.
+    for name in ("mosaico-outreach-follow-up-run", "mosaico-outreach-invite-run"):
+        text = flat((CLAUDE / f"skills/{name}/SKILL.md").read_text(encoding="utf-8"))
+        check("whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`" in text, f"Claude {name} does not say the identifier may be a name or an ACoAA id")
+        check("`requestedIdentifier`" in text and "`resolvedIdentifier`" in text and "`memberUrn`" in text, f"Claude {name} does not pass the identifier fields on")
+        check("`errorStep`" in text, f"Claude {name} does not name errorStep")
 
     codex_thread = flat(section(codex, "Capture the thread"))
     for needle in (
@@ -122,9 +129,9 @@ def main() -> None:
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.5", f"{manifest.name} is not at 0.8.5")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.6", f"{manifest.name} is not at 0.8.6")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    check("### 0.7.0" in readme and readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
+    check("### 0.7.0" in readme and readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
     entry = flat(readme[readme.index("### 0.8.1") : readme.index("### 0.8.0")])
     for needle in ("up to 8 pages", "`coverage`", "`outcome`", "no-pressure", "awaiting", "`draftsDiscarded`", "`repair_drafts`", "`integrity`", "`evidence-altered`"):
@@ -138,7 +145,7 @@ def main() -> None:
     skill = flat(claude)
     check("messaging search by the Lead's name" in skill and "primary-inbox conversation list" in skill and "Other tab are not paged" in skill and "`lookup`" in skill,
           "the Claude follow-up skill does not describe the name search and the paged primary-inbox fallback")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.8.5.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.8.6.")
 
 
 if __name__ == "__main__":
