@@ -90,7 +90,7 @@ of any cookie or session export:
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
 - `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead by LinkedIn's messaging search on the Lead's name (up to 3 pages, names used only in the page) and, when that finds nothing, by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead` and `searchPagesRead`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
-- Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
+- Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces, object keys whose value is null or undefined omitted at every depth; array items stay) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the first line's value may change), expands a one-line run
@@ -104,6 +104,16 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.1
+
+- The integrity seal is computed over the null-free canonical form. The claude.ai connector drops null-valued
+  keys from tool arguments in transit, so a capture sealed over a form that kept nulls could never verify. In
+  all five approved scripts `canonical()` now omits object keys whose value is null or undefined at every
+  depth; array items stay, and a null item stays as `null`. The returned payload itself is unchanged (nulls are
+  still present in the output), the digest helpers are still identical text in all five scripts, and the
+  header sentence says "over the canonical JSON with null-valued keys omitted". The script gate is unaffected
+  (first lines unchanged). Mosaico verifies against the payload as received and against the null-free form.
 
 ### 0.9.0
 

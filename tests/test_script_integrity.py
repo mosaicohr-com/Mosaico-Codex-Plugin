@@ -2,8 +2,9 @@
 """Every approved browser script seals what it returns with an integrity digest Mosaico can recompute.
 
 Each script is run under node against a fake page and a fake LinkedIn: no network, no real cookie. The digest is
-FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces) of the returned payload without
-its `integrity` field. The check below recomputes it with an independent Python implementation. Skipped (and says
+FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces, object keys whose value is null
+or undefined omitted at every depth, array items kept) of the returned payload without its `integrity` field.
+The omission matters because the claude.ai connector drops null-valued keys in transit. The check below recomputes it with an independent Python implementation. Skipped (and says
 so) when node is not installed.
 """
 
@@ -106,7 +107,10 @@ const helpers = src.filter((l) => /^const (isObj|canonical|fnv1a32) = /.test(l))
 const { canonical, fnv1a32 } = new Function(helpers + '\nreturn { canonical, fnv1a32 };')();
 const payload = { status: 200, signedIn: true, text: 'hi​there é 😀', urn: 'urn:li:fsd_profile:ABC_def-123', n: [1, null, 2.5], z: { b: false, a: null } };
 console.log(JSON.stringify({ text: canonical(payload), digest: fnv1a32(canonical(payload)), empty: fnv1a32(''), a: fnv1a32('a'), foobar: fnv1a32('foobar'),
-  undef: canonical({ a: undefined, b: [undefined, 1] }) }));
+  undef: canonical({ a: undefined, b: [undefined, 1] }),
+  nullFree: canonical({ a: null, b: [null, { c: null, d: 1 }], e: { f: null }, g: 0 }),
+  withNulls: fnv1a32(canonical({ x: 1, y: { z: null }, w: null, l: [null] })), withoutNulls: fnv1a32(canonical({ x: 1, y: {}, l: [null] })),
+  changed: fnv1a32(canonical({ x: 2, y: {}, l: [null] })) }));
 """
 
 
@@ -122,8 +126,17 @@ def fnv1a32(data: bytes) -> str:
     return f"{h:08x}"
 
 
+def null_free(value: object) -> object:
+    """Drops object keys whose value is null at every depth; array items (null ones included) stay."""
+    if isinstance(value, dict):
+        return {k: null_free(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [null_free(v) for v in value]
+    return value
+
+
 def canonical(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(null_free(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def digest_of(record: dict) -> str:
@@ -151,17 +164,23 @@ def main() -> None:
 
     # The golden vector, run through the helper text each script carries.
     expected_text = ('{"n":[1,null,2.5],"signedIn":true,"status":200,"text":"hi​there é \U0001f600",'
-                     '"urn":"urn:li:fsd_profile:ABC_def-123","z":{"a":null,"b":false}}')
+                     '"urn":"urn:li:fsd_profile:ABC_def-123","z":{"b":false}}')
     check(fnv1a32(b"") == "811c9dc5" and fnv1a32(b"a") == "e40c292c" and fnv1a32(b"foobar") == "bf9cf968", "the Python FNV-1a does not match the standard vectors")
-    check(fnv1a32(expected_text.encode("utf-8")) == "5325bec9", "the golden vector's digest is not 5325bec9")
+    check(fnv1a32(expected_text.encode("utf-8")) == "aa3bbe69", "the golden vector's digest is not aa3bbe69")
     helper_texts = set()
     for name in SCRIPTS.values():
         done = subprocess.run([node, "-e", GOLDEN, str(BROWSER / name)], capture_output=True, text=True, encoding="utf-8", check=False)
         check(done.returncode == 0, f"{name}: golden snippet failed: {done.stderr[-300:]}")
         golden = json.loads(done.stdout)
-        check(golden["text"] == expected_text and golden["digest"] == "5325bec9", f"{name}: golden vector differs ({golden['digest']})")
+        check(golden["text"] == expected_text and golden["digest"] == "aa3bbe69", f"{name}: golden vector differs ({golden['digest']})")
         check((golden["empty"], golden["a"], golden["foobar"]) == ("811c9dc5", "e40c292c", "bf9cf968"), f"{name}: FNV-1a standard vectors differ")
         check(golden["undef"] == '{"b":[null,1]}', f"{name}: undefined is not dropped from objects and nulled in arrays")
+        check(golden["nullFree"] == '{"b":[null,{"d":1}],"e":{},"g":0}', f"{name}: null-valued keys are not omitted at every depth, or array items changed ({golden['nullFree']})")
+        check(golden["withNulls"] == golden["withoutNulls"], f"{name}: a payload with and without its null keys gives different digests")
+        check(golden["withNulls"] != golden["changed"], f"{name}: a changed value gives the same digest")
+        check(golden["withNulls"] == fnv1a32(canonical({"x": 1, "y": {"z": None}, "w": None, "l": [None]}).encode("utf-8")), f"{name}: digest differs from the Python mirror")
+        header = (BROWSER / name).read_text(encoding="utf-8")
+        check("the canonical JSON (keys sorted, no spaces, with null-valued keys omitted) of everything else" in header, f"{name}: header integrity sentence not updated")
         lines = (BROWSER / name).read_text(encoding="utf-8").split("\n")
         helper_texts.add("\n".join(line for line in lines if line.startswith(("const canonical = ", "const fnv1a32 = "))))
     check(len(helper_texts) == 1 and next(iter(helper_texts)).count("\n") == 1, "the digest helpers are not identical text in all five scripts")
