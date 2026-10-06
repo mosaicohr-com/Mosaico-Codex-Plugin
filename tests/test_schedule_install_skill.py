@@ -99,8 +99,10 @@ def main() -> None:
     source = claude[claude.index("Mosaico Outreach — Source leads") : claude.index("**Mosaico Outreach — Repair**")]
     repair = claude[claude.index("**Mosaico Outreach — Repair**") : claude.index("## Keep the schedules apart")]
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
-    check("0.8.1 or later" in sync and "0.8.0 or later" not in sync, "Sync data schedule text does not require plugin 0.8.1")
+    check("0.9.2 or later" in sync and "0.8.1 or later" not in sync, "Sync data schedule text does not require plugin 0.9.2 (the thread directive carries the Lead name)")
     flat_sync = " ".join(sync.split())
+    for name, text in (("Sync data", sync), ("Repair", repair)):
+        check("LEAD_NAME=<" in text and "PUBLIC_IDENTIFIER=<scriptIdentifier>" in text, f"{name} schedule text does not give the thread directive with the Lead's name")
     for needle in (
         "outcome of the Lead's latest message (declined, interested or neutral)",
         "a no ends the Lead",
@@ -141,7 +143,7 @@ def main() -> None:
     flat_repair = " ".join(repair.split())
     check("`0 10 * * 0`" in repair and "Sunday at 10:00 AM" in repair, "Repair schedule is not weekly Sunday 10:00 (cron 0 10 * * 0)")
     check("also whenever the person asks for it" in flat_repair, "Repair schedule is not also available on demand")
-    check("mosaico:mosaico-outreach-repair-run" in repair and "0.9.0 or later" in repair, "Repair schedule text does not use the qualified repair-run skill, 0.9.0 or later")
+    check("mosaico:mosaico-outreach-repair-run" in repair and "0.9.2 or later" in repair, "Repair schedule text does not use the qualified repair-run skill, 0.9.2 or later")
     for needle in (
         "intent repair", "outreach_get_repair_queue", "recommendedCall", "in the order Mosaico gives them", "supplyAlso",
         "// mosaico run <script>.js <PLACEHOLDER>=<value>", "scriptIdentifier", "capture_connections", "outreach_record_connections_snapshot",
@@ -184,7 +186,7 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.1", f"{manifest.name} is not at 0.9.1")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.2", f"{manifest.name} is not at 0.9.2")
     print("PASS: both schedule-install skills describe the three schedules (Sync data, Source leads, Repair), qualified skill names, the post-send check and the stale-copy checks.")
 
 

@@ -201,8 +201,11 @@ Lead's name (inbox, spam and archive; up to 3 pages) and, when that finds nothin
 conversation list with LinkedIn's own paged query (up to 8 pages, about 160 conversations; message requests
 and the Other tab are not paged), and returns the participants' member ids and the messages oldest
 first, each with only its delivery time, its sender and its text, plus `coverage` (`complete` or
-`page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead`, `searchPagesRead` and the `integrity` seal. The
-name is used only inside the page as the search keywords; names and every other field are dropped. It runs in
+`page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead`, `searchPagesRead` and the `integrity` seal. When the
+Lead's stored identifier is out of date (an old vanity, or an id LinkedIn no longer matches), it finds the conversation
+by the Lead's name among the search results instead, and says so: `matchBasis` is `identifier` or `name`, with the
+matched person's `memberUrn`, `resolvedIdentifier` and `displayName`, and the `requestedName` it was given. Mosaico checks
+that match itself. Every other field is dropped. It runs in
 Claude's built-in browser pane only: the Chrome extension cannot run it, and Codex cannot either.
 
 Run these steps in order for one Lead:
@@ -211,8 +214,8 @@ Run these steps in order for one Lead:
    `identityEvidence` for the deposit. It goes stale: when the output you hold is older than 8 minutes,
    run it again.
 2. Run the script with the browser pane's `javascript_tool` on any linkedin.com page by sending one line as the
-   whole script: `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<public identifier>`, where the
-   identifier is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
+   whole script: `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<public identifier> LEAD_NAME=<the Lead's name>`, where the
+   Lead's name is the name Mosaico holds for the Lead, as it reads, without quotes (leave out any double quote or backslash in it), and the identifier is the Lead's `scriptIdentifier` from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`, with no trailing slash or query,
    without quotes. This is whatever stands there: a name such as `jane-doe`, or an id that starts with `ACoAA`. Use it as it is; do not look the Lead up or swap one for the other. The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder,
    shorten or extend it. The queries inside it are the ones known to work today: if LinkedIn stops
    answering them, stop and report that; do not guess others.
@@ -223,7 +226,7 @@ Run these steps in order for one Lead:
    ```
 
    then run the printed script with the browser pane's `javascript_tool` on any linkedin.com page, changing
-   only the value on its first line to the same identifier, in quotes. Do not paraphrase, reorder,
+   only the value on its first line to the same identifier, in quotes, and the value on its second line to the Lead's name, in quotes. Do not paraphrase, reorder,
    shorten or extend it: the gate refuses anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the step and report it. If `status`
    is not 200 or `state` is `error`, the script could not read the thread: its `errorStep` (`me`, `profile`,
@@ -232,8 +235,8 @@ Run these steps in order for one Lead:
 5. Judge the outcome of the Lead's latest message with **Judge the Lead's latest message** below.
 6. Straight away (the capture is refused when it is more than 10 minutes old), call
    `outreach_deposit_conversation` with `threadEvidence` (the script output exactly as returned, `integrity`
-   included, `coverage`, `pagesRead`, `requestedIdentifier`, `resolvedIdentifier` and `memberUrn` too, all
-   unchanged), `identityEvidence`, `runId`, `personName`, `publicLinkedInUrl`
+   included, `coverage`, `pagesRead`, `requestedIdentifier`, `requestedName`, `resolvedIdentifier`, `memberUrn`,
+   `matchBasis` and `displayName` too, all unchanged), `identityEvidence`, `runId`, `personName`, `publicLinkedInUrl`
    (the Lead's profile URL) and `outcome`. Never pass `messages` with it; Mosaico ignores them.
 7. Report Mosaico's answer in plain words:
    - stored, with its `threadStatus`, the outcome it recorded and any `draftsDiscarded` (count them for the
@@ -328,8 +331,10 @@ Run these steps in order for one Lead:
    line to that last segment, in quotes. Do not paraphrase, reorder, shorten or extend it: the gate refuses
    anything else.
 4. If `signedIn` is false, the pane is not signed in to LinkedIn: stop the capture and report it. If
-   `status` is not 200, `state` is `error` or `entries` is empty, stop: leave the Lead unverified, list it as
-   skipped with the script's `errorStep` and `status` (they say why) and continue with the next Lead.
+   `status` is not 200, `state` is `error` or `entries` is empty, the script could not read the profile: still
+   do step 5 with its output exactly as returned, so Mosaico records the failure against the Lead (it stops
+   handing a Lead out after the same failure twice). Then leave the Lead unverified, list it as skipped with
+   the script's `errorStep` and `status` (they say why) and continue with the next Lead.
 5. Call `outreach_record_connection_evidence` with the script's whole output exactly as returned
    (`status`, `signedIn`, `capturedAt`, `state`, `errorStep`, `profileIdentifier`, `requestedIdentifier`,
    `resolvedIdentifier`, `memberUrn`, `entries` and `integrity`; none of them changed), plus `profileUrl`

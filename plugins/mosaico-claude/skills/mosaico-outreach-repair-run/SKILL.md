@@ -73,10 +73,12 @@ group you prefer, or attempt the same `itemId` twice in one run. What each `acti
   `// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<scriptIdentifier>` as the whole
   script), then call `outreach_record_connection_evidence` with the item's arguments, the script's output
   exactly as returned and fresh `identityEvidence`. Never read a Message, Connect or Pending button, never
-  compare names and never set the connection yourself. If the capture is unusable, leave the Lead
+  compare names and never set the connection yourself. If the capture is unusable (the script returns an
+  `errorStep` and no entries), still pass its output exactly as returned to `outreach_record_connection_evidence`:
+  Mosaico records the failure against the Lead and, after a second one, stops listing the Lead. Leave the Lead
   unverified, list it as skipped with the script's `errorStep` and continue.
 - `read_thread` and `repair_drafts`: run **Capture the thread** from the mosaico:mosaico-outreach-follow-up-run
-  skill with `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier>`, judge the
+  skill with `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<personName>`, judge the
   outcome of the Lead's latest message under **Judge the Lead's latest message** in that skill, then call
   `outreach_deposit_conversation` with the item's arguments, the script's output exactly as returned as
   `threadEvidence`, fresh `identityEvidence`, the `runId` and the `outcome`. The outcome is required
@@ -92,7 +94,7 @@ consequence.
 
 Every script is run by sending the browser pane's `javascript_tool` its one-line directive,
 `// mosaico run <script>.js <PLACEHOLDER>=<value>`, as the whole script. The value for a per-Lead script is
-the item's `scriptIdentifier` (a member id or a public identifier, whatever Mosaico supplies). Never retype
+the item's `scriptIdentifier` (a member id or a public identifier, whatever Mosaico supplies); the thread script also takes the item's `personName` as `LEAD_NAME`. Never retype
 a script. Only when the gate refuses the directive, use the fallback the mosaico:mosaico-outreach-follow-up-run
 skill gives for that script. Every script's output goes to Mosaico exactly as returned, every field
 including `integrity`; if Mosaico answers `evidence-altered`, run the script again once and pass the new
@@ -109,7 +111,9 @@ past the cap.
 
 Stop only when `completion.mustContinue` is false: `stopReason` `run-cap-reached`, `queue-empty` or
 `end-of-queue`, or on a run-level blocker. Items that need a person (`summary.needsPerson`: no profile
-address to open) are never listed; count them in the report.
+address to open, a thread Mosaico found no conversation for twice, or a profile capture that failed twice)
+are never listed, and Mosaico flags each one in To sort with a plain note; count them in the report with their
+`cause` and never try them again yourself.
 
 ## Report
 

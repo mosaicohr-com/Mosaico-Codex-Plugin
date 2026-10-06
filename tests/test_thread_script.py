@@ -23,9 +23,9 @@ const SRC = fs.readFileSync(process.argv[1], 'utf8');
 const OWNER = 'urn:li:fsd_profile:OWNERID1', LEAD = 'urn:li:fsd_profile:LEADID01', OTHER = 'urn:li:fsd_profile:OTHERID1';
 const CONV = 'urn:li:msg_conversation:(urn:li:fsd_profile:OWNERID1,2-ABC==)';
 const TOKEN = 'ajax:SECRET-TOKEN';
-async function run(id, routes, cookie = 'JSESSIONID="' + TOKEN + '"') {
+async function run(id, routes, cookie = 'JSESSIONID="' + TOKEN + '"', name = '') {
   const calls = [];
-  const body = SRC.replace('const PUBLIC_IDENTIFIER = "";', 'const PUBLIC_IDENTIFIER = ' + JSON.stringify(id) + ';');
+  const body = SRC.replace('const PUBLIC_IDENTIFIER = "";', 'const PUBLIC_IDENTIFIER = ' + JSON.stringify(id) + ';').replace('const LEAD_NAME = "";', 'const LEAD_NAME = ' + JSON.stringify(name) + ';');
   const wrapped = new AsyncFunction('document', 'fetch', '(async () => {})();' + 'return await (async () => {' + body.replace(/\n\(\{/, '\nreturn ({') + '})();');
   const result = await wrapped({ cookie }, async (url, init) => { calls.push({ url, init }); return routes(url, init); });
   return { result, calls };
@@ -47,10 +47,11 @@ const FIRST_ID = 'messengerConversations.0d5e6781bbee71c3e51c8843c6519f48', PAGE
 // collection (default) or as paging.cursor (options.cursorStyle 'paging'). options.searchFail answers 500.
 const route = (conversations, messages, options = {}) => (url) => {
   if (url.includes('/voyager/api/me')) return me;
-  if (url.includes('voyagerIdentityDashProfiles')) return options.profileResponse !== undefined ? options.profileResponse : options.names !== undefined ? profileWith(options.names) : profile;
+  if (url.includes('voyagerIdentityDashProfiles')) return typeof options.profileResponse === 'function' ? options.profileResponse(decodeURIComponent(url)) : options.profileResponse !== undefined ? options.profileResponse : options.names !== undefined ? profileWith(options.names) : profile;
   if (url.includes('queryId=' + SEARCH_ID)) {
     if (options.searchFail) return bad(500);
-    const list = options.search || [];
+    const words = /keywords:([^)]*)\)$/.exec(url);
+    const list = options.searchBy ? options.searchBy(words ? decodeURIComponent(words[1]) : '') : options.search || [];
     const c = /nextCursor:([^,]+),keywords/.exec(url);
     const offset = c ? Number(Buffer.from(decodeURIComponent(c[1]), 'base64').toString().split('&')[1]) : 0;
     const node = { elements: list.slice(offset, offset + 20) };
@@ -208,6 +209,66 @@ const elsewhere = { entityUrn: 'urn:li:msg_conversation:(x,E)', conversationPart
   out.profileFails = (await run('jane-doe-old', route([one], [], { profileResponse: bad(429) }))).result;
   // An exact vanity (any case) among several Profiles is the one used.
   out.exactAmongMany = (await run('jane-doe', route([one], [message(1000, 'hi', OWNER)], { profileResponse: ok({ included: [{ $type: P, publicIdentifier: 'other', entityUrn: OTHER }, { $type: P, publicIdentifier: 'Jane-Doe', entityUrn: LEAD }] }) }))).result;
+  // Name fallback (0.9.2). The Lead's name is the second value; the search keywords are the profile's names, then the Lead's name.
+  const memberNamed = (urn, first, last) => ({ entityUrn: CONV, conversationParticipants: [
+    { hostIdentityUrn: OWNER, participantType: { member: { firstName: { text: 'Owner' }, lastName: { text: 'Person' } } } },
+    { hostIdentityUrn: urn, participantType: { member: { firstName: { text: first }, lastName: { text: last } } } },
+  ], lastActivityAt: 5 });
+  const LENA_ID = 'ACoAAC9new_Lena', LENA_URN = 'urn:li:fsd_profile:' + LENA_ID;
+  const lena = memberNamed(LENA_URN, 'Lena', 'Brook - The Money Coach and Trading Mentor');
+  const nothing = ok({ included: [] });
+  // The stored vanity resolves nothing: the name is the keyword, the search finds her, and her public identifier is read by her id.
+  const lenaById = (url) => (url.includes('vanityName:' + LENA_ID) ? ok({ included: [{ $type: P, publicIdentifier: 'lena-brook-3b1', entityUrn: LENA_URN, firstName: 'Lena' }] }) : nothing);
+  r = await run('lena-old', route([], [message(1000, 'hi', OWNER), message(2000, 'no thanks', LENA_URN)], { profileResponse: lenaById, search: [lena] }), undefined, 'Lena Brook');
+  out.nameByName = r.result; out.nameByNameUrls = strip(r); out.nameByNameRaw = raw(r);
+  // The identifier resolves, but to a member who is not in the conversation (a stale id): the profile's names are searched, the name matches.
+  const ZARA_URN = 'urn:li:fsd_profile:ACoAAD_zara_current';
+  r = await run(OPAQUE, route([], [message(1000, 'hi', OWNER)], { profileResponse: (url) => (url.includes('vanityName:ACoAAD_zara_current') ? nothing : byId({ firstName: 'Zara', lastName: 'Hill' })), search: [memberNamed(ZARA_URN, 'Zara', 'Hill')] }), undefined, 'Zara Hill');
+  out.nameStale = r.result; out.nameStaleUrls = strip(r);
+  // The name rule: case, diacritics and spaces folded; a suffix after the name is fine; another name is not.
+  const matches = async (leadName, first, last) => (await run('lena-old', route([], [message(1000, 'hi', OWNER)], { profileResponse: nothing, search: [memberNamed(LENA_URN, first, last)] }), undefined, leadName)).result;
+  out.rule = {
+    diacritics: await matches('Ren\u00e9e Dupr\u00e9', 'Renee', 'Dupre'),
+    decomposed: await matches('Renee Dupre', 'RENEE', 'Dupre\u0301'),
+    spaces: await matches('  Lena   Brook ', 'lena', ' Brook'),
+    comma: await matches('Ann Lee', 'Ann', 'Lee, MBA'),
+    pipe: await matches('Ann Lee', 'Ann', 'Lee | Coach'),
+    leadSuffix: await matches('Ann Lee - Coach', 'Ann', 'Lee'),
+    otherSuffix: await matches('Ann Lee | Coach', 'Ann', 'Lee - Mentor'),
+    longer: await matches('Ann Lee', 'Ann', 'Leeson'),
+    hyphen: await matches('Ann Lee', 'Ann', 'Lee-Smith'),
+    other: await matches('Lena Brook', 'Lena2', 'Brook'),
+    single: await matches('Ana', 'Ana', 'Souza'),
+    shorter: await matches('Ann Lee Jr', 'Ann', 'Lee'),
+    empty: await matches('', 'Lena', 'Brook'),
+  };
+  // A member-URN match beats a name match; two different people with the name are ambiguous and none is taken.
+  const IDENTIFIED = memberNamed(LEAD, 'Jane', 'Doe');
+  r = await run('jane-doe', route([], [message(1000, 'hi', OWNER)], { search: [lena, IDENTIFIED] }), undefined, 'Lena Brook');
+  out.urnBeatsName = r.result;
+  const second = { ...memberNamed('urn:li:fsd_profile:ACoAAE_other_lena', 'Lena', 'Brook'), entityUrn: 'urn:li:msg_conversation:(x,L2)' };
+  r = await run('lena-old', route([], [], { profileResponse: nothing, search: [lena, second] }), undefined, 'Lena Brook');
+  out.nameAmbiguous = r.result; out.nameAmbiguousUrls = strip(r);
+  r = await run('jane-doe', route([...fillers(5)], [], { search: [lena, second] }), undefined, 'Lena Brook');
+  out.nameAmbiguousKnown = r.result; out.nameAmbiguousKnownUrls = strip(r);
+  // The same person twice (two conversations with one member) is one person: the newer conversation is taken.
+  const older = { ...lena, entityUrn: 'urn:li:msg_conversation:(x,OLD)', lastActivityAt: 1 };
+  r = await run('lena-old', route([], [message(1000, 'hi', OWNER)], { profileResponse: nothing, search: [older, lena] }), undefined, 'Lena Brook');
+  out.nameSamePerson = r.result;
+  // The identifier resolves and the search finds a name match: the name is taken at once, and the list is not read.
+  r = await run('jane-doe', route([one], [message(1000, 'hi', OWNER)], { search: [lena] }), undefined, 'Lena Brook');
+  out.nameKnownIdentifier = r.result; out.nameKnownIdentifierUrls = strip(r);
+  // The name matches nobody and the identifier resolves nothing: an error at the profile step, as before, and no list is read.
+  r = await run('lena-old', route([one], [], { profileResponse: nothing, search: [memberNamed(LENA_URN, 'Someone', 'Else')] }), undefined, 'Lena Brook');
+  out.nameMiss = r.result; out.nameMissUrls = strip(r);
+  // The second keyword set: the profile's own names find nothing, the Lead's name does; the page budget is shared.
+  r = await run('jane-doe', route([], [message(1000, 'hi', OWNER)], { profileResponse: byId({}), searchBy: (words) => (words.includes('Lena') ? [lena] : []) }), undefined, 'Lena Brook');
+  out.nameSecondSearch = r.result;
+  r = await run(OPAQUE, route([], [message(1000, 'hi', OWNER)], { profileResponse: byId({ firstName: 'Lou', lastName: 'B' }), searchBy: (words) => (words.includes('Lena') ? [lena] : []) }), undefined, 'Lena Brook');
+  out.nameSecondSearchUrls = strip(r); out.nameSecondSearchOwn = r.result;
+  // A name never leaves the page in a call other than LinkedIn's own search keywords, and a failed search by id does not stop the name path.
+  r = await run('lena-old', route([], [message(1000, 'hi', OWNER)], { profileResponse: (url) => (url.includes('vanityName:' + LENA_ID) ? bad(500) : nothing), search: [lena] }), undefined, 'Lena Brook');
+  out.nameLookupFails = r.result;
   // The owner could not be read from /me.
   out.noOwner = (await run('jane-doe', (url) => (url.includes('/voyager/api/me') ? ok({ included: [] }) : route([one], [])(url)))).result;
   console.log(JSON.stringify(out));
@@ -251,7 +312,7 @@ def sealed_correctly(record: dict) -> bool:
 
 
 CONVERSATION = "urn:li:msg_conversation:(urn:li:fsd_profile:OWNERID1,2-ABC==)"
-KEYS = ["status", "signedIn", "capturedAt", "state", "errorStep", "source", "publicIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn",
+KEYS = ["status", "signedIn", "capturedAt", "state", "errorStep", "source", "publicIdentifier", "requestedIdentifier", "requestedName", "resolvedIdentifier", "memberUrn", "matchBasis", "displayName",
         "conversationUrn", "participants", "messages", "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"]
 FILLER_ACTIVITY = lambda i: 1000000 - i * 1000  # noqa: E731 - mirrors the harness
 
@@ -477,6 +538,62 @@ def main() -> None:
           "the exact vanity among several Profiles was not used")
     for name in ("opaque", "redirect", "twoProfiles", "noOwner"):
         check(sealed_correctly(out[name]), f"{name}: the new fields are not inside the digest")
+
+    # Name fallback (0.9.2).
+    LOUISE = "urn:li:fsd_profile:ACoAAC9new_Lena"
+    check(found["matchBasis"] == "identifier" and found["displayName"] is None and found["requestedName"] is None,
+          "an identifier match without a name must say matchBasis identifier, no displayName and no requestedName")
+    by_name = out["nameByName"]
+    check(by_name["state"] == "ok" and by_name["matchBasis"] == "name" and by_name["lookup"] == "search" and by_name["coverage"] == "complete",
+          f"a stale vanity with a name that matches the search result is not found by name: {by_name}")
+    check(by_name["requestedIdentifier"] == "lena-old" and by_name["publicIdentifier"] == "lena-old" and by_name["requestedName"] == "Lena Brook"
+          and by_name["memberUrn"] == LOUISE and by_name["displayName"] == "Lena Brook - The Money Coach and Trading Mentor"
+          and by_name["resolvedIdentifier"] == "lena-brook-3b1", f"the name match does not report who matched: {by_name}")
+    check(by_name["participants"] == ["urn:li:fsd_profile:OWNERID1", LOUISE] and [m["text"] for m in by_name["messages"]] == ["hi", "no thanks"]
+          and [m["senderUrn"] for m in by_name["messages"]] == ["urn:li:fsd_profile:OWNERID1", LOUISE], "the name match did not read the conversation")
+    urls = out["nameByNameUrls"]
+    check(len(conversation_urls(urls)) == 0 and len(search_urls(urls)) == 1 and sum("voyagerIdentityDashProfiles" in u for u in urls) == 2,
+          f"the name path made an unexpected set of calls (search once, profile twice, no list): {urls}")
+    check(search_urls(urls)[0].endswith(",keywords:Lena Brook)"), f"the name was not the search keyword: {search_urls(urls)[0]}")
+    check(all("Brook" not in u for u in urls if SEARCH_ID not in u), "the name travelled in a call other than the search")
+    stale = out["nameStale"]
+    check(stale["matchBasis"] == "name" and stale["memberUrn"] == "urn:li:fsd_profile:ACoAAD_zara_current" and stale["state"] == "ok"
+          and stale["resolvedIdentifier"] is None and stale["requestedIdentifier"] == "ACoAAB1x_y-Z" and stale["displayName"] == "Zara Hill" and stale["lookup"] == "search",
+          f"a stale member id is not found by name: {stale}")
+    check(len(conversation_urls(out["nameStaleUrls"])) == 0, "a name match still read the conversation list")
+    rule = out["rule"]
+    for key in ("diacritics", "decomposed", "spaces", "comma", "pipe", "leadSuffix", "otherSuffix"):
+        check(rule[key]["state"] == "ok" and rule[key]["matchBasis"] == "name", f"the name rule refused a name it should accept: {key}: {rule[key]['state']}")
+    for key in ("longer", "hyphen", "other", "single", "shorter", "empty"):
+        check(rule[key]["state"] == "error" and rule[key]["errorStep"] == "profile" and rule[key]["matchBasis"] is None and rule[key]["displayName"] is None,
+              f"the name rule accepted a name it should refuse: {key}: {rule[key]['state']}")
+    check(rule["diacritics"]["displayName"] == "Renee Dupre" and rule["spaces"]["requestedName"] == "Lena Brook" and rule["spaces"]["displayName"] == "lena Brook",
+          "names are not normalised for the evidence")
+    urn_wins = out["urnBeatsName"]
+    check(urn_wins["matchBasis"] == "identifier" and urn_wins["memberUrn"] == "urn:li:fsd_profile:LEADID01" and urn_wins["requestedName"] == "Lena Brook",
+          "a member-URN match did not beat a name match")
+    check(out["nameAmbiguous"]["state"] == "error" and out["nameAmbiguous"]["matchBasis"] is None and len(conversation_urls(out["nameAmbiguousUrls"])) == 0,
+          "two different people with the name were taken as one match, or the list was read with no member URN")
+    known = out["nameAmbiguousKnown"]
+    check(known["state"] == "no-conversation" and known["matchBasis"] is None and known["memberUrn"] == "urn:li:fsd_profile:LEADID01"
+          and known["coverage"] == "complete" and len(conversation_urls(out["nameAmbiguousKnownUrls"])) >= 1,
+          f"an ambiguous name did not leave the list path to run: {known['state']}")
+    check(out["nameSamePerson"]["matchBasis"] == "name" and out["nameSamePerson"]["conversationUrn"] == CONVERSATION,
+          "two conversations with one person were not taken as that person's newer one")
+    known_id = out["nameKnownIdentifier"]
+    check(known_id["matchBasis"] == "name" and known_id["memberUrn"] == LOUISE and known_id["lookup"] == "search" and len(conversation_urls(out["nameKnownIdentifierUrls"])) == 0,
+          "a resolved identifier with no member in the results did not fall back to the name")
+    check(out["nameMiss"]["state"] == "error" and out["nameMiss"]["errorStep"] == "profile" and len(conversation_urls(out["nameMissUrls"])) == 0
+          and out["nameMiss"]["messages"] == [] and out["nameMiss"]["matchBasis"] is None, "a name that matches nobody was not an error at the profile step")
+    check(out["nameSecondSearch"]["matchBasis"] == "name" and out["nameSecondSearch"]["searchPagesRead"] == 1, "the Lead's name was not searched when the profile had none")
+    check(out["nameSecondSearchOwn"]["matchBasis"] == "name" and out["nameSecondSearchOwn"]["searchPagesRead"] == 2
+          and len(search_urls(out["nameSecondSearchUrls"])) == 2, "the Lead's name was not searched after the profile's names found nothing")
+    check(out["nameLookupFails"]["state"] == "ok" and out["nameLookupFails"]["matchBasis"] == "name" and out["nameLookupFails"]["resolvedIdentifier"] is None,
+          "a failed lookup of the matched person stopped the name match")
+    for name in ("nameByName", "nameStale", "urnBeatsName", "nameAmbiguous", "nameKnownIdentifier", "nameMiss", "nameSamePerson"):
+        check(sealed_correctly(out[name]), f"{name}: the name fields are not inside the digest")
+    check(out["nameByName"]["integrity"]["digest"] == digest_of(out["nameByName"]) and "displayName" in out["nameByName"], "the digest does not cover the name evidence")
+    check(not any("cookie" in json.dumps(out[name]).lower() or "ajax:SECRET" in json.dumps(out[name]) for name in ("nameByName", "nameStale")), "a name result carries the session")
 
     # Text is normalised before it is hashed: NBSP and thin space become spaces, zero-width goes, CRLF becomes LF, control characters go,
     # runs of spaces collapse, line ends are trimmed, and the text is NFC. Emoji and the quotation survive.

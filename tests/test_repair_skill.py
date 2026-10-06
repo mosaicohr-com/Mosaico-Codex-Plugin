@@ -87,7 +87,7 @@ def main() -> None:
         "its `tool` and `arguments` unchanged",
         "attempt the same `itemId` twice",
         "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=<scriptIdentifier>",
-        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier>",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<personName>",
         "A decline found while reading a thread is recorded with `outcome: declined`",
         "flagged `history-mismatch` too",
         "exactly as returned, every field including `integrity`",
@@ -144,7 +144,7 @@ def main() -> None:
 
     # Both packages: the version, the changelog and the overview routes.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.1", f"{manifest.name} is not at 0.9.1")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.2", f"{manifest.name} is not at 0.9.2")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     entry = " ".join(readme[readme.index("### 0.9.0") : readme.index("### 0.8.7")].split())
     for needle in (

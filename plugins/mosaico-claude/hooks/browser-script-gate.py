@@ -6,10 +6,12 @@ extension's `javascript_tool`, alone or inside a `browser_batch`). It is the enf
 connection-evidence capability:
 
 * A script that is one of the approved capture scripts under `browser/`, word for word apart from the
-  value on its first line, is allowed.
-* A one-line directive, `// mosaico run <script>.js [<PLACEHOLDER>=<value>]`, as the whole script is expanded:
-  the hook rewrites the call's `text` to the approved script with its first line set, so a long script is
-  never retyped. Claude Code's PreToolUse contract: print `hookSpecificOutput` with `hookEventName`
+  values on its leading placeholder lines (the first line; for the thread script also the second, `LEAD_NAME`),
+  is allowed.
+* A one-line directive, `// mosaico run <script>.js [<PLACEHOLDER>=<value> ...]`, as the whole script is expanded:
+  the hook rewrites the call's `text` to the approved script with its placeholder lines set, so a long script is
+  never retyped. The thread script takes two: `PUBLIC_IDENTIFIER=<id> LEAD_NAME=<name>` (the name is the rest of the
+  line, so it may hold spaces). Claude Code's PreToolUse contract: print `hookSpecificOutput` with `hookEventName`
   "PreToolUse", `permissionDecision` "allow" and `updatedInput` (the complete replacement tool input) and
   exit 0. A malformed directive is refused.
 * Any other script that names LinkedIn, its API, its session or CSRF material, or reads a credential
@@ -32,8 +34,11 @@ from pathlib import Path
 APPROVED_DIR = Path(__file__).resolve().parent.parent / "browser"
 
 # First-line placeholders and the values a run may put in their place.
+# A name goes into a double-quoted string literal, so it may hold anything except a quote, a backslash or a control character.
+NAME_BODY = r'[^"\\\x00-\x1f\x7f-\x9f\u2028\u2029]'
 PLACEHOLDERS: dict[str, tuple[str, re.Pattern[str]]] = {
     "PUBLIC_IDENTIFIER": ('"PUBLIC_IDENTIFIER"', re.compile(r'^"[A-Za-z0-9._%-]{1,120}"$')),
+    "LEAD_NAME": ('"LEAD_NAME"', re.compile(r'^"' + NAME_BODY + r'{0,120}"$')),
     "STOP_AT": ("0", re.compile(r"^[0-9]{1,16}$")),
     "NOOP": ("0", re.compile(r"^0$")),
 }
@@ -56,20 +61,30 @@ def _normalise(text: str) -> list[str]:
     return [line.rstrip() for line in text.replace("\r\n", "\n").strip("\n").split("\n")]
 
 
-def _canonical(lines: list[str]) -> list[str] | None:
-    """`lines` with its first line's value replaced by the placeholder's canonical one, or None.
+def _leading_placeholders(lines: list[str]) -> list[tuple[str, str]]:
+    """The (name, value) of each consecutive leading `const NAME = value;` line whose NAME is a known placeholder."""
+    found: list[tuple[str, str]] = []
+    for line in lines:
+        head = FIRST_LINE.match(line)
+        if head is None or head.group("name") not in PLACEHOLDERS:
+            break
+        found.append((head.group("name"), head.group("value")))
+    return found
 
-    None means the first line is not a recognised placeholder or its value is not one a run may put there.
-    An approved script is held in this form too, so a template whose first line carries any placeholder
-    value (an empty identifier, a stop marker of 0) is the same script as a run's with a real value.
+
+def _canonical(lines: list[str]) -> list[str] | None:
+    """`lines` with each leading placeholder line's value replaced by the placeholder's canonical one, or None.
+
+    None means the first line is not a recognised placeholder or a placeholder value is not one a run may put there.
+    An approved script is held in this form too, so a template whose placeholder lines carry any placeholder
+    value (an empty identifier, a stop marker of 0) is the same script as a run's with real values.
     """
-    head = FIRST_LINE.match(lines[0]) if lines else None
-    if head is None:
+    leading = _leading_placeholders(lines)
+    if not leading:
         return None
-    placeholder = PLACEHOLDERS.get(head.group("name"))
-    if placeholder is None or not placeholder[1].match(head.group("value")):
+    if any(not PLACEHOLDERS[name][1].match(value) for name, value in leading):
         return None
-    return [f"const {head.group('name')} = {placeholder[0]};", *lines[1:]]
+    return [*(f"const {name} = {PLACEHOLDERS[name][0]};" for name, _ in leading), *lines[len(leading):]]
 
 
 def approved_scripts() -> dict[str, list[str]]:
@@ -78,11 +93,11 @@ def approved_scripts() -> dict[str, list[str]]:
     if APPROVED_DIR.is_dir():
         for path in sorted(APPROVED_DIR.glob("*.js")):
             lines = _normalise(path.read_text(encoding="utf-8"))
-            head = FIRST_LINE.match(lines[0]) if lines else None
-            placeholder = PLACEHOLDERS.get(head.group("name")) if head else None
-            # A template's own first-line value need not satisfy the run-time pattern (the thread script's is empty).
+            leading = _leading_placeholders(lines)
+            # A template's own placeholder values need not satisfy the run-time pattern (the thread script's are empty).
             scripts[path.name] = (
-                [f"const {head.group('name')} = {placeholder[0]};", *lines[1:]] if head and placeholder else lines
+                [*(f"const {name} = {PLACEHOLDERS[name][0]};" for name, _ in leading), *lines[len(leading):]]
+                if leading else lines
             )
     return scripts
 
@@ -131,26 +146,46 @@ def scripts_in(tool_name: str, tool_input: object) -> list[str] | None:
 
 
 DIRECTIVE_START = re.compile(r"^\s*//\s*mosaico\s+run\b", re.IGNORECASE)
-DIRECTIVE = re.compile(r"^// mosaico run (?P<script>[A-Za-z0-9._-]+\.js)(?: (?P<name>[A-Z_]+)=(?P<value>\S+))?$")
+DIRECTIVE = re.compile(r"^// mosaico run (?P<script>[A-Za-z0-9._-]+\.js)(?P<rest>(?: [A-Z_]+=.+)?)$")
+ASSIGNMENT = re.compile(r" (?P<name>[A-Z_]+)=")
+TOKEN = re.compile(r"\S+")
 IDENTIFIER = re.compile(r"^[A-Za-z0-9._%-]{1,120}$")
+LEAD_NAME_VALUE = re.compile(r"^" + NAME_BODY + r"{1,120}$")
+# The one placeholder whose value may hold spaces: it is the rest of the line, so it comes last.
+REST_OF_LINE = "LEAD_NAME"
 
 
-def _first_line_name(raw: str) -> str | None:
-    head = FIRST_LINE.match(raw.split("\n", 1)[0].rstrip())
-    return head.group("name") if head else None
+def _placeholder_names(raw: str) -> list[str]:
+    """The placeholders an approved script takes, in order: its consecutive leading placeholder lines."""
+    return [name for name, _ in _leading_placeholders(raw.replace("\r\n", "\n").split("\n"))]
+
+
+def _assignments(rest: str) -> list[tuple[str, str]] | None:
+    """`NAME=value` pairs of a directive's tail, or None when it is not made of them. A LEAD_NAME value runs to the line's end."""
+    found: list[tuple[str, str]] = []
+    while rest:
+        head = ASSIGNMENT.match(rest)
+        if head is None:
+            return None
+        rest = rest[head.end():]
+        if head.group("name") == REST_OF_LINE:
+            value, rest = rest, ""
+        else:
+            token = TOKEN.match(rest)
+            if token is None:
+                return None
+            value, rest = token.group(0), rest[token.end():]
+        found.append((head.group("name"), value))
+    return found
 
 
 def valid_directives(raw_scripts: dict[str, str]) -> str:
     """The directives a run may send, for the refusal message."""
     forms = []
+    meaning = {"PUBLIC_IDENTIFIER": "<public identifier>", "LEAD_NAME": "<name>", "STOP_AT": "<whole number>"}
     for name, raw in sorted(raw_scripts.items()):
-        placeholder = _first_line_name(raw)
-        if placeholder == "PUBLIC_IDENTIFIER":
-            forms.append(f"// mosaico run {name} PUBLIC_IDENTIFIER=<public identifier>")
-        elif placeholder == "STOP_AT":
-            forms.append(f"// mosaico run {name} STOP_AT=<whole number>")
-        else:
-            forms.append(f"// mosaico run {name}")
+        given = " ".join(f"{placeholder}={meaning[placeholder]}" for placeholder in _placeholder_names(raw) if placeholder in meaning)
+        forms.append(f"// mosaico run {name}" + (f" {given}" if given else ""))
     return "; ".join(forms) or "none installed"
 
 
@@ -161,7 +196,7 @@ def raw_approved_scripts() -> dict[str, str]:
 
 
 def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
-    """The approved script a valid directive stands for, its first line set; None when the directive is not valid."""
+    """The approved script a valid directive stands for, its placeholder lines set; None when the directive is not valid."""
     lines = script.replace("\r\n", "\n").strip("\n").split("\n")
     match = DIRECTIVE.match(lines[0].rstrip()) if len(lines) == 1 else None
     if match is None:
@@ -169,29 +204,37 @@ def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
     raw = raw_scripts.get(match.group("script"))
     if raw is None:
         return None
-    placeholder = _first_line_name(raw)
-    if placeholder is None or placeholder not in PLACEHOLDERS:
+    names = _placeholder_names(raw)
+    if not names:
         return None
-    assigned, value = match.group("name"), match.group("value")
-    if assigned is None:
-        head = FIRST_LINE.match(raw.split("\n", 1)[0].rstrip())
-        # No value: only a script whose own first line is a value a run may use (not an empty identifier).
-        if head is None or not PLACEHOLDERS[placeholder][1].match(head.group("value")):
+    given = _assignments(match.group("rest"))
+    raw_lines = raw.split("\n")
+    if given is None:
+        return None
+    if not given:
+        # No value: only a script whose own placeholder lines are all values a run may use (not an empty identifier).
+        leading = _leading_placeholders([line.rstrip() for line in raw_lines])
+        if any(not PLACEHOLDERS[name][1].match(value) for name, value in leading):
             return None
         return raw
-    if assigned != placeholder or placeholder == "NOOP":
+    # Every placeholder the script takes, in its order, exactly once; a name or a value that is not its own is refused.
+    if [name for name, _ in given] != names or "NOOP" in names:
         return None
-    if placeholder == "PUBLIC_IDENTIFIER":
-        bare = value[1:-1] if len(value) >= 2 and value[0] == value[-1] == '"' else value
-        if not IDENTIFIER.match(bare):
+    literals: list[str] = []
+    for placeholder, value in given:
+        quoted = len(value) >= 2 and value[0] == value[-1] == '"'
+        bare = value[1:-1] if quoted else value
+        if placeholder == "PUBLIC_IDENTIFIER":
+            if not IDENTIFIER.match(bare):
+                return None
+        elif placeholder == "LEAD_NAME":
+            if not LEAD_NAME_VALUE.match(bare) or bare != bare.strip():
+                return None
+        elif not PLACEHOLDERS[placeholder][1].match(value):
             return None
-        literal = f'"{bare}"'
-    else:
-        if not PLACEHOLDERS[placeholder][1].match(value):
-            return None
-        literal = value
-    rest = raw.split("\n", 1)[1] if "\n" in raw else ""
-    return f"const {placeholder} = {literal};\n{rest}" if "\n" in raw else f"const {placeholder} = {literal};"
+        literals.append(f'"{bare}"' if placeholder in ("PUBLIC_IDENTIFIER", "LEAD_NAME") else value)
+    head = [f"const {placeholder} = {literal};" for (placeholder, _), literal in zip(given, literals)]
+    return "\n".join([*head, *raw_lines[len(names):]])
 
 
 def evaluate(payload: object) -> tuple[bool, str, dict | None]:

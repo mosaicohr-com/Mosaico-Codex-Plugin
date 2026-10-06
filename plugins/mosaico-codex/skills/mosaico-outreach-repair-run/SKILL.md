@@ -33,7 +33,8 @@ Only Owners and Admins can use Outreach.
      `outreach_deposit_conversation`, fixes addresses and drops declined Leads with `outreach_update_lead`,
      links duplicate Leads with `outreach_link_duplicate_leads`, captures the connections list with
      `outreach_record_connections_snapshot`, and reports from `outreach_get_run`.
-   - For items in `summary.needsPerson` (a Lead with no profile address to open), a person adds the profile
+   - For items in `summary.needsPerson` (a Lead with no profile address to open, a thread Mosaico found no
+     conversation for twice, or a profile capture that failed twice), a person checks or adds the profile
      address in Outreach, To sort.
    - For a history-mismatch item, a person compares the stored sent Messages with the LinkedIn thread in
      Outreach, To sort, then clears the flag; the Repair routine only looks for a decline there.
