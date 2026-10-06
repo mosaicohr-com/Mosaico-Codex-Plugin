@@ -187,10 +187,12 @@ def main() -> None:
     # Thread: the new coverage fields sit before the seal; odd characters survive and are digested as UTF-8.
     thread = out["thread"]
     check(list(thread) == ["status", "signedIn", "capturedAt", "state", "source", "publicIdentifier", "conversationUrn", "participants", "messages",
-                           "coverage", "pagesRead", "integrity"], "thread keys changed")
+                           "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"], "thread keys changed")
     check(thread["state"] == "ok" and thread["coverage"] == "complete" and thread["pagesRead"] == 1, "thread coverage wrong")
-    check(thread["messages"][1]["text"] == out["odd"], "zero-width or non-BMP text changed")
-    check(out["threadFailed"]["coverage"] == "page-limit" and out["threadFailed"]["pagesRead"] == 0, "failed thread coverage wrong")
+    # 0.8.5: text is normalised before it is sealed (zero-width and control characters go), so the sealed text is the normalised one.
+    check(thread["messages"][1]["text"] == "hithere \u00e9 \U0001f600 \"q\" \\ x", f"non-BMP text lost or text not normalised: {thread['messages'][1]['text']!r}")
+    check(digest_of(thread) == thread["integrity"]["digest"], "the thread digest is not over the normalised text")
+    check(out["threadFailed"]["coverage"] == "page-limit" and out["threadFailed"]["pagesRead"] == 0 and out["threadFailed"]["searchPagesRead"] == 0 and out["threadFailed"]["lookup"] == "none", "failed thread coverage wrong")
 
     # Connections: every page is sealed on its own, and the whole result's digest covers the pages' seals.
     connections = out["connections"]

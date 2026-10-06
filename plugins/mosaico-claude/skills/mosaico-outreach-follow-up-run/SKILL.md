@@ -187,11 +187,13 @@ The capture is the plugin's thread script: one approved script, shipped at
 `browser/linkedin-thread-messages.js` inside the installed plugin, run through a one-line run directive in the signed-in
 LinkedIn page by the built-in browser pane, under the same rules as **Capture connection evidence**. It
 sends LinkedIn's own session and CSRF material to LinkedIn only and never returns it. It finds the
-one-to-one conversation between the signed-in account and the Lead by paging LinkedIn's primary-inbox
+one-to-one conversation between the signed-in account and the Lead, first by LinkedIn's own messaging search by the
+Lead's name (inbox, spam and archive; up to 3 pages) and, when that finds nothing, by paging LinkedIn's primary-inbox
 conversation list with LinkedIn's own paged query (up to 8 pages, about 160 conversations; message requests
-and the Other tab are not searched) and returns the participants' member ids and the messages oldest
+and the Other tab are not paged), and returns the participants' member ids and the messages oldest
 first, each with only its delivery time, its sender and its text, plus `coverage` (`complete` or
-`page-limit`), `pagesRead` and the `integrity` seal. Names and every other field are dropped. It runs in
+`page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead`, `searchPagesRead` and the `integrity` seal. The
+name is used only inside the page as the search keywords; names and every other field are dropped. It runs in
 Claude's built-in browser pane only: the Chrome extension cannot run it, and Codex cannot either.
 
 Run these steps in order for one Lead:
