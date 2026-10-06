@@ -38,6 +38,14 @@ def substituted(script: str, value: str) -> str:
     return f"const {name} = {value};\n{rest}"
 
 
+def named(script: str, value: str) -> str:
+    """`script` with its second line (the Lead's name placeholder) set to `value`."""
+    lines = script.split("\n")
+    assert lines[1].startswith("const LEAD_NAME = "), "the second line is not the LEAD_NAME placeholder"
+    lines[1] = f"const LEAD_NAME = {value};"
+    return "\n".join(lines)
+
+
 def check(condition: bool, message: str) -> None:
     if not condition:
         raise SystemExit(f"FAIL: {message}")
@@ -68,6 +76,18 @@ def main() -> None:
 
     # The thread script takes the Lead's public identifier on its first line, like the evidence script.
     check(THREAD.split("\n", 1)[0] == 'const PUBLIC_IDENTIFIER = "";', "thread script's first line changed")
+    # 0.9.2: the Lead's name is the second placeholder line, a quoted string that cannot hold a quote, a backslash or a control character.
+    check(THREAD.split("\n")[1] == 'const LEAD_NAME = "";', "thread script's second line is not the LEAD_NAME placeholder")
+    check(call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"Lena Brook"')})[0], "thread script with a name refused")
+    check(call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"Ren\u00e9e Dupr\u00e9 - Coach, MBA"') + "\n"})[0], "thread script with a name holding spaces, an accent and a suffix refused")
+    check(not call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"a\\" + document.cookie + \\""')})[0], "thread script with an unsafe name passed")
+    check(not call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"a\\\\"')})[0], "thread script with a name ending in a backslash passed")
+    check(not call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"' + "a" * 121 + '"')})[0], "thread script with an over-long name passed")
+    check(not call(TOOL, {"text": named(substituted(THREAD, '"x"'), "1")})[0], "thread script with a number as its name passed")
+    check(not call(TOOL, {"text": named(substituted(THREAD, '"x"'), '"x"').replace("const LEAD_NAME", "var LEAD_NAME")})[0], "thread script with its name line changed to var passed")
+    check(not call(TOOL, {"text": substituted(THREAD, '"x"').replace('const LEAD_NAME = "";\n', "")})[0], "thread script without its name line passed")
+    check(not call(TOOL, {"text": edited(substituted(THREAD, '"x"'), "function namesMatch", "function namesMatch2") if "function namesMatch" in THREAD else edited(substituted(THREAD, '"x"'), "const namesMatch = ", "const namesMatch2 = ")})[0], "thread script with a renamed name rule passed")
+    check(not call(TOOL, {"text": edited(substituted(THREAD, '"x"'), 'a.includes(" ") && b.startsWith(a)', 'b.startsWith(a)')})[0], "thread script with a looser name rule passed")
     check(call(TOOL, {"text": substituted(THREAD, '"jane-doe_42"')})[0], "thread script with identifier refused")
     check(call(CHROME_TOOL, {"text": substituted(THREAD, '"Jane-Doe%C3%A9"') + "\n"})[0], "thread script with encoded identifier or trailing newline refused")
     check(call("mcp__Claude_Browser__browser_batch", {"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "text": substituted(THREAD, '"x"')}}]})[0], "thread script in a batch refused")
@@ -78,6 +98,9 @@ def main() -> None:
     check(not call(TOOL, {"text": edited(THREAD, "messengerMessages.5846eeb71c981f11e0134cb6626cc314", "messengerMessages.00000000000000000000000000000000")})[0], "thread script with another query passed")
     check(not call(TOOL, {"text": THREAD + "\nconsole.log(document.cookie)"})[0], "thread script with appended line passed")
     check(not call(TOOL, {"text": "\n".join(THREAD.split("\n")[1:])})[0], "thread script without its first line passed")
+    check(not call(TOOL, {"text": EVIDENCE.split("\n", 1)[0].replace('"PUBLIC_IDENTIFIER"', '"x"') + '\nconst LEAD_NAME = "y";\n' + EVIDENCE.split("\n", 1)[1]})[0], "evidence script with an added name line passed")
+    check(not call(TOOL, {"text": substituted(THREAD, '"x"').replace('const LEAD_NAME = "";\n', 'const LEAD_NAME = "";\nconst LEAD_NAME = "other";\n')})[0], "thread script with a second name line passed")
+    check(not call(TOOL, {"text": substituted(THREAD, '"x"').replace('const LEAD_NAME = "";', 'const LEAD_NAME = "Jane"; document.title;')})[0], "thread script with code after its name passed")
     check(not call(TOOL, {"text": "const STOP_AT = 0;\n" + THREAD.split("\n", 1)[1]})[0], "thread script under another placeholder passed")
     # The thread script returns only what the application reads: never the token, and no key is named for it.
     returned = THREAD.rstrip("\n").split("\n")[-1]
@@ -186,14 +209,18 @@ def main() -> None:
         ("linkedin-recent-connections.js", "// mosaico run linkedin-recent-connections.js", CONNECTIONS),
         ("linkedin-recent-connections.js", "// mosaico run linkedin-recent-connections.js STOP_AT=1759400000000",
          replaced(CONNECTIONS, "const STOP_AT = 1759400000000;")),
-        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=Jane-Doe%C3%A9",
-         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "Jane-Doe%C3%A9";')),
-        ("linkedin-thread-messages.js", '// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER="jane-doe"\n',
-         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=Jane-Doe%C3%A9 LEAD_NAME=Jane Doe",
+         named(replaced(THREAD, 'const PUBLIC_IDENTIFIER = "Jane-Doe%C3%A9";'), '"Jane Doe"')),
+        ("linkedin-thread-messages.js", '// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER="jane-doe" LEAD_NAME="Jane Doe"\n',
+         named(replaced(THREAD, 'const PUBLIC_IDENTIFIER = "jane-doe";'), '"Jane Doe"')),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=lena-brook-1 LEAD_NAME=Lena Brook - The Money Coach, Trading Mentor",
+         named(replaced(THREAD, 'const PUBLIC_IDENTIFIER = "lena-brook-1";'), '"Lena Brook - The Money Coach, Trading Mentor"')),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=nandika LEAD_NAME=Ren\u00e9e Dupr\u00e9 O'Neil",
+         named(replaced(THREAD, 'const PUBLIC_IDENTIFIER = "nandika";'), '"Ren\u00e9e Dupr\u00e9 O\'Neil"')),
         ("linkedin-connection-evidence.js", "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
          replaced(EVIDENCE, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
-        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
-         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z LEAD_NAME=Zara Hill",
+         named(replaced(THREAD, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";'), '"Zara Hill"')),
         ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
          replaced(SENT, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
         ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=jane-doe",
@@ -216,7 +243,7 @@ def main() -> None:
               f"batch directive expanded wrongly or touched another item: {directive}")
         check(batch["actions"][1]["input"]["text"] == directive, "the submitted call was modified in place")
     # Word for word stays allowed and is not rewritten.
-    for script in (EVIDENCE, WHOAMI, substituted(THREAD, '"x"')):
+    for script in (EVIDENCE, WHOAMI, substituted(THREAD, '"x"'), named(substituted(THREAD, '"x"'), '"Jane Doe"')):
         allowed, _, updated = expand(TOOL, {"text": script})
         check(allowed and updated is None, "a word-for-word script was rewritten or refused")
 
@@ -231,11 +258,24 @@ def main() -> None:
         "// mosaico run linkedin-recent-connections.js STOP_AT=-1",
         "// mosaico run linkedin-recent-connections.js STOP_AT=abc",
         "// mosaico run linkedin-thread-messages.js",
+        # 0.9.2: the thread script takes both values, in this order, and the name is a plain string.
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe",
+        "// mosaico run linkedin-thread-messages.js LEAD_NAME=Jane Doe",
+        "// mosaico run linkedin-thread-messages.js LEAD_NAME=Jane Doe PUBLIC_IDENTIFIER=jane-doe",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME= Jane Doe",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane\" + document.cookie + \"",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane\\",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane Doe\nconsole.log(document.cookie)",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=" + "a" * 121,
+        "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane Doe",
+        "// mosaico run linkedin-sent-invitations.js LEAD_NAME=Jane Doe",
+        "// mosaico run linkedin-whoami.js LEAD_NAME=Jane Doe",
         "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=a\"+document.cookie+\"",
         "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=",
         "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=a b",
         "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=" + "a" * 121,
-        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=x\nconsole.log(document.cookie)",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=x LEAD_NAME=y\nconsole.log(document.cookie)",
         "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=x; fetch('https://www.linkedin.com/voyager/api/me')",
         "// mosaico run",
         "//mosaico run linkedin-whoami.js",
@@ -245,7 +285,8 @@ def main() -> None:
                                  ({"actions": [{"name": "javascript_tool", "input": {"text": directive}}]}, "mcp__Claude_Browser__browser_batch")):
             allowed, reason, updated = expand(tool, tool_input)
             check(not allowed and updated is None, f"invalid directive passed: {directive!r}")
-            check("// mosaico run linkedin-whoami.js" in reason and "PUBLIC_IDENTIFIER=<public identifier>" in reason and "STOP_AT=<whole number>" in reason,
+            check("// mosaico run linkedin-whoami.js" in reason and "PUBLIC_IDENTIFIER=<public identifier>" in reason and "STOP_AT=<whole number>" in reason
+                  and "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<public identifier> LEAD_NAME=<name>" in reason,
                   "the refusal does not name the valid directives")
             check("unknown" not in reason and "cookie" not in reason.replace("credential", "") and "fetch" not in reason, "the refusal echoed the submitted directive")
     # One bad directive refuses a whole batch, and a directive plus another script is judged item by item.
@@ -268,13 +309,13 @@ def main() -> None:
     bad = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": "document.cookie"}}),
                          capture_output=True, text=True, env=env, check=False)
     check(bad.returncode == 2 and "refused" in bad.stderr and "document.cookie" not in bad.stderr, "hook did not refuse cleanly")
-    directive = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"action": "javascript_exec", "text": "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe", "tabId": 3}}),
+    directive = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"action": "javascript_exec", "text": "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane Doe", "tabId": 3}}),
                                capture_output=True, text=True, env=env, check=False)
     out = json.loads(directive.stdout) if directive.returncode == 0 else {}
     specific = out.get("hookSpecificOutput", {})
     check(directive.returncode == 0 and set(out) == {"hookSpecificOutput"} and specific.get("hookEventName") == "PreToolUse"
           and specific.get("permissionDecision") == "allow"
-          and specific.get("updatedInput") == {"action": "javascript_exec", "text": substituted(THREAD, '"jane-doe"'), "tabId": 3},
+          and specific.get("updatedInput") == {"action": "javascript_exec", "text": named(substituted(THREAD, '"jane-doe"'), '"Jane Doe"'), "tabId": 3},
           "hook did not print the PreToolUse allow decision with updatedInput for a directive")
     refused = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": "// mosaico run linkedin-whoami.js X=1"}}),
                              capture_output=True, text=True, env=env, check=False)

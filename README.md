@@ -89,11 +89,11 @@ of any cookie or session export:
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
-- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead by LinkedIn's messaging search on the Lead's name (up to 3 pages, names used only in the page) and, when that finds nothing, by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead` and `searchPagesRead`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
+- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line and the Lead's name on its second (0.9.2), finds the one-to-one conversation with that Lead by LinkedIn's messaging search on the Lead's name (up to 3 pages) and, when that finds nothing, by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead`, `searchPagesRead` and, since 0.9.2, `matchBasis` (`identifier` or `name`), `requestedName` and the matched person's `displayName`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
 - Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces, object keys whose value is null or undefined omitted at every depth; array items stay) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
-  an approved script word for word (only the first line's value may change), expands a one-line run
+  an approved script word for word (only the values on its leading placeholder lines may change: the first line, and for the thread script the second, the Lead's name), expands a one-line run
   directive (0.8.4, below) into the approved script, and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,
   cookie or response.
@@ -104,6 +104,37 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.2
+
+- The thread script finds a conversation when the Lead's stored address is out of date. Two Repair leads
+  (a polite no and a yes with an email) answered no-conversation twice because the old vanity or member id
+  no longer matched what LinkedIn returns. The script now takes the Lead's name on a second placeholder line
+  (`const LEAD_NAME = "";`) and the directive becomes
+  `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<id> LEAD_NAME=<name>` (the name is the rest of
+  the line, so it may hold spaces; it cannot hold a quote, a backslash or a control character, and the gate still
+  refuses every other edit). The lookup order is unchanged (identifier, then the search by name, then the
+  list). When the identifier resolves nothing, or no participant of any search result carries its member URN,
+  the script matches the search results by name: case and accents folded, spaces collapsed, the Lead's name
+  equal to the display name, a prefix of it followed by a space or comma, or equal once a trailing
+  " - ...", " | ..." or ", ..." part is dropped. Two different people with that name are ambiguous and none is
+  taken, and a member-URN match always wins. A name match skips the list and reads the matched person's public
+  identifier with the existing profile query; no other endpoint is added.
+- New evidence fields, sealed with the rest: `matchBasis` (`identifier`, `name`, or null when no
+  conversation was found), `requestedName`, `displayName` of the matched person, and `memberUrn` and
+  `resolvedIdentifier` of the person matched. Mosaico accepts `matchBasis` `name` only by comparing the Lead's
+  own name with `displayName` under the same rule, then repairs the Lead's address and member id from the
+  thread and keeps the old ones as aliases. Not yet validated against a live account: the participant's name
+  fields (`participantType.member.firstName` and `lastName`) the script reads.
+- The follow-up-run, repair-run and schedule-install skills, and the Sync data and Repair schedule texts, give
+  the thread directive both values (`PUBLIC_IDENTIFIER=<scriptIdentifier>` and `LEAD_NAME=<the Lead's name>`),
+  and the schedule texts need plugin 0.9.2 or later. When a profile capture cannot read the profile (an
+  `errorStep` and no entries), the run still passes the output to `outreach_record_connection_evidence`, so
+  Mosaico records the failure; a Lead whose thread was not found twice, or whose profile capture failed twice,
+  leaves the Repair queue and waits in To sort for a person (`summary.needsPerson`, with a `cause`).
+- Tests: the gate rejects every other edit and every unsafe name; the thread script is run under node against
+  a fake LinkedIn for the name cases (including accents, suffixes, ambiguity and a failed profile lookup);
+  the Codex package is unchanged (it has no scripts) and only its Repair text names the new causes.
 
 ### 0.9.1
 

@@ -1,7 +1,9 @@
 const PUBLIC_IDENTIFIER = "";
+const LEAD_NAME = "";
 // Mosaico Outreach: the conversation thread with one Lead, read from LinkedIn's own messaging data.
 // Approved capture script. The plugin's browser-script gate allows it only word for word, with the
-// first line's value changed to the Lead's public identifier (the part of the profile address after /in/).
+// first line's value changed to the Lead's public identifier (the part of the profile address after /in/) and the second line's value
+// changed to the Lead's name as Mosaico holds it (0.9.2; an empty name switches the name fallback below off).
 // Identifier forms (0.8.7): the first line's value is either a vanity (jane-doe) or an opaque member id (ACoAA...; matched by
 // ^ACoAA[A-Za-z0-9_-]+$, the id part of urn:li:fsd_profile:<id>). An opaque id builds the member URN directly
 // (urn:li:fsd_profile:<id>) and is then looked up the way linkedin-connection-evidence.js does it: the profile query with the id
@@ -32,9 +34,26 @@ const PUBLIC_IDENTIFIER = "";
 // page adds nextCursor:<opaque cursor from the previous response> before keywords. The cursor is read defensively: the first
 // string field named nextCursor (or a paging cursor) in the response's data node; no cursor ends the search. The script reads
 // at most MAX_SEARCH_PAGES (3) search pages. The keywords are the Lead's first and last name from the Lead's Profile entity.
-// The names are used ONLY inside the page as the search keywords: they are never returned, never hashed and never leave the
-// page. The same participant match as the list path is applied to the search results (two participants: the owner and the
+// The same participant match as the list path is applied to the search results (two participants: the owner and the
 // Lead). The search covers INBOX, SPAM and ARCHIVE, so it finds conversations the PRIMARY_INBOX list does not hold.
+// Name fallback (0.9.2): the stored identifier can go stale (an old vanity, or a member id that no longer matches what LinkedIn
+// returns), so the identifier lookup resolves nothing or no participant of any search result carries its member URN. Then the
+// search results are matched by name: the search keywords are the profile's first and last name and, when that finds nothing
+// and differs, LEAD_NAME; with no identifier lookup result at all LEAD_NAME is the keyword (the same search call, the same
+// page budget MAX_SEARCH_PAGES shared by both). A search result is a name match when its two participants are the owner and one
+// other person whose display name (first and last name as LinkedIn shows them in the conversation) matches LEAD_NAME by the one
+// rule foldName/namesMatch below: fold case and diacritics, collapse spaces; equal, or LEAD_NAME (two words or more) is a prefix
+// of the display name followed by a space or comma, or the two are equal once a trailing " - ...", " | ..." or ", ..." suffix is
+// dropped from either. A member-URN match always wins over a name match. When more than one other person matches by name the
+// match is ambiguous and none is taken. A name match skips the list path (the conversation is found: coverage "complete", lookup
+// "search") and reports matchBasis "name". The matched participant's public identifier is then read with the profile query used
+// above (the participant's opaque id as vanityName, accepted only when the returned Profile's entityUrn is that participant)
+// and returned as resolvedIdentifier; it is null when that lookup answers nothing. No other call is added.
+// Evidence added in 0.9.2: matchBasis ("identifier" when the member URN matched, "name" when the name fallback did, null when no
+// conversation was found), memberUrn (the matched participant's member URN), resolvedIdentifier (that person's public identifier
+// when known), displayName (the matched participant's name as LinkedIn shows it, null when none was found) and requestedName
+// (LEAD_NAME, null when empty). Mosaico accepts matchBasis "name" only when it applies the same name rule to its own copy of the
+// Lead's name and displayName; the script's own match is never trusted alone.
 // List path (the fallback, run only when the search found nothing; validated: paging call observed 6 Oct 2026): page 1 is the owner's mailbox query as is (messengerConversations
 // with only mailboxUrn, about 20 conversations), which ignores any cursor. Pages 2 to MAX_CONVERSATION_PAGES use
 // LinkedIn's DIFFERENT paged query id, with the exact variables form LinkedIn's own inbox sends when it scrolls:
@@ -98,6 +117,17 @@ const cursorIn = (v, depth = 0) => {
   return null;
 };
 const elementsIn = (data) => { for (const v of isObj(data) ? Object.values(data) : []) { if (isObj(v) && Array.isArray(v.elements)) return v.elements; } return []; };
+const textOf = (v) => (typeof v === "string" ? v : isObj(v) && typeof v.text === "string" ? v.text : "");
+const displayNameOf = (p) => { const m = isObj(p) && isObj(p.participantType) && isObj(p.participantType.member) ? p.participantType.member : isObj(p) ? p : {}; return normalizeText([textOf(m.firstName), textOf(m.lastName)].filter((n) => n !== "").join(" ")).trim(); };
+const foldName = (s) => normalizeText(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const dropSuffix = (s) => s.replace(/(?: [-\u2013\u2014|] |, ).*$/, "").trim();
+const namesMatch = (lead, shown) => {
+  const a = foldName(lead);
+  const b = foldName(shown);
+  if (a === "" || b === "") return false;
+  if (a === b || dropSuffix(a) === dropSuffix(b)) return true;
+  return a.includes(" ") && b.startsWith(a) && /^[ ,]/.test(b.slice(a.length));
+};
 let state = "error";
 let errorStep = csrf === "" ? "me" : "profile";
 let resolvedIdentifier = null;
@@ -109,6 +139,9 @@ let coverage = "page-limit";
 let pagesRead = 0;
 let lookup = "none";
 let searchPagesRead = 0;
+let matchBasis = null;
+let displayName = null;
+const leadName = normalizeText(LEAD_NAME).trim();
 try {
   if (csrf !== "" && PUBLIC_IDENTIFIER !== "") {
     errorStep = "me";
@@ -141,44 +174,69 @@ try {
       }
     }
     leadMemberUrn = leadUrn;
-    if (leadUrn === null || ownerUrn === leadUrn) throw null;
+    if (ownerUrn === leadUrn || (leadUrn === null && leadName === "")) throw null;
     errorStep = "conversations";
     const mailbox = encodeURIComponent(ownerUrn);
-    const match = (page) => {
+    const scan = (page) => {
       let hit = null;
+      const named = [];
       for (const c of page) {
         if (!isObj(c) || typeof c.entityUrn !== "string") continue;
-        const urns = listOf(c.conversationParticipants !== undefined ? c.conversationParticipants : c.participants).map(participantUrn);
+        const raw = listOf(c.conversationParticipants !== undefined ? c.conversationParticipants : c.participants);
+        const urns = raw.map(participantUrn);
         const unique = urns.filter((u, i) => u !== null && urns.indexOf(u) === i);
-        if (unique.length !== 2 || urns.length !== 2 || !unique.includes(ownerUrn) || !unique.includes(leadUrn)) continue;
+        if (unique.length !== 2 || urns.length !== 2 || !unique.includes(ownerUrn)) continue;
         const activity = typeof c.lastActivityAt === "number" ? c.lastActivityAt : 0;
-        if (hit === null || activity > hit.activity) hit = { urn: c.entityUrn, urns: unique, activity };
+        const other = unique.find((u) => u !== ownerUrn);
+        const entry = { urn: c.entityUrn, urns: unique, activity, other, shown: displayNameOf(raw[urns.indexOf(other)]) };
+        if (other === leadUrn) { if (hit === null || activity > hit.activity) hit = entry; }
+        else if (leadName !== "" && namesMatch(leadName, entry.shown)) named.push(entry);
       }
-      return hit;
+      return { hit, named };
     };
     let best = null;
     let searchOk = false;
-    if (keywords !== "") {
-      let searchCursor = null;
-      try {
+    const byName = [];
+    const keywordSets = [keywords, leadName].filter((k, i, all) => k !== "" && all.findIndex((x) => foldName(x) === foldName(k)) === i);
+    try {
+      for (const words of keywordSets) {
+        let searchCursor = null;
         while (best === null && searchPagesRead < MAX_SEARCH_PAGES) {
-          const variables = "(categories:List(INBOX,SPAM,ARCHIVE),count:20,firstDegreeConnections:false,mailboxUrn:" + mailbox + (searchCursor === null ? "" : ",nextCursor:" + encoded(searchCursor)) + ",keywords:" + encoded(keywords) + ")";
+          const variables = "(categories:List(INBOX,SPAM,ARCHIVE),count:20,firstDegreeConnections:false,mailboxUrn:" + mailbox + (searchCursor === null ? "" : ",nextCursor:" + encoded(searchCursor)) + ",keywords:" + encoded(words) + ")";
           const found = await getJson(API + "/voyagerMessagingGraphQL/graphql?queryId=" + CONVERSATIONS_SEARCH_QUERY_ID + "&variables=" + variables, GRAPHQL);
           searchPagesRead++;
           searchOk = true;
           const page = elementsIn(found && found.data);
-          best = match(page);
+          const seen = scan(page);
+          best = seen.hit;
+          byName.push(...seen.named);
           const next = cursorIn(found && found.data);
-          if (best !== null) lookup = "search";
+          if (best !== null) { lookup = "search"; matchBasis = "identifier"; }
           else if (page.length === 0 || next === null || next === searchCursor) break;
           else searchCursor = next;
         }
-      } catch (e) { searchOk = false; }
+        if (best !== null) break;
+      }
+    } catch (e) { searchOk = false; }
+    if (best === null && byName.length > 0 && byName.every((c) => c.other === byName[0].other)) {
+      best = byName.reduce((a, c) => (c.activity > a.activity ? c : a), byName[0]);
+      lookup = "search";
+      matchBasis = "name";
+      leadMemberUrn = best.other;
+      const matchedId = best.other.slice("urn:li:fsd_profile:".length);
+      resolvedIdentifier = null;
+      if (OPAQUE_ID.test(matchedId)) {
+        try {
+          const byId = await getJson(API + "/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(matchedId) + ")&queryId=" + PROFILE_QUERY_ID, NORMALIZED);
+          const own = listOf(byId && byId.included).filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e)) && memberUrn(e.entityUrn) === best.other && typeof e.publicIdentifier === "string");
+          if (own.length > 0) resolvedIdentifier = own[own.length - 1].publicIdentifier;
+        } catch (e) { resolvedIdentifier = null; }
+      }
     }
     let cursor = null;
     let exhausted = false;
     let stalled = false;
-    while (best === null && !exhausted && !stalled && pagesRead < MAX_CONVERSATION_PAGES) {
+    while (best === null && leadUrn !== null && !exhausted && !stalled && pagesRead < MAX_CONVERSATION_PAGES) {
       const request = cursor === null
         ? "queryId=" + CONVERSATIONS_QUERY_ID + "&variables=(mailboxUrn:" + mailbox + ")"
         : "queryId=" + CONVERSATIONS_PAGED_QUERY_ID + "&variables=(query:(predicateUnions:List((conversationCategoryPredicate:(category:PRIMARY_INBOX)))),count:20,mailboxUrn:" + mailbox + ",lastUpdatedBefore:" + cursor + ")";
@@ -192,13 +250,14 @@ try {
         const activity = isObj(c) && typeof c.lastActivityAt === "number" ? c.lastActivityAt : 0;
         if (Number.isSafeInteger(activity) && activity > 0 && (oldest === null || activity < oldest)) oldest = activity;
       }
-      best = match(fresh);
-      if (best !== null) lookup = "list";
+      best = scan(fresh).hit;
+      if (best !== null) { lookup = "list"; matchBasis = "identifier"; }
       if (best === null && !exhausted) {
         if (oldest === null) stalled = true;
         else cursor = oldest;
       }
     }
+    if (best === null && leadUrn === null) { errorStep = "profile"; throw null; }
     coverage = best !== null || (searchOk && exhausted) ? "complete" : "page-limit";
     if (best === null) {
       state = "no-conversation";
@@ -216,6 +275,7 @@ try {
       }
       read.sort((a, b) => a.at - b.at);
       conversationUrn = best.urn;
+      displayName = best.shown !== "" ? best.shown : null;
       participants = best.urns;
       messages = read.slice(-MAX_MESSAGES).map((m) => ({ messageUrn: m.messageUrn, deliveredAt: m.deliveredAt, senderUrn: m.senderUrn, text: m.text }));
       state = "ok";
@@ -223,6 +283,6 @@ try {
     errorStep = null;
     status = 200;
   }
-} catch (e) { status = typeof e === "number" ? e : e === null ? status : 0; state = "error"; conversationUrn = null; participants = []; messages = []; coverage = "page-limit"; lookup = "none"; }
-const payload = { status, signedIn: csrf !== "", capturedAt, state, errorStep: state === "error" ? errorStep : null, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, resolvedIdentifier, memberUrn: leadMemberUrn, conversationUrn, participants, messages, coverage, lookup, pagesRead, searchPagesRead };
+} catch (e) { status = typeof e === "number" ? e : e === null ? status : 0; state = "error"; conversationUrn = null; participants = []; messages = []; coverage = "page-limit"; lookup = "none"; matchBasis = null; displayName = null; }
+const payload = { status, signedIn: csrf !== "", capturedAt, state, errorStep: state === "error" ? errorStep : null, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, requestedName: leadName === "" ? null : leadName, resolvedIdentifier, memberUrn: leadMemberUrn, matchBasis, displayName, conversationUrn, participants, messages, coverage, lookup, pagesRead, searchPagesRead };
 ({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

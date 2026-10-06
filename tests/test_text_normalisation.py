@@ -129,7 +129,9 @@ def main() -> None:
         uses = re.findall(r"normalizeText\(([^)]*)\)", script.read_text(encoding="utf-8").split("\n", 1)[1].replace(HELPER.findall(script.read_text(encoding="utf-8"))[0], ""))
         if script.name == "linkedin-thread-messages.js":
             check(any("m.body.text" in use for use in uses), "the thread script does not normalise message text")
-            check(all(("m.body.text" in use or "e.firstName" in use or "[" in use) for use in uses), f"thread script normalises an unexpected value: {uses}")
+            # Message text, the profile's and the participants' names (search keywords and displayName), the Lead's own name (0.9.2)
+            # and the name rule's own parameter (foldName): nothing else.
+            check(all(("m.body.text" in use or "firstName" in use or "[" in use or use in ("LEAD_NAME", "s")) for use in uses), f"thread script normalises an unexpected value: {uses}")
         else:
             check(uses == [], f"{script.name} normalises a value although it returns no free text: {uses}")
     print("PASS: all five approved scripts carry one normalisation rule, it matches the Python mirror on NBSP, zero-width, CRLF, thin space and control characters, and URNs, URLs and timestamps are untouched.")
