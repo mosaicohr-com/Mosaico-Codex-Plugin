@@ -75,9 +75,18 @@ def fnv1a32(data: bytes) -> str:
     return f"{h:08x}"
 
 
+def null_free(value):
+    """Canonical JSON with object keys whose value is None omitted at every depth (array items stay)."""
+    if isinstance(value, dict):
+        return {k: null_free(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [null_free(v) for v in value]
+    return value
+
+
 def digest_of(record: dict) -> str:
     body = {k: v for k, v in record.items() if k != "integrity"}
-    return fnv1a32(json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+    return fnv1a32(json.dumps(null_free(body), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
 
 
 KEYS = ["status", "signedIn", "capturedAt", "state", "errorStep", "profileIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn", "entries", "integrity"]

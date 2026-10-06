@@ -62,7 +62,7 @@ const PUBLIC_IDENTIFIER = "";
 // is removed; (6) each run of plain spaces becomes one space; (7) spaces and tabs at the end of each line are removed. URNs, URLs,
 // identifiers and timestamps are never touched. The integrity digest is computed after normalisation.
 // Integrity: the result's last field, integrity, is { algorithm: "fnv1a32", digest }: FNV-1a 32-bit over the UTF-8 bytes of
-// the canonical JSON (keys sorted, no spaces) of everything else the script returns, as 8 lowercase hex characters.
+// the canonical JSON (keys sorted, no spaces, with null-valued keys omitted) of everything else the script returns, as 8 lowercase hex characters.
 // Pass the whole result to Mosaico exactly as returned: Mosaico recomputes the digest and refuses an altered copy.
 const API = "https://www.linkedin.com/voyager/api";
 const PROFILE_QUERY_ID = "voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a";
@@ -74,7 +74,7 @@ const MAX_MESSAGES = 98;
 const MAX_CONVERSATION_PAGES = 8;
 const MAX_SEARCH_PAGES = 3;
 const isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
-const canonical = (v) => (Array.isArray(v) ? "[" + v.map((x) => (x === undefined ? "null" : canonical(x))).join(",") + "]" : isObj(v) ? "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}" : JSON.stringify(v));
+const canonical = (v) => (Array.isArray(v) ? "[" + v.map((x) => (x === undefined ? "null" : canonical(x))).join(",") + "]" : isObj(v) ? "{" + Object.keys(v).filter((k) => v[k] !== undefined && v[k] !== null).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}" : JSON.stringify(v));
 const fnv1a32 = (s) => { let h = 0x811c9dc5; for (const b of new TextEncoder().encode(s)) { h = Math.imul(h ^ b, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
 const normalizeText = (s) => String(s).normalize("NFC").replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, " ").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "").replace(/ {2,}/g, " ").replace(/[ \t]+(?=\n|$)/g, "");
 const typeOf = (e) => (isObj(e) && typeof e["$type"] === "string" ? e["$type"] : "");
