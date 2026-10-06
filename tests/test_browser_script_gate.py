@@ -113,7 +113,7 @@ def main() -> None:
     check(not call(TOOL, {"text": substituted(edited(THREAD, "category:PRIMARY_INBOX", "category:OTHER"), '"x"')})[0], "thread script with another category passed")
     check(not call(TOOL, {"text": substituted(edited(THREAD, "MAX_CONVERSATION_PAGES = 8", "MAX_CONVERSATION_PAGES = 800"), '"x"')})[0], "thread script with another page limit passed")
     check(not call(TOOL, {"text": substituted(edited(THREAD, "lastUpdatedBefore:", "lastUpdatedAfter:"), '"x"')})[0], "thread script with another cursor name passed")
-    check(not call(TOOL, {"text": substituted(edited(THREAD, 'coverage = best !== null || exhausted ? "complete" : "page-limit";', 'coverage = "complete";'), '"x"')})[0], "thread script that always claims complete coverage passed")
+    check(not call(TOOL, {"text": substituted(edited(THREAD, 'coverage = best !== null || (searchOk && exhausted) ? "complete" : "page-limit";', 'coverage = "complete";'), '"x"')})[0], "thread script that always claims complete coverage passed")
     for label, script, first in (("whoami", WHOAMI, None), ("evidence", EVIDENCE, '"x"'), ("connections", CONNECTIONS, "1"), ("thread", THREAD, '"x"'), ("sent", SENT, '"x"')):
         body = script if first is None else substituted(script, first)
         check(call(TOOL, {"text": body})[0], f"{label} script with the integrity digest refused")

@@ -96,15 +96,15 @@ def main() -> None:
     check("by screen" in flat(section(read(CODEX, "mosaico-outreach-follow-up-run"), "One pass per thread")),
           "Codex one pass per thread does not name its sends as by screen")
 
-    # 0.8.4 changes the gate (the run directive) and no approved browser script.
+    # Since 0.8.5 only the gate and the five approved browser scripts may differ from main; nothing else under those folders.
     changed = subprocess.run(
         ["git", "diff", "--name-only", "origin/main", "--", "plugins/mosaico-claude/browser", "plugins/mosaico-claude/hooks"],
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     if changed.returncode == 0:
         files = set(changed.stdout.split())
-        gate = {"plugins/mosaico-claude/hooks/browser-script-gate.py"}
-        check(files <= gate, f"a file other than the gate changed, or an approved browser script changed: {sorted(files - gate)}")
+        allowed = {"plugins/mosaico-claude/hooks/browser-script-gate.py"} | {f"plugins/mosaico-claude/browser/{path.name}" for path in (ROOT / "plugins" / "mosaico-claude" / "browser").glob("*.js")}
+        check(files <= allowed, f"a file other than the gate or an approved browser script changed: {sorted(files - allowed)}")
     print("PASS: both invite-run and follow-up-run skills confirm a send from LinkedIn's data (Claude) or declare it by screen (Codex).")
 
 

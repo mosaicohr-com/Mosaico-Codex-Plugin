@@ -88,7 +88,7 @@ of any cookie or session export:
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
   and every other field are dropped before anything leaves the page.
 - `plugins/mosaico-claude/browser/linkedin-whoami.js` is the identity script: one call to LinkedIn's "who am I" endpoint that returns only the account's numeric id, URNs and public identifier, which a run passes unchanged as `identityEvidence` to `outreach_start_run`.
-- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`) and `pagesRead`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
+- `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line, finds the one-to-one conversation with that Lead by LinkedIn's messaging search on the Lead's name (up to 3 pages, names used only in the page) and, when that finds nothing, by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead` and `searchPagesRead`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
 - Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
@@ -103,6 +103,28 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.8.5
+
+- Thread lookup searches by name first. The thread script now finds the one-to-one conversation by LinkedIn's own
+  messaging search (the call LinkedIn's search box sends, observed 6 Oct 2026: query
+  `messengerConversations.737b27144cf922499202658a5345016f`, categories INBOX, SPAM and ARCHIVE, 20 a page, up to 3
+  pages, each next page adding the response's `nextCursor`) using the Lead's first and last name from the profile
+  response. The names are used only inside the page as the search keywords and are never returned. When the
+  search finds nothing, the script falls back to the primary-inbox list paging of 0.8.3, unchanged. The search
+  found a conversation the list paging missed. The result gains `lookup` (`search`, `list` or `none`) and
+  `searchPagesRead` beside `pagesRead`. `coverage` is `complete` when the conversation was found by either path, or
+  when the search returned at least one page without error and the list was exhausted; otherwise `page-limit`
+  (including when the search failed or could not run and the list hit its cap or stalled).
+- Text is normalised before it is hashed. Every approved script now carries one `normalizeText` rule, stated in
+  its header so the application can mirror it, and applies it to every free-text field that leaves the page (today
+  the message text of the thread script). In order: Unicode NFC; every space separator (U+00A0, U+1680,
+  U+2000-U+200A, U+202F, U+205F, U+3000) becomes a plain space; zero-width characters (U+200B-U+200D, U+2060,
+  U+FEFF) are removed; CRLF and CR become LF; every other C0 or C1 control character (U+0000-U+001F,
+  U+007F-U+009F) except LF and TAB is removed; each run of spaces becomes one space; spaces and tabs at the end of
+  each line are removed. URNs, URLs, identifiers and timestamps are never touched. The `integrity` digest is
+  computed after normalisation. The browser-script gate is unchanged: the scripts' first lines and placeholders
+  are as before and the run directive keeps working. The Codex skills are unchanged.
 
 ### 0.8.4
 
