@@ -77,6 +77,15 @@ each Lead in `repairSuggestions` first: read its thread by eye, deposit it with 
 the thread**), then reread `outreach_get_follow_ups`. Report in plain words how many drafts Mosaico
 discarded, for which Leads and for which reasons.
 
+## Repair is a separate routine
+
+The Sync data run is daily work and does not clear the backlog. Mosaico caps the verification list at 20
+Leads per run, oldest invitation first (`verifyCap` on `outreach_get_follow_ups`); the rest are counted as
+`summary.deferredToRepair`, and `repairNeeded` counts what the Repair routine would work, per group and in
+total. Work only what `outreach_get_follow_ups` lists, and never go looking for more. When its `notes` hold
+`repair-recommended`, do not work the backlog in this run: end the final report with the line "Repair needed:
+n items, run the Repair routine", where n is `repairNeeded.total`.
+
 ## Check for new follow-ups
 
 1. Work across all dates and read `outreach_get_follow_ups` with the `runId`. When the recommended

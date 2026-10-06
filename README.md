@@ -35,9 +35,10 @@ Complete Mosaico authorization using your own account when prompted.
 
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
-action. The schedule option installs two per-user local-time schedules: Sync data (connections and
-messaging, once a day, the only one that sends) and Source leads (every two hours in business hours,
-at least 60 minutes from Sync, never sends). Before installing, the Claude package checks that
+action. The schedule option installs three per-user local-time schedules: Sync data (connections and
+messaging, once a day, the only one that sends), Source leads (every two hours in business hours,
+at least 60 minutes from Sync, never sends) and Repair (once a week, Sunday 10:00 AM by default, also on
+demand, never sends). Before installing, the Claude package checks that
 `~/.claude/settings.json` allows the three browser tools scheduled sessions need
 (`mcp__Claude_Browser__javascript_tool`, `mcp__Claude_Browser__computer` and
 `mcp__Claude_Browser__browser_batch`; the pane batches a click with a wait and a screenshot through the
@@ -103,6 +104,33 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.0
+
+- New Repair routine. Sync data stays daily work (threads, approved follow-ups, invitations, and a small
+  verification cap); a separate routine, run on demand or weekly, works the backlog behind it. Mosaico owns the
+  list: `outreach_get_repair_queue` (run intent `repair`) returns the items grouped (`duplicates`,
+  `addresses`, `declinedPending`, `mismatches`, `repairSuggestions`, `unverified`) in the order Mosaico sets,
+  each with `leadId`, `personName`, `scriptIdentifier`, a one-line `reason` and the exact `recommendedCall`
+  (the tool and arguments to pass unchanged, and `supplyAlso` for what the run adds), plus `summary` counts,
+  `progress`, the cap (25 items per Repair run, counted by Mosaico from the run's own calls), `nextCursor` and
+  `completion` with its valid stop reasons.
+- New skill `mosaico-outreach-repair-run` (Claude): starts a run with intent `repair`, reads the queue, works
+  the items in the order given with the directive form for scripts and each item's exact call, reads the queue
+  again after each group, stops where Mosaico says (`run-cap-reached`, `queue-empty`, `end-of-queue`) and
+  reports counts per group and what remains. It never sends a message or an invitation. A decline found while
+  reading a thread is recorded with `outcome` `declined`. The Codex copy is read-only: it lists the queue and
+  what a person should do.
+- New tool used by the skill: `outreach_link_duplicate_leads` links two Leads of one owner that are the same
+  person; Mosaico keeps the one with the richer history and drops the other as an alias.
+- The schedule installer adds a third routine, "Mosaico Outreach — Repair": weekly, Sunday 10:00 AM local time
+  by default (cron `0 10 * * 0`), also on demand, kept 60 minutes from Sync data and Source leads on its day.
+  The Sync data text gains one sentence: when Mosaico notes `repair-recommended`, do not work the backlog, and
+  end the report with "Repair needed: n items, run the Repair routine". The follow-up-run skills say the same
+  and that Mosaico caps the verification list at 20 Leads per run (`deferredToRepair` counts the rest).
+- Needs the Mosaico application release that adds `outreach_get_repair_queue`, `outreach_link_duplicate_leads`
+  and the `repair` run intent. The scripts are unchanged. Schedule installs keep working without it, but the
+  Repair routine stops at its first read until the application is updated.
 
 ### 0.8.7
 

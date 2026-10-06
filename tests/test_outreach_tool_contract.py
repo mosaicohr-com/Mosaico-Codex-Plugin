@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from pathlib import Path
 
@@ -36,8 +37,8 @@ def main() -> None:
     parser.add_argument(
         "--app-repo",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / "mosaico-app",
-        help="Path to the mosaico-app checkout that owns the MCP registry.",
+        default=Path(os.environ.get("MOSAICO_APP_REPO") or Path(__file__).resolve().parents[2] / "mosaico-app"),
+        help="Path to the mosaico-app checkout that owns the MCP registry (default: $MOSAICO_APP_REPO, else ../mosaico-app).",
     )
     args = parser.parse_args()
     plugin_root = Path(__file__).resolve().parents[1] / "plugins"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The schedule-install skills describe the two Outreach schedules and refuse unsafe installs."""
+"""The schedule-install skills describe the three Outreach schedules and refuse unsafe installs."""
 
 from __future__ import annotations
 
@@ -18,12 +18,14 @@ SKILLS = {
 TITLES = (
     "Mosaico Outreach — Sync data (connections and messaging)",
     "Mosaico Outreach — Source leads",
+    "Mosaico Outreach — Repair",
 )
 OUTREACH_SKILLS = (
     "mosaico-outreach-invite-run",
     "mosaico-outreach-follow-up-run",
     "mosaico-outreach-lead-management",
     "mosaico-outreach-agent-management",
+    "mosaico-outreach-repair-run",
 )
 FORBIDDEN = ("Connect means", "Message means", "Pending means", "already-connected", "invite-pending")
 ALLOW_RULES = (
@@ -37,6 +39,11 @@ OLD_AUTOMATIONS = (
 )
 SCRIPTS = ("browser/linkedin-whoami.js", "browser/linkedin-connection-evidence.js", "browser/linkedin-recent-connections.js", "browser/linkedin-sent-invitations.js")
 STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
+
+
+def second_person(text: str) -> str:
+    section = text[text.index("## Set up a second person") :]
+    return " ".join(section[: section.index("\n## ", 5)].split())
 
 
 def check(condition: bool, message: str) -> None:
@@ -89,6 +96,8 @@ def main() -> None:
         check(rule in readme, f"README does not name the allow rule {rule}")
     check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
     sync = claude[claude.index("Mosaico Outreach — Sync data") : claude.index("Mosaico Outreach — Source leads")]
+    source = claude[claude.index("Mosaico Outreach — Source leads") : claude.index("**Mosaico Outreach — Repair**")]
+    repair = claude[claude.index("**Mosaico Outreach — Repair**") : claude.index("## Keep the schedules apart")]
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data schedule text does not describe paged snapshot submission")
     check("0.8.1 or later" in sync and "0.8.0 or later" not in sync, "Sync data schedule text does not require plugin 0.8.1")
     flat_sync = " ".join(sync.split())
@@ -122,6 +131,36 @@ def main() -> None:
     check("Verify each sent invitation on LinkedIn" not in step3, "Sync data Step 3 still marks an invitation from a screen check")
     check("from the screen alone" in step2 and "from the screen alone" in step3, "Sync data Steps 2 and 3 do not forbid marking from the screen alone")
     check("sends confirmed from data versus by screen" in step4, "Sync data Step 4 does not report sends confirmed from data versus by screen")
+    check(
+        "When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run" in step4
+        and "Repair needed: n items, run the Repair routine" in step4,
+        "Sync data Step 4 does not recommend Repair instead of working the backlog",
+    )
+
+    # The third routine: Repair, weekly Sunday 10:00 by default, also on demand, never sends.
+    flat_repair = " ".join(repair.split())
+    check("`0 10 * * 0`" in repair and "Sunday at 10:00 AM" in repair, "Repair schedule is not weekly Sunday 10:00 (cron 0 10 * * 0)")
+    check("also whenever the person asks for it" in flat_repair, "Repair schedule is not also available on demand")
+    check("mosaico:mosaico-outreach-repair-run" in repair and "0.9.0 or later" in repair, "Repair schedule text does not use the qualified repair-run skill, 0.9.0 or later")
+    for needle in (
+        "intent repair", "outreach_get_repair_queue", "recommendedCall", "in the order Mosaico gives them", "supplyAlso",
+        "// mosaico run <script>.js <PLACEHOLDER>=<value>", "scriptIdentifier", "capture_connections", "outreach_record_connections_snapshot",
+        "outcome declined", "history-mismatch", "completion.mustContinue", "run-cap-reached", "queue-empty", "end-of-queue",
+        "never earlier for volume", "Reread the queue after each group", "outreach_get_run", "draftsDiscarded", "nothing was sent and nothing was approved",
+        "never sends a message or an invitation", "never attempt the same item twice",
+    ):
+        check(needle in flat_repair, f"Repair schedule text lacks: {needle}")
+    for script in ("browser/linkedin-whoami.js", "browser/linkedin-connection-evidence.js", "browser/linkedin-recent-connections.js", "browser/linkedin-thread-messages.js"):
+        check(script in repair, f"Repair schedule text does not name the approved script {script}")
+    check("browser/linkedin-sent-invitations.js" not in repair, "Repair schedule text names the sent-invitations script, which Repair never needs")
+    check("outreach_mark_message_sent" not in repair and "outreach_record_message" not in repair, "Repair schedule text names a sending or drafting tool")
+    check("Repair never sends" in claude, "Claude skill does not say Repair never sends")
+    check("60 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from Sync data and Source leads")
+    check("0 10 * * 0" in claude.split("## Install")[1], "Install readback does not confirm the Repair cron")
+    check("Her Repair schedule works only her own backlog and never sends" in second_person(claude), "Second-person section does not install her Repair schedule")
+    check("Source leads and Repair are not installed" in claude, "Single-task fallback does not mention Repair")
+    # Source leads and Repair are separate texts: neither borrows the other's steps.
+    check("outreach_get_repair_queue" not in source and "outreach_get_repair_queue" not in sync, "Sync data or Source leads text reads the repair queue")
 
     for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
@@ -145,8 +184,8 @@ def main() -> None:
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.8.7", f"{manifest.name} is not at 0.8.7")
-    print("PASS: both schedule-install skills describe the two schedules, qualified skill names, the post-send check and the stale-copy checks.")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.0", f"{manifest.name} is not at 0.9.0")
+    print("PASS: both schedule-install skills describe the three schedules (Sync data, Source leads, Repair), qualified skill names, the post-send check and the stale-copy checks.")
 
 
 if __name__ == "__main__":

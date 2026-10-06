@@ -8,20 +8,25 @@ description: Install or repair the Mosaico Outreach Source leads schedule in the
 Use the supported persistent recurring-automation mechanism in this Codex environment. This action
 configures personal automation state; it does not change Mosaico workflow records.
 
-## Two schedules, one installable from Codex
+## Three schedules, one installable from Codex
 
-Mosaico Outreach runs on two schedules:
+Mosaico Outreach runs on three schedules:
 
 - **Mosaico Outreach — Sync data (connections and messaging)** — once a day. It checks LinkedIn
   connections, handles messages, and sends approved follow-ups and invitations. It is the only
   schedule that clicks Connect or sends a message.
 - **Mosaico Outreach — Source leads** — every two hours during business hours. It finds Leads and
   writes invitation drafts. It never approves or sends.
+- **Mosaico Outreach — Repair** — once a week (by default Sunday at 10:00 AM local time, cron
+  `0 10 * * 0`), and on demand. It works the backlog Mosaico lists in its repair queue: connections to
+  verify, threads to read, redirected addresses, duplicate Leads and declines. It never approves or sends.
 
 The Codex package cannot capture connection evidence or LinkedIn identity. Only Claude's built-in
-browser pane can. So a Sync data schedule installed from Codex must not send anything. Do not install
-it here. Tell the person to install Sync data from Claude, using the Claude plugin's schedule skill.
-Offer only the Source leads schedule from Codex.
+browser pane can. So a Sync data schedule installed from Codex must not send anything, and a Repair
+schedule installed from Codex could not verify or read anything. Do not install either here. Tell the
+person to install Sync data and Repair from Claude, using the Claude plugin's schedule skill. Offer only
+the Source leads schedule from Codex. The Codex package's repair-run skill is read-only: it lists the
+queue and what a person should do.
 
 ## Check before installing
 
