@@ -102,7 +102,8 @@ def main() -> None:
     returned = SENT.rstrip("\n").split("\n")[-1]
     check(returned.startswith("({") and returned.endswith("})") and "csrf:" not in returned and "csrf," not in returned,
           "sent-invitations script's last line returns something other than the record")
-    check(SENT.count("https://") == 1 and 'const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";' in SENT, "sent-invitations script names another address")
+    check(SENT.count("https://") == 2 and 'const ENDPOINT = "https://www.linkedin.com/voyager/api/relationships/sentInvitationViewsV2";' in SENT
+          and 'const PROFILE_ENDPOINT = "https://www.linkedin.com/voyager/api/graphql";' in SENT, "sent-invitations script names another address")
     check("validated: pending" in SENT, "sent-invitations script does not say its endpoint is not validated")
 
     # Paging, coverage and the integrity digest are part of the approved text: change one word and the script is refused.
@@ -125,7 +126,8 @@ def main() -> None:
         last = script.rstrip("\n").split("\n")[-1]
         check(last.startswith("({") and last.endswith("})") and "csrf" not in last, f"{label} script's last line is not a single record expression without the token")
         check(last == '({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })', f"{label} script's last line is not the sealed payload")
-        check(script.count("https://") == 1, f"{label} script names more than one address")
+        # The sent-invitations script names LinkedIn's list and (for a vanity) LinkedIn's profile query; every other script names one address.
+        check(script.count("https://") == (2 if label == "sent" else 1), f"{label} script names more than one address")
     check(call(TOOL, {"text": substituted(CONNECTIONS, "0")})[0] and "pages.push(sealed({ elements, entries }));" in CONNECTIONS, "connections script does not seal each page")
     check(not call(TOOL, {"text": edited(CONNECTIONS, "pages.push(sealed({ elements, entries }));", "pages.push({ elements, entries });")})[0], "connections script without page seals passed")
     check(sorted(gate.approved_scripts()) == sorted(path.name for path in BROWSER.glob("*.js")) and len(gate.approved_scripts()) == 5, "the gate's approved scripts are not the five scripts in the browser folder")
@@ -163,6 +165,12 @@ def main() -> None:
     check(call("mcp__Claude_Browser__browser_batch", batch_ok)[0], "approved batch refused")
     check(not call("mcp__Claude_Browser__browser_batch", batch_bad)[0], "batch with cookie read passed")
 
+    # An opaque member id (ACoAA..., 0.8.6) is an identifier like any other: word for word and through the directive, for the three identifier scripts.
+    for label, script in (("evidence", EVIDENCE), ("thread", THREAD), ("sent", SENT)):
+        check(call(TOOL, {"text": substituted(script, '"ACoAAB1x_y-Z"')})[0], f"{label} script with an opaque member id refused")
+        check(not call(TOOL, {"text": edited(substituted(script, '"ACoAAB1x_y-Z"'), "ACoAA[A-Za-z0-9_-]+", "ACoAA[A-Za-z0-9_-]*")})[0], f"{label} script with an edited opaque id pattern passed")
+        check("const OPAQUE_ID = /^ACoAA[A-Za-z0-9_-]+$/;" in script, f"{label} script lost the opaque member id pattern")
+
     # The run directive: one line stands for an approved script, and the hook rewrites the call to it.
     def expand(tool_name: str, tool_input: object) -> tuple[bool, str, object]:
         return gate.evaluate({"tool_name": tool_name, "tool_input": tool_input})
@@ -182,6 +190,12 @@ def main() -> None:
          replaced(THREAD, 'const PUBLIC_IDENTIFIER = "Jane-Doe%C3%A9";')),
         ("linkedin-thread-messages.js", '// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER="jane-doe"\n',
          replaced(THREAD, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
+        ("linkedin-connection-evidence.js", "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
+         replaced(EVIDENCE, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
+        ("linkedin-thread-messages.js", "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
+         replaced(THREAD, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
+        ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=ACoAAB1x_y-Z",
+         replaced(SENT, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
         ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=jane-doe",
          replaced(SENT, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
     )

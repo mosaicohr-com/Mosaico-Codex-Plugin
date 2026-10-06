@@ -104,6 +104,29 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.8.6
+
+- The thread, connection-evidence and sent-invitations scripts accept an opaque member id as well as a vanity.
+  The first line's value (the part of the Lead's profile address after `/in/`) may be a name such as `jane-doe` or an
+  id that matches `^ACoAA[A-Za-z0-9_-]+$` (the id part of `urn:li:fsd_profile:<id>`). In production 43 of 97 active
+  Leads store the id form. Thread and sent-invitations build the member URN directly from an id and skip the
+  profile lookup (so the thread script has no name to search by and uses the list path only). Connection-evidence
+  sends the id as the profile query's `vanityName` and accepts the Profile only when its `entityUrn` carries the same id.
+- A redirected vanity is accepted. When the profile lookup finds no Profile with the requested vanity but returns
+  exactly one Profile entity, that one is the redirect target (an old vanity LinkedIn now sends to a new one, such as
+  `zoe-milligan-conscious-learning-architecture` to `zoemilliganignitespark`). Any other answer is an error at the
+  `profile` step. Sent-invitations, which had no lookup, now resolves a vanity first and matches the invitee by member
+  id, or by the requested or the resolved identifier.
+- Every output carries `requestedIdentifier` (as given), `resolvedIdentifier` (the response's `publicIdentifier`, or the
+  opaque id) and `memberUrn`; they are null when the Profile was not resolved. The existing identifier field
+  (`publicIdentifier` or `profileIdentifier`) is unchanged. The new fields are inside the integrity digest.
+- A failed lookup never throws and says why: `state` is `error` with `status` (the HTTP status, or 0) and `errorStep`,
+  one of `me`, `profile`, `conversations`, `messages` or `sent-invitations`. Connection-evidence gains `state`
+  (`ok` or `error`) and `errorStep`, and returns no entries on an error.
+- The follow-up-run and invite-run skills say the first-line value is whatever follows `/in/` (a name or an
+  `ACoAA...` id) and that `requestedIdentifier`, `resolvedIdentifier` and `memberUrn` are passed on unchanged.
+- The application must accept the new fields on `threadEvidence`, `sendEvidence` and `sentInvitationEvidence`.
+
 ### 0.8.5
 
 - Thread lookup searches by name first. The thread script now finds the one-to-one conversation by LinkedIn's own

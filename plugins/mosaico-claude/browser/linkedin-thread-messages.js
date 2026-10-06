@@ -2,6 +2,15 @@ const PUBLIC_IDENTIFIER = "";
 // Mosaico Outreach: the conversation thread with one Lead, read from LinkedIn's own messaging data.
 // Approved capture script. The plugin's browser-script gate allows it only word for word, with the
 // first line's value changed to the Lead's public identifier (the part of the profile address after /in/).
+// Identifier forms (0.8.6): the first line's value is either a vanity (jane-doe) or an opaque member id (ACoAA...; matched by
+// ^ACoAA[A-Za-z0-9_-]+$, the id part of urn:li:fsd_profile:<id>). An opaque id builds the member URN directly
+// (urn:li:fsd_profile:<id>) and skips the vanity lookup, so no name is known and the search path is not used (the list path
+// runs; a miss then reads page-limit unless the list is exhausted). A vanity is looked up with the profile query: when the
+// response holds a Profile whose publicIdentifier equals the vanity (any case) that one is used; otherwise, when the response
+// holds exactly one Profile entity, it is taken as the redirect target (LinkedIn answers an old vanity with the person's new
+// one); any other answer is an error with errorStep "profile". Every output carries requestedIdentifier (the value as given),
+// resolvedIdentifier (the response's publicIdentifier, or the opaque id) and memberUrn (the Lead's member URN, null when it
+// was not resolved). The Lead's conversation is matched by that member URN.
 // It runs inside the signed-in LinkedIn page: the CSRF token is read here, sent only to LinkedIn's own
 // who-am-I, profile and messaging calls, and never returned. It finds the one-to-one conversation between
 // the signed-in account and the Lead, first by searching LinkedIn's messaging search by the Lead's name and then, when the
@@ -9,6 +18,10 @@ const PUBLIC_IDENTIFIER = "";
 // participants (member URNs) and its messages oldest first, each with only its delivery time, its sender's
 // member URN and its text. Names, pictures, reactions, attachments and every other field are dropped before
 // anything leaves the page. Any error returns the status, state "error" and empty lists: the script never throws.
+// Error reporting (0.8.6): state "error" carries status (the HTTP status LinkedIn answered, or 0 when the call itself failed or
+// nobody is signed in) and errorStep, the step that failed: "me" (who-am-I, or no signed-in session), "profile" (the Lead's
+// profile lookup or identifier), "conversations" (the conversation list) or "messages" (the thread's messages). errorStep is
+// null when state is not "error". A failed search does not end the run: the list path is tried.
 // Search path (validated: search call observed 6 Oct 2026, the call LinkedIn's own messaging search box sends): the query
 // messengerConversations.737b27144cf922499202658a5345016f with the variables
 // (categories:List(INBOX,SPAM,ARCHIVE),count:20,firstDegreeConnections:false,mailboxUrn:<owner URN>,keywords:<text>); each next
@@ -65,7 +78,9 @@ const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1] || "";
 const capturedAt = new Date().toISOString();
 const NORMALIZED = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" };
 const GRAPHQL = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/graphql" };
-const getJson = async (url, headers) => { const r = await fetch(url, { credentials: "include", headers }); if (!r.ok) throw r.status; return r.json(); };
+let status = 0;
+const getJson = async (url, headers) => { const r = await fetch(url, { credentials: "include", headers }); status = r.status; if (!r.ok) throw r.status; return r.json(); };
+const OPAQUE_ID = /^ACoAA[A-Za-z0-9_-]+$/;
 const memberUrn = (v) => (typeof v === "string" && /^urn:li:fsd_profile:[A-Za-z0-9_-]+$/.test(v) ? v : null);
 const participantUrn = (p) => memberUrn(typeof p === "string" ? p : isObj(p) ? p.hostIdentityUrn : null);
 const isoOf = (ms) => (typeof ms === "number" && ms > 0 && ms < 8.64e15 ? new Date(ms).toISOString() : null);
@@ -79,8 +94,10 @@ const cursorIn = (v, depth = 0) => {
   return null;
 };
 const elementsIn = (data) => { for (const v of isObj(data) ? Object.values(data) : []) { if (isObj(v) && Array.isArray(v.elements)) return v.elements; } return []; };
-let status = 0;
 let state = "error";
+let errorStep = csrf === "" ? "me" : "profile";
+let resolvedIdentifier = null;
+let leadMemberUrn = null;
 let conversationUrn = null;
 let participants = [];
 let messages = [];
@@ -90,19 +107,33 @@ let lookup = "none";
 let searchPagesRead = 0;
 try {
   if (csrf !== "" && PUBLIC_IDENTIFIER !== "") {
+    errorStep = "me";
     const me = await getJson(API + "/me", NORMALIZED);
     let ownerUrn = null;
     for (const e of listOf(me && me.included)) { if (isObj(e) && /MiniProfile$/.test(typeOf(e))) ownerUrn = memberUrn(e.dashEntityUrn); }
-    const profile = await getJson(API + "/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + PROFILE_QUERY_ID, NORMALIZED);
+    if (ownerUrn === null) throw null;
+    errorStep = "profile";
     let leadUrn = null;
     let keywords = "";
-    for (const e of listOf(profile && profile.included)) {
-      if (isObj(e) && /profile\.Profile$/.test(typeOf(e)) && typeof e.publicIdentifier === "string" && e.publicIdentifier.toLowerCase() === PUBLIC_IDENTIFIER.toLowerCase()) {
-        leadUrn = memberUrn(e.entityUrn);
-        keywords = normalizeText([e.firstName, e.lastName].filter((n) => typeof n === "string").join(" ")).trim();
+    if (OPAQUE_ID.test(PUBLIC_IDENTIFIER)) {
+      leadUrn = "urn:li:fsd_profile:" + PUBLIC_IDENTIFIER;
+      resolvedIdentifier = PUBLIC_IDENTIFIER;
+    } else {
+      const profile = await getJson(API + "/graphql?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + PROFILE_QUERY_ID, NORMALIZED);
+      const profiles = listOf(profile && profile.included).filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e)));
+      const exact = profiles.filter((e) => typeof e.publicIdentifier === "string" && e.publicIdentifier.toLowerCase() === PUBLIC_IDENTIFIER.toLowerCase());
+      const hit = exact.length > 0 ? exact[exact.length - 1] : profiles.length === 1 && typeof profiles[0].publicIdentifier === "string" ? profiles[0] : null;
+      if (hit !== null) {
+        leadUrn = memberUrn(hit.entityUrn);
+        if (leadUrn !== null) {
+          resolvedIdentifier = hit.publicIdentifier;
+          keywords = normalizeText([hit.firstName, hit.lastName].filter((n) => typeof n === "string").join(" ")).trim();
+        }
       }
     }
-    if (ownerUrn === null || leadUrn === null || ownerUrn === leadUrn) throw 0;
+    leadMemberUrn = leadUrn;
+    if (leadUrn === null || ownerUrn === leadUrn) throw null;
+    errorStep = "conversations";
     const mailbox = encodeURIComponent(ownerUrn);
     const match = (page) => {
       let hit = null;
@@ -163,6 +194,7 @@ try {
     if (best === null) {
       state = "no-conversation";
     } else {
+      errorStep = "messages";
       const encodedUrn = encodeURIComponent(best.urn).replace(/\(/g, "%28").replace(/\)/g, "%29");
       const thread = await getJson(API + "/voyagerMessagingGraphQL/graphql?queryId=" + MESSAGES_QUERY_ID + "&variables=(conversationUrn:" + encodedUrn + ")", GRAPHQL);
       const messageNode = isObj(thread && thread.data) ? thread.data.messengerMessagesBySyncToken : null;
@@ -179,8 +211,9 @@ try {
       messages = read.slice(-MAX_MESSAGES).map((m) => ({ messageUrn: m.messageUrn, deliveredAt: m.deliveredAt, senderUrn: m.senderUrn, text: m.text }));
       state = "ok";
     }
+    errorStep = null;
     status = 200;
   }
-} catch (e) { status = typeof e === "number" ? e : 0; state = "error"; conversationUrn = null; participants = []; messages = []; coverage = "page-limit"; lookup = "none"; }
-const payload = { status, signedIn: csrf !== "", capturedAt, state, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, conversationUrn, participants, messages, coverage, lookup, pagesRead, searchPagesRead };
+} catch (e) { status = typeof e === "number" ? e : e === null ? status : 0; state = "error"; conversationUrn = null; participants = []; messages = []; coverage = "page-limit"; lookup = "none"; }
+const payload = { status, signedIn: csrf !== "", capturedAt, state, errorStep: state === "error" ? errorStep : null, source: "linkedin-voyager-messages", publicIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, resolvedIdentifier, memberUrn: leadMemberUrn, conversationUrn, participants, messages, coverage, lookup, pagesRead, searchPagesRead };
 ({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

@@ -85,7 +85,7 @@ out.thread = (await run('linkedin-thread-messages.js', 'const PUBLIC_IDENTIFIER 
 out.threadFailed = (await run('linkedin-thread-messages.js', 'const PUBLIC_IDENTIFIER = "jane-doe";', () => bad(403))).result;
 
 // sent invitations
-const sentRoute = () => ok({ data: { elements: ['v'] }, included: [
+const sentRoute = (url) => url.includes('voyagerIdentityDashProfiles') ? ok({ included: [{ $type: 'x.profile.Profile', publicIdentifier: /vanityName:([^)]*)\)/.exec(url)[1], entityUrn: /vanityName:jane-doe\)/.test(url) ? LEAD : 'urn:li:fsd_profile:NOBODY01' }] }) : ok({ data: { elements: ['v'] }, included: [
   { $type: 'x.invitation.SentInvitationView', entityUrn: 'urn:li:fs_relInvitationView:V', '*invitation': 'urn:li:fs_relInvitation:I', '*toMember': 'urn:li:fs_miniProfile:M' },
   { $type: 'x.invitation.Invitation', entityUrn: 'urn:li:fs_relInvitation:I', sentTime: 1759700000000, '*toMember': 'urn:li:fs_miniProfile:M' },
   { $type: 'x.MiniProfile', entityUrn: 'urn:li:fs_miniProfile:M', dashEntityUrn: LEAD, publicIdentifier: 'jane-doe' }] });
@@ -180,14 +180,17 @@ def main() -> None:
     check(list(out["whoami"]) == ["status", "signedIn", "capturedAt", "plainId", "entries", "integrity"], "whoami keys changed")
     check(out["whoami"]["plainId"] == 1234 and len(out["whoami"]["entries"]) == 1 and out["whoamiFailed"]["status"] == 403, "whoami content changed")
     check(out["whoamiSignedOut"]["signedIn"] is False, "signed-out whoami reported signed in")
-    check(list(out["evidence"]) == ["status", "signedIn", "capturedAt", "profileIdentifier", "entries", "integrity"] and len(out["evidence"]["entries"]) == 2, "evidence keys or entries changed")
-    check(list(out["sent"]) == ["status", "signedIn", "capturedAt", "state", "publicIdentifier", "invitation", "pagesRead", "integrity"]
+    check(list(out["evidence"]) == ["status", "signedIn", "capturedAt", "state", "errorStep", "profileIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn",
+                                    "entries", "integrity"] and len(out["evidence"]["entries"]) == 2, "evidence keys or entries changed")
+    check(out["evidenceFailed"]["state"] == "error" and out["evidenceFailed"]["errorStep"] == "profile" and out["evidenceFailed"]["entries"] == [], "failed evidence not reported")
+    check(list(out["sent"]) == ["status", "signedIn", "capturedAt", "state", "errorStep", "publicIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn",
+                                "invitation", "pagesRead", "integrity"]
           and out["sent"]["state"] == "found" and out["sentNotFound"]["state"] == "not-found", "sent-invitations content changed")
 
     # Thread: the new coverage fields sit before the seal; odd characters survive and are digested as UTF-8.
     thread = out["thread"]
-    check(list(thread) == ["status", "signedIn", "capturedAt", "state", "source", "publicIdentifier", "conversationUrn", "participants", "messages",
-                           "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"], "thread keys changed")
+    check(list(thread) == ["status", "signedIn", "capturedAt", "state", "errorStep", "source", "publicIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn",
+                           "conversationUrn", "participants", "messages", "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"], "thread keys changed")
     check(thread["state"] == "ok" and thread["coverage"] == "complete" and thread["pagesRead"] == 1, "thread coverage wrong")
     # 0.8.5: text is normalised before it is sealed (zero-width and control characters go), so the sealed text is the normalised one.
     check(thread["messages"][1]["text"] == "hithere \u00e9 \U0001f600 \"q\" \\ x", f"non-BMP text lost or text not normalised: {thread['messages'][1]['text']!r}")

@@ -47,7 +47,7 @@ const FIRST_ID = 'messengerConversations.0d5e6781bbee71c3e51c8843c6519f48', PAGE
 // collection (default) or as paging.cursor (options.cursorStyle 'paging'). options.searchFail answers 500.
 const route = (conversations, messages, options = {}) => (url) => {
   if (url.includes('/voyager/api/me')) return me;
-  if (url.includes('voyagerIdentityDashProfiles')) return options.names !== undefined ? profileWith(options.names) : profile;
+  if (url.includes('voyagerIdentityDashProfiles')) return options.profileResponse !== undefined ? options.profileResponse : options.names !== undefined ? profileWith(options.names) : profile;
   if (url.includes('queryId=' + SEARCH_ID)) {
     if (options.searchFail) return bad(500);
     const list = options.search || [];
@@ -165,6 +165,33 @@ const elsewhere = { entityUrn: 'urn:li:msg_conversation:(x,E)', conversationPart
   const odd = 'hi' + ZW + 'there ' + NB + NB + 'e\u0301 ' + String.fromCharCode(0xd83d, 0xde00) + THIN + 'x "quoted" \\ back\tslash\x01\r\nnext  ';
   r = await run('jane-doe', route([one], [message(1000, odd, LEAD)]));
   out.odd = r.result; out.oddText = odd;
+
+  // Identifier forms (0.8.6). An opaque member id builds the member URN itself and skips the vanity lookup; no name is known, so no search.
+  const OPAQUE = 'ACoAAB1x_y-Z', OPAQUE_URN = 'urn:li:fsd_profile:' + OPAQUE;
+  const oneWith = (urn) => ({ ...one, conversationParticipants: [{ hostIdentityUrn: OWNER }, { hostIdentityUrn: urn }] });
+  r = await run(OPAQUE, route([oneWith(OPAQUE_URN)], [message(1000, 'hi', OWNER)], { search: [oneWith(OPAQUE_URN)] }));
+  out.opaque = r.result; out.opaqueUrls = strip(r);
+  r = await run(OPAQUE, route([...fillers(20), { ...oneWith(OPAQUE_URN), lastActivityAt: 500000 }], [message(1000, 'hi', OWNER)]));
+  out.opaquePage2 = r.result;
+  r = await run(OPAQUE, route([group, elsewhere, one], []));
+  out.opaqueMiss = r.result;
+  // An id that is not an opaque id (wrong prefix, or too short) is a vanity and is looked up.
+  r = await run('ACoABxyz', route([one], [message(1000, 'hi', OWNER)]));
+  out.notOpaque = r.result; out.notOpaqueUrls = strip(r);
+  // A redirected vanity: LinkedIn answers the old vanity with the one Profile of the person's new one.
+  r = await run('jane-doe-old', route([one], [message(1000, 'hi', OWNER)]));
+  out.redirect = r.result; out.redirectUrls = strip(r);
+  // Two Profiles and none of the requested vanity is not a redirect; neither is a single Profile without a member URN, nor none at all.
+  const P = 'com.linkedin.voyager.dash.identity.profile.Profile';
+  r = await run('jane-doe-old', route([one], [], { profileResponse: ok({ included: [{ $type: P, publicIdentifier: 'a', entityUrn: LEAD }, { $type: P, publicIdentifier: 'b', entityUrn: OTHER }] }) }));
+  out.twoProfiles = r.result; out.twoProfilesUrls = strip(r);
+  out.noProfile = (await run('jane-doe-old', route([one], [], { profileResponse: ok({ included: [] }) }))).result;
+  out.noUrnProfile = (await run('jane-doe-old', route([one], [], { profileResponse: ok({ included: [{ $type: P, publicIdentifier: 'a', entityUrn: 'urn:li:fsd_company:1' }] }) }))).result;
+  out.profileFails = (await run('jane-doe-old', route([one], [], { profileResponse: bad(429) }))).result;
+  // An exact vanity (any case) among several Profiles is the one used.
+  out.exactAmongMany = (await run('jane-doe', route([one], [message(1000, 'hi', OWNER)], { profileResponse: ok({ included: [{ $type: P, publicIdentifier: 'other', entityUrn: OTHER }, { $type: P, publicIdentifier: 'Jane-Doe', entityUrn: LEAD }] }) }))).result;
+  // The owner could not be read from /me.
+  out.noOwner = (await run('jane-doe', (url) => (url.includes('/voyager/api/me') ? ok({ included: [] }) : route([one], [])(url)))).result;
   console.log(JSON.stringify(out));
 })();
 """
@@ -197,8 +224,8 @@ def sealed_correctly(record: dict) -> bool:
 
 
 CONVERSATION = "urn:li:msg_conversation:(urn:li:fsd_profile:OWNERID1,2-ABC==)"
-KEYS = ["status", "signedIn", "capturedAt", "state", "source", "publicIdentifier", "conversationUrn", "participants", "messages",
-        "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"]
+KEYS = ["status", "signedIn", "capturedAt", "state", "errorStep", "source", "publicIdentifier", "requestedIdentifier", "resolvedIdentifier", "memberUrn",
+        "conversationUrn", "participants", "messages", "coverage", "lookup", "pagesRead", "searchPagesRead", "integrity"]
 FILLER_ACTIVITY = lambda i: 1000000 - i * 1000  # noqa: E731 - mirrors the harness
 
 
@@ -240,6 +267,8 @@ def main() -> None:
     check(found["coverage"] == "complete" and found["pagesRead"] == 1 and found["lookup"] == "list" and found["searchPagesRead"] == 1,
           "a thread found on list page 1 after one empty search is not complete, lookup list, one search page")
     check(found["source"] == "linkedin-voyager-messages" and found["publicIdentifier"] == "jane-doe", "source or identifier wrong")
+    check(found["errorStep"] is None and found["requestedIdentifier"] == "jane-doe" and found["resolvedIdentifier"] == "Jane-Doe" and found["memberUrn"] == "urn:li:fsd_profile:LEADID01",
+          "identifier fields wrong for an exact vanity")
     check(found["conversationUrn"] == "urn:li:msg_conversation:(urn:li:fsd_profile:OWNERID1,2-ABC==)", "wrong conversation chosen")
     check(found["participants"] == ["urn:li:fsd_profile:OWNERID1", "urn:li:fsd_profile:LEADID01"], "participants are not the two member URNs")
     # Oldest first; the blank message is dropped; sender is the message's sender, never its actor (the viewer).
@@ -303,10 +332,12 @@ def main() -> None:
     check(out["fullNoActivity"]["coverage"] == "page-limit" and out["fullNoActivity"]["pagesRead"] == 1 and out["fullNoActivity"]["state"] == "no-conversation"
           and out["fullNoActivityCalls"] == 4, "a full page without readable lastActivityAt must stop as page-limit, since the cursor cannot move")
 
-    for name, status, pages in (("forbidden", 403, 0), ("network", 0, 0), ("sameMember", 0, 0), ("laterPageFails", 500, 1), ("messagesFail", 500, 2)):
+    for name, status, pages, step in (("forbidden", 403, 0, "me"), ("network", 0, 0, "me"), ("sameMember", 200, 0, "profile"), ("laterPageFails", 500, 1, "conversations"),
+                                      ("messagesFail", 500, 2, "messages")):
         record = out[name]
         check(record["status"] == status and record["state"] == "error" and record["conversationUrn"] is None
               and record["participants"] == [] and record["messages"] == [], f"{name}: error not reduced to status and empty lists")
+        check(record["errorStep"] == step, f"{name}: errorStep is {record['errorStep']}, expected {step}")
         check(record["coverage"] == "page-limit" and record["pagesRead"] == pages and record["lookup"] == "none",
               f"{name}: coverage, lookup or pagesRead wrong ({record['coverage']}, {record['lookup']}, {record['pagesRead']})")
     check(out["laterPageFailsCalls"] == 5, "a failed conversation page was retried or not reached")
@@ -315,6 +346,9 @@ def main() -> None:
               f"{name}: nothing was called, so nothing was read")
     check(out["signedOut"]["signedIn"] is False and out["signedOut"]["status"] == 0 and out["signedOutCalls"] == 0, "signed-out script still called LinkedIn")
     check(out["emptyId"]["state"] == "error" and out["emptyIdCalls"] == 0, "empty identifier still called LinkedIn")
+    check(out["signedOut"]["errorStep"] == "me" and out["emptyId"]["errorStep"] == "profile", "errorStep wrong when nothing could be asked")
+    check(out["sameMember"]["memberUrn"] == "urn:li:fsd_profile:OWNERID1", "what was resolved before the failure is not reported")
+    check(out["noOwner"]["state"] == "error" and out["noOwner"]["errorStep"] == "me" and out["noOwner"]["status"] == 200, "an unreadable owner is not an error at the me step")
     check(out["capped"] == 98, "messages not capped at the newest 98")
 
     # Search first: found by the search, no list call; the exact variables; the names stay in the page.
@@ -325,7 +359,8 @@ def main() -> None:
     check(len(conversation_urls(out["searchFoundUrls"])) == 0 and len(out["searchFoundUrls"]) == 4, "the list was paged although the search found the conversation")
     sent = search_urls(out["searchFoundRaw"])[0]
     check(sent.endswith(f"queryId={SEARCH_ID}&variables={SEARCH_VARIABLES('Jane%20Doe')}"), f"search variables not exactly LinkedIn's form: {sent}")
-    check("Doe" not in json.dumps(sf) and "Jane" not in json.dumps(sf).replace("jane-doe", ""), "the Lead's name reached the result")
+    visible = json.dumps(sf).replace("jane-doe", "").replace("Jane-Doe", "")
+    check("Doe" not in visible and "Jane" not in visible, "the Lead's name reached the result")
     check(sealed_correctly(sf), "search-found result not sealed correctly")
     # nextCursor paging: the cursor is handed back, before keywords, base64 of 0&20 and 0&40.
     sp = out["searchPaged"]
@@ -366,6 +401,34 @@ def main() -> None:
           "without a name there is no search, and a list-only miss is page-limit")
     check(search_urls(out["searchNamesRaw"])[0].endswith(f"variables={SEARCH_VARIABLES('Jane%20D%C3%B6%20%28Dr%29')}") and out["searchNames"]["lookup"] == "search",
           "keywords are not normalised and encoded (parentheses included) as one value")
+
+    # Identifier forms (0.8.6).
+    opaque = out["opaque"]
+    check(opaque["state"] == "ok" and opaque["requestedIdentifier"] == "ACoAAB1x_y-Z" and opaque["publicIdentifier"] == "ACoAAB1x_y-Z" and opaque["resolvedIdentifier"] == "ACoAAB1x_y-Z"
+          and opaque["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z" and opaque["errorStep"] is None, f"opaque id not resolved to its member URN: {opaque}")
+    check(opaque["participants"] == ["urn:li:fsd_profile:OWNERID1", "urn:li:fsd_profile:ACoAAB1x_y-Z"] and opaque["lookup"] == "list" and opaque["searchPagesRead"] == 0,
+          "the conversation was not matched by the opaque id's member URN, or a search ran without a name")
+    check(not any("voyagerIdentityDashProfiles" in u for u in out["opaqueUrls"]) and len(search_urls(out["opaqueUrls"])) == 0 and out["opaqueUrls"][0] == "/me",
+          "an opaque id still looked up the profile or searched")
+    check(out["opaquePage2"]["state"] == "ok" and out["opaquePage2"]["pagesRead"] == 2 and out["opaquePage2"]["coverage"] == "complete", "an opaque id's conversation on list page 2 was not found")
+    check(out["opaqueMiss"]["state"] == "no-conversation" and out["opaqueMiss"]["coverage"] == "page-limit" and out["opaqueMiss"]["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z",
+          "an opaque id with no search and a list miss must read page-limit")
+    check(out["notOpaque"]["state"] == "ok" and any("voyagerIdentityDashProfiles" in u and "vanityName:ACoABxyz)" in u for u in out["notOpaqueUrls"]),
+          "an identifier that is not ACoAA... must be looked up as a vanity")
+    redirect = out["redirect"]
+    check(redirect["state"] == "ok" and redirect["requestedIdentifier"] == "jane-doe-old" and redirect["publicIdentifier"] == "jane-doe-old" and redirect["resolvedIdentifier"] == "Jane-Doe"
+          and redirect["memberUrn"] == "urn:li:fsd_profile:LEADID01" and redirect["errorStep"] is None and redirect["lookup"] == "list" and redirect["searchPagesRead"] == 1 and redirect["conversationUrn"] == CONVERSATION,
+          f"a redirected vanity was not accepted: {redirect}")
+    for name in ("twoProfiles", "noProfile", "noUrnProfile"):
+        record = out[name]
+        check(record["state"] == "error" and record["errorStep"] == "profile" and record["status"] == 200 and record["resolvedIdentifier"] is None and record["memberUrn"] is None
+              and record["pagesRead"] == 0 and record["searchPagesRead"] == 0 and record["messages"] == [], f"{name}: an unresolved vanity is not an error at the profile step: {record}")
+    check(len(out["twoProfilesUrls"]) == 2, "conversations were read after the profile failed")
+    check(out["profileFails"]["state"] == "error" and out["profileFails"]["errorStep"] == "profile" and out["profileFails"]["status"] == 429, "a failed profile call is not reported with its status")
+    check(out["exactAmongMany"]["state"] == "ok" and out["exactAmongMany"]["resolvedIdentifier"] == "Jane-Doe" and out["exactAmongMany"]["memberUrn"] == "urn:li:fsd_profile:LEADID01",
+          "the exact vanity among several Profiles was not used")
+    for name in ("opaque", "redirect", "twoProfiles", "noOwner"):
+        check(sealed_correctly(out[name]), f"{name}: the new fields are not inside the digest")
 
     # Text is normalised before it is hashed: NBSP and thin space become spaces, zero-width goes, CRLF becomes LF, control characters go,
     # runs of spaces collapse, line ends are trimmed, and the text is NFC. Emoji and the quotation survive.
