@@ -89,7 +89,10 @@ one that fails.
    Owner to do it, and check again after she says it is done. Do not install anything until the check
    passes.
 6. **Run this installer.** It installs her Sync data schedule and her Repair schedule. Ask once whether
-   she sources Leads herself; only if she does, also install her Source leads schedule.
+   she sources Leads herself; only if she does, also install her Source leads schedule. Her schedule needs
+   her own member id in its quota map (she is the run owner of her runs), plus any colleague who
+   receives Leads with her: ask her the two questions under the Source leads schedule and read the ids
+   with `get_team_profiles`.
 
 Each person's Sync data schedule runs on that person's own Mac, in that person's own browser pane, and
 sends only from that person's account. Her Repair schedule works only her own backlog and never sends.
@@ -104,6 +107,10 @@ reports it; it does not work around it.
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<public identifier>` is the last part of the person's LinkedIn profile address (the part after
 `/in/`); `<timezone>` is their local timezone. Ask only if one of them cannot be found.
+
+The Source leads schedule also needs `<quota map>`, the quota map of member ids to accepted-Lead targets
+(1 to 100 each, always including the run owner). Ask once for it, as described under the Source leads
+schedule below.
 
 **Mosaico Outreach — Sync data (connections and messaging)** — once a day, at 1:00 PM local time unless
 the person chose another time. This is the only schedule that clicks Connect or sends a message. Its
@@ -132,24 +139,50 @@ Guards: pacing between page loads, the weekly invitation ceiling and run expiry 
 approves or sends anything. Its text is:
 
 ```text
-Use the installed mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.5.0 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
+Use the installed mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.9.3 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
 
 Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
 
 Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com page, signed in to my LinkedIn (<public identifier>). Obtain connection evidence and identity only through the plugin's approved capture scripts, run by sending the browser javascript tool the one-line directive `// mosaico run <script>.js <PLACEHOLDER>=<value>` (the plugin's gate inserts the approved script; never retype a script), exactly as the skills describe; if the gate refuses the directive, run the approved script word for word with only the first line's value changed (the thread script's second line holds the Lead's name). The first-line value for every per-Lead script is the Lead's scriptIdentifier from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its linkedInProfileUrl after /in/. The thread script also takes the Lead's name from the Mosaico read, so its directive is `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<the Lead's name>`. The approved scripts are browser/linkedin-whoami.js and browser/linkedin-connection-evidence.js; read each from the installed plugin. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
 
-Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it.
+Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile) and the quota <quota map> as quota. Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope, each with the same quota <quota map>, and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. If it answers sourcing_participant_required or sourcing_quota_invalid, stop and report that code and what Mosaico says to fix; never start a run without the quota, and never name a colleague that is not in the quota above. When a run stops because no quota or colleague was sent, quote Mosaico's code and message verbatim when Mosaico gave one, then end the report with this sentence: "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
 
-Step 2. Run the mosaico:mosaico-outreach-invite-run skill with the selected day the next business day and the selected action "source Leads only", using the quota Mosaico reports. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead.
+Step 2. Run the mosaico:mosaico-outreach-invite-run skill with the selected day the next business day and the selected action "source Leads only", using the quota sent at the start. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead.
 
 Step 3. Run the mosaico:mosaico-outreach-invite-run skill again with the same day and the selected action "source Leads and prepare invitation drafts". For each Lead Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. Never approve or send an invitation.
 
 Step 4. Stop only when Mosaico says the quota is met, or when Mosaico reports stop_run after the tenth failure. In that case write the sourcing report Mosaico asks for. A skipped candidate or a refused write for one Lead is not a reason to stop.
 
-Step 5. Report separately, using Mosaico's counts, not memory: Leads saved, drafts written, quota remaining, candidates skipped with reasons, Leads left unverified, blockers. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+Step 5. Report separately, using Mosaico's counts, not memory: Leads saved and quota remaining for each owner in the quota map (name and member id), drafts written, candidates skipped with reasons, Leads left unverified, blockers. A run that saved nothing is a failed run: report it as failed with Mosaico's code (for example sourcing_participant_required or sourcing_quota_invalid) and message, also when Mosaico refused the start, and never as successful. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
 
 Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
 ```
+
+**Source leads: who receives the Leads.**
+Ask these two questions once at install time, only if you install or update the Source leads schedule,
+and keep the answers as the schedule's standing answers:
+
+1. "Who receives the Leads this schedule sources: only you, you and a colleague, or several members?"
+2. "How many accepted Leads should each of them reach per run (1 to 100 each)?"
+
+Read the member ids with `get_team_profiles`: each person's "Person ID" is their member id. The run owner
+is the person whose LinkedIn this schedule uses, so their own id is always in the map. Build `<quota map>`
+from the answers, for example `{"<run owner member id>": 3, "<colleague member id>": 3}`, and write the
+real map into the saved text; never leave a placeholder or an id from memory. Only an Owner or Admin can
+name anyone but the run owner in the map. If an id is not found among the active members,
+ask again. If the person does not say who receives the Leads or how many, do not install Source leads.
+Mosaico refuses a sourcing run that carries neither a quota map nor a colleague, and the application never
+guesses one. A Source leads schedule saved before 0.9.3 has no quota map: update it in place with these
+answers, as described under **Update the Source leads quota in place** below.
+
+### Update the Source leads quota in place
+
+Use this when a Source leads schedule is already installed and only its quota has to be set or changed: one saved before 0.9.3, one whose run stopped for want of a quota, or a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the Source leads schedule and nothing else.
+
+1. Ask only the two questions under **Source leads: who receives the Leads** (skip any the person already answered in this conversation), read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
+2. Find the installed "Mosaico Outreach — Source leads" scheduled task, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
+3. Change only the quota map and the per-owner wording in its text. If its text predates 0.9.3, replace it with the Source leads text above, filled with the schedule's own public identifier and timezone and the new map. Keep its cron times, timezone, public identifier, name, enabled state, working folder and every other saved setting exactly as they are.
+4. Read the saved schedule back and confirm to the person its name, timezone, enabled state, times (unchanged) and the quota map it now holds. A write without readback is not completion.
 
 **Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
 `0 10 * * 0`) unless the person chose another day or time, and also whenever the person asks for it. It
