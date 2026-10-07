@@ -29,18 +29,81 @@ from __future__ import annotations
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 APPROVED_DIR = Path(__file__).resolve().parent.parent / "browser"
 
 # First-line placeholders and the values a run may put in their place.
-# A name goes into a double-quoted string literal, so it may hold anything except a quote, a backslash or a control character.
-NAME_BODY = r'[^"\\\x00-\x1f\x7f-\x9f\u2028\u2029]'
-PLACEHOLDERS: dict[str, tuple[str, re.Pattern[str]]] = {
-    "PUBLIC_IDENTIFIER": ('"PUBLIC_IDENTIFIER"', re.compile(r'^"[A-Za-z0-9._%-]{1,120}"$')),
-    "LEAD_NAME": ('"LEAD_NAME"', re.compile(r'^"' + NAME_BODY + r'{0,120}"$')),
-    "STOP_AT": ("0", re.compile(r"^[0-9]{1,16}$")),
-    "NOOP": ("0", re.compile(r"^0$")),
+#
+# Both the identifier and the name go into a double-quoted string literal, so each is checked against a short list of what
+# may appear, not a list of what may not. Anything else (a quote, a backslash, a line break or other control character, a
+# bracket, `$`, a backtick, `/`, `;`, a zero-width or direction-changing character, a lone surrogate, an unassigned or
+# private-use code point) is refused. Letters and marks of every script are fine: LinkedIn public identifiers and names
+# hold them ("jose-garcia", "Zoe", "Soren", CJK names), and a mark is how a decomposed accent is written.
+#
+# The identifier is best given as LinkedIn spells it (decoded), which is what the application hands over as
+# scriptIdentifier: the scripts pass it through encodeURIComponent and compare it with the publicIdentifier LinkedIn
+# returns. A well-formed percent sequence ("%C3%A9", as copied from a profile address) is still accepted, as before, but
+# it is never decoded here: the text stays word for word, and the script would look it up double-encoded. A bare `%` is
+# refused. `_` and `-` stay because opaque member ids (ACoAA...) use them; `.` stays as before.
+IDENTIFIER_PUNCTUATION = frozenset("-._")
+NAME_PUNCTUATION = frozenset(" -\u2010\u2011'\u2019.,")
+IDENTIFIER_MAX = 120
+NAME_MAX = 120
+# Letters and marks that draw nothing (joiners, fillers, variation selectors): never allowed.
+INVISIBLE = frozenset(
+    {0x034F, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x180B, 0x180C, 0x180D, 0x180F, 0x3164, 0xFFA0}
+    | set(range(0xFE00, 0xFE10)) | set(range(0xE0100, 0xE01F0))
+)
+
+
+def _text_char(ch: str) -> bool:
+    """A letter, a combining mark or a decimal digit of any script, and not an invisible one."""
+    category = unicodedata.category(ch)
+    return (category[0] in "LM" or category == "Nd") and ord(ch) not in INVISIBLE
+
+
+PERCENT_SEQUENCE = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def valid_identifier(text: str) -> bool:
+    """A public identifier or a member id as the scripts take it: 1 to 120 text characters, `-`, `.`, `_` or a `%XX` sequence."""
+    rest = PERCENT_SEQUENCE.sub("", text)
+    return 1 <= len(text) <= IDENTIFIER_MAX and all(ch in IDENTIFIER_PUNCTUATION or _text_char(ch) for ch in rest)
+
+
+def valid_name(text: str, *, minimum: int) -> bool:
+    """A Lead's name: text characters, spaces, hyphens, apostrophes, periods and commas, `minimum` to 120 characters."""
+    return minimum <= len(text) <= NAME_MAX and all(ch in NAME_PUNCTUATION or _text_char(ch) for ch in text)
+
+
+def _inside_quotes(value: str) -> str | None:
+    """What a double-quoted literal holds, or None when `value` is not one."""
+    return value[1:-1] if len(value) >= 2 and value[0] == value[-1] == '"' else None
+
+
+def _identifier_literal(value: str) -> bool:
+    inner = _inside_quotes(value)
+    return inner is not None and valid_identifier(inner)
+
+
+def _name_literal(value: str) -> bool:
+    inner = _inside_quotes(value)
+    return inner is not None and valid_name(inner, minimum=0)
+
+
+def _pattern(expression: str):
+    compiled = re.compile(expression)
+    return lambda value: compiled.fullmatch(value) is not None
+
+
+# placeholder -> (its canonical value in an approved script, whether a run's value for it is allowed)
+PLACEHOLDERS = {
+    "PUBLIC_IDENTIFIER": ('"PUBLIC_IDENTIFIER"', _identifier_literal),
+    "LEAD_NAME": ('"LEAD_NAME"', _name_literal),
+    "STOP_AT": ("0", _pattern(r"[0-9]{1,16}")),
+    "NOOP": ("0", _pattern(r"0")),
 }
 FIRST_LINE = re.compile(r"^const (?P<name>[A-Z_]+) = (?P<value>.+);$")
 
@@ -82,7 +145,7 @@ def _canonical(lines: list[str]) -> list[str] | None:
     leading = _leading_placeholders(lines)
     if not leading:
         return None
-    if any(not PLACEHOLDERS[name][1].match(value) for name, value in leading):
+    if any(not PLACEHOLDERS[name][1](value) for name, value in leading):
         return None
     return [*(f"const {name} = {PLACEHOLDERS[name][0]};" for name, _ in leading), *lines[len(leading):]]
 
@@ -149,8 +212,6 @@ DIRECTIVE_START = re.compile(r"^\s*//\s*mosaico\s+run\b", re.IGNORECASE)
 DIRECTIVE = re.compile(r"^// mosaico run (?P<script>[A-Za-z0-9._-]+\.js)(?P<rest>(?: [A-Z_]+=.+)?)$")
 ASSIGNMENT = re.compile(r" (?P<name>[A-Z_]+)=")
 TOKEN = re.compile(r"\S+")
-IDENTIFIER = re.compile(r"^[A-Za-z0-9._%-]{1,120}$")
-LEAD_NAME_VALUE = re.compile(r"^" + NAME_BODY + r"{1,120}$")
 # The one placeholder whose value may hold spaces: it is the rest of the line, so it comes last.
 REST_OF_LINE = "LEAD_NAME"
 
@@ -214,7 +275,7 @@ def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
     if not given:
         # No value: only a script whose own placeholder lines are all values a run may use (not an empty identifier).
         leading = _leading_placeholders([line.rstrip() for line in raw_lines])
-        if any(not PLACEHOLDERS[name][1].match(value) for name, value in leading):
+        if any(not PLACEHOLDERS[name][1](value) for name, value in leading):
             return None
         return raw
     # Every placeholder the script takes, in its order, exactly once; a name or a value that is not its own is refused.
@@ -225,12 +286,12 @@ def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
         quoted = len(value) >= 2 and value[0] == value[-1] == '"'
         bare = value[1:-1] if quoted else value
         if placeholder == "PUBLIC_IDENTIFIER":
-            if not IDENTIFIER.match(bare):
+            if not valid_identifier(bare):
                 return None
         elif placeholder == "LEAD_NAME":
-            if not LEAD_NAME_VALUE.match(bare) or bare != bare.strip():
+            if not valid_name(bare, minimum=1) or bare != bare.strip():
                 return None
-        elif not PLACEHOLDERS[placeholder][1].match(value):
+        elif not PLACEHOLDERS[placeholder][1](value):
             return None
         literals.append(f'"{bare}"' if placeholder in ("PUBLIC_IDENTIFIER", "LEAD_NAME") else value)
     head = [f"const {placeholder} = {literal};" for (placeholder, _), literal in zip(given, literals)]
@@ -288,8 +349,16 @@ def decide(payload: object) -> tuple[bool, str]:
 
 
 def main() -> int:
+    # The call is UTF-8 JSON whatever the machine's locale says. Read the bytes and decode them as UTF-8 (a call that is not
+    # valid UTF-8 is refused, never guessed at). The answer is printed as plain-ASCII JSON (non-ASCII text as \uXXXX escapes),
+    # which any reader decodes to the same characters, so an accented identifier or name survives the round trip.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     try:
-        payload = json.load(sys.stdin)
+        payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     except Exception:  # noqa: BLE001 - fail closed on any unreadable input
         print("Browser-script gate: the call could not be read, so it was refused.", file=sys.stderr)
         return 2
