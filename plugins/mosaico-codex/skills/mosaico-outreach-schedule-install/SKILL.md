@@ -55,52 +55,34 @@ blocker, the run stops and reports it; it does not work around it.
 
 Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved automation stale. Never copy any step of the procedure into an automation text.
 
-**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
+**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads text needs 0.9.8, the first release where the sourcing plan on the Agents drives it. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
 
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<timezone>` is their local timezone. Ask only if it cannot be found.
 
-The schedule also needs `<quota map>`, the quota map of member ids to accepted-Lead targets (1 to 100 each,
-always including the run owner). Ask once for it, as described below the schedule text.
+The number of Leads per day and who sources them are set on each Agent in Outreach, Agent tab (Leads per day and Sourced by), not in the schedule. A schedule saved with a quota map needs no change, but to drop it follow **Update the standing answers in place** below.
 
 Install **Mosaico Outreach — Source leads** every two hours during business hours, by default 8:00 AM
 to 6:00 PM local time, unless the person chose other hours. Its text is:
 
 ```text
-Use the installed $mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.6 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
+Use the installed $mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.8 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
 
-Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; quota map <quota map> (who receives the Leads and how many each per run); day: the next business day; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; day: the next business day; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
 
 Use the authenticated LinkedIn browser. A LinkedIn warning or captcha stops the run, which then reports.
 
-If the installed plugin is older than 0.9.6 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
+If the installed plugin is older than 0.9.8 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
 ```
-
-**Who receives the Leads.**
-Ask these two questions once at install time, only if you install or update the Source leads schedule,
-and keep the answers as the schedule's standing answers:
-
-1. "Who receives the Leads this schedule sources: only you, you and a colleague, or several members?"
-2. "How many accepted Leads should each of them reach per run (1 to 100 each)?"
-
-Read the member ids with `get_team_profiles`: each person's "Person ID" is their member id. The run owner
-is the person whose LinkedIn this schedule uses, so their own id is always in the map. Build `<quota map>`
-from the answers, for example `{"<run owner member id>": 3, "<colleague member id>": 3}`, and write the
-real map into the saved text; never leave a placeholder or an id from memory. Only an Owner or Admin can
-name anyone but the run owner in the map. If an id is not found among the active members,
-ask again. If the person does not say who receives the Leads or how many, do not install Source leads.
-Mosaico refuses a sourcing run that carries neither a quota map nor a colleague, and the application never
-guesses one. A Source leads schedule saved before 0.9.3 has no quota map: update it in place with these
-answers, as described under **Update the standing answers in place** below.
 
 ### Update the standing answers in place
 
-Use this when a Source leads automation is already installed and only its standing answers have to be set or changed: its timezone or its quota map. It also covers an automation saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text; one saved before 0.9.3 or whose run stopped for want of a quota; and a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the Source leads automation and nothing else.
+Use this when a Source leads automation is already installed and only its standing answers have to be set or changed: its timezone. It also covers an automation saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, and one saved before 0.9.8 that still carries a quota map (the thin text drops it; if it is left, Mosaico ignores the extra standing answer). Another skill may follow these steps; they touch the Source leads automation and nothing else.
 
-1. Ask only for the answer that is missing or changing. For the quota that is the two questions under **Who receives the Leads** (skip any the person already answered in this conversation); read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
+1. Ask only for the answer that is missing or changing (the timezone). Ask nothing else. Never ask for a quota: the number of Leads per day and who sources them are set on each Agent in Outreach, Agent tab (Leads per day and Sourced by), not in the schedule.
 2. Find the installed "Mosaico Outreach — Source leads" automation, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
-3. Replace the whole text with the Source leads text above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in" and the quota map after "quota"; carry them over unchanged unless the person gave a new one. Change nothing else: keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
-4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the quota map it now holds. A write without readback is not completion.
+3. Replace the whole text with the Source leads text above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in"; carry them over unchanged unless the person gave a new one, and drop any quota map. Change nothing else: keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
+4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion.
 
 ## Keep it apart from Sync data
 
