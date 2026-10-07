@@ -135,6 +135,8 @@ modify another owner's records.
 
 This is the Repair flow of Mosaico Outreach. It works the backlog Mosaico lists in its repair queue: Leads whose connection nobody verified, drafts that break a rule, addresses LinkedIn redirected, one person held under two Leads, and declines nobody applied. It never sends a message or an invitation, never approves, rewrites or replaces a draft, never sets a connection state and never reads a thread by eye; the Sync data schedule does the daily sending. It uses this skill and the procedures it names from mosaico:mosaico-outreach-follow-up-run.
 
+**Mosaico connector.** Use the Mosaico connector that serves production (app.mosaico.one): the plugin's own Mosaico server or the claude.ai Mosaico connector. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
+
 The schedule's text carries only the person's standing answers: the timezone and the LinkedIn public identifier; the scope is the whole repair queue, up to the cap Mosaico sets for one run. Take them from there; the schedule supplies the answers to this skill's opening questions, so do not ask them, do not show a menu, and do not ask which days or which scope. If a standing answer is missing, stop and report which one.
 
 Resolve the current business date and time in the timezone from the schedule's standing answers. The person has supplied standing answers for this recurring automation: proceed without asking which scope.

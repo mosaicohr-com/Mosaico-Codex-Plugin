@@ -53,6 +53,15 @@ Do these checks first. If one fails, install nothing and tell the person what to
    `~/.codex/automations/mosaico-lead-preparation`. If either exists and its `automation.toml` says
    `status = "ACTIVE"`, tell the person to disable it. Codex cannot run the connection check, and a
    parallel run would send invitations twice. Do not install the Sync data schedule while one is active.
+4. **Non-production Mosaico server.** Look for an MCP server that points at a non-production Mosaico
+   address, in the project's `.mcp.json` and in the project and user entries of `~/.claude.json`
+   (`mcpServers`; the project entry is the one for the folder the schedules run in). An address that
+   contains `amplifyapp.com`, `stage`, `staging`, `test` or `localhost` is not production. If one exists,
+   refuse to install. Tell the person to remove it before installing: a scheduled run can pick it
+   because stage and production share organisation ids, and it would then write to stage. Production
+   is `app.mosaico.one`, reached through the plugin's own Mosaico server or the claude.ai Mosaico
+   connector. A stage server needed on purpose can be added back under a distinct name such as
+   `mosaico-stage`, in a session that is not a scheduled run. Check again after they say it is done.
 
 ## Set up a second person
 

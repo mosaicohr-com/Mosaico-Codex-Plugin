@@ -43,6 +43,11 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 
 MIN_VERSION = "0.9.6"
+CONNECTOR_RULE = (
+    "Use the Mosaico connector that serves production (app.mosaico.one): the plugin's own Mosaico server or the claude.ai Mosaico connector. "
+    "Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. "
+    "Do not choose a server because its organisation id matches; stage and production share ids."
+)
 
 
 def routine(text: str, name: str) -> str:
@@ -247,6 +252,18 @@ def main() -> None:
     check("Source leads and Repair are not installed" in claude, "Single-task fallback does not mention Repair")
     # Each routine is its own section: none borrows another's steps.
     check("outreach_get_repair_queue" not in source and "outreach_get_repair_queue" not in sync, "Sync data or Source leads routine reads the repair queue")
+
+    # Production connector only: every scheduled routine and the overview skill name the connector to use and refuse a stage server.
+    overview_claude = (CLAUDE / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
+    for label, text in (("Sync data routine", sync), ("Source leads routine", source), ("Repair routine", repair), ("mosaico-outreach skill", overview_claude)):
+        flat = " ".join(text.split())
+        check(CONNECTOR_RULE in flat, f"{label} lacks the production-connector rule")
+        check(flat.count("amplifyapp.com") == 1, f"{label} must name the non-production addresses exactly once")
+    installer = " ".join(claude.split())
+    check("4. **Non-production Mosaico server.**" in installer, "Claude installer lacks the fourth pre-install check")
+    for needle in ("`.mcp.json`", "`~/.claude.json`", "amplifyapp.com", "`localhost`", "refuse to install", "remove it before installing", "stage and production share organisation ids", "`mosaico-stage`", "app.mosaico.one"):
+        check(needle in installer, f"Claude installer's fourth check lacks: {needle}")
+    check("Non-production Mosaico server" not in SKILLS["Codex"], "Codex installer carries the Claude-only connector check")
 
     for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())

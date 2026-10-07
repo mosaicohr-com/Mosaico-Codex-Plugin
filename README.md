@@ -116,6 +116,10 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### Unreleased
+
+- Production connector only. The Source leads, Sync data and Repair routine sections and the `mosaico-outreach` skill now say which Mosaico connector to use: the one that serves production (app.mosaico.one), either the plugin's own Mosaico server or the claude.ai Mosaico connector. A server whose address contains amplifyapp.com, stage, staging, test or localhost is never used; if it is the only Mosaico server, the run stops and reports it; a server is never chosen because its organisation id matches, because stage and production share ids. The schedule installer has a fourth check before installing: a project or user MCP server that points at a non-production Mosaico address must be removed first. A scheduled Source leads run had started its Mosaico run on a stage server this way.
+
 ### 0.9.6
 
 - Thin routines. The schedule installer now saves, for each of Sync data, Source leads and Repair, a short text
