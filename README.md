@@ -84,7 +84,7 @@ from that person's account. Nobody's run touches another owner's Leads.
 The Claude Code package verifies LinkedIn connection status through a browser-side capability instead
 of any cookie or session export:
 
-- `plugins/mosaico-claude/browser/` holds the five approved capture scripts. Each runs inside the
+- `plugins/mosaico-claude/browser/` holds the six approved capture scripts. Each runs inside the
   signed-in LinkedIn page in Claude's built-in browser pane, calls one fixed LinkedIn endpoint, uses the
   page's own session and CSRF material without ever returning it, and returns only the fields Mosaico's
   evidence parser reads (status, relationship state, profile identifier, capture time). Names, headlines
@@ -93,8 +93,9 @@ of any cookie or session export:
 - `plugins/mosaico-claude/browser/linkedin-thread-messages.js` is the thread script: it takes the Lead's public identifier on its first line and the Lead's name on its second (0.9.2), finds the one-to-one conversation with that Lead by LinkedIn's messaging search on the Lead's name (up to 3 pages) and, when that finds nothing, by paging LinkedIn's conversation list (up to 8 pages, about 160 conversations, stopping at the first page that holds it), and returns only the participants' member ids and the messages oldest first, each with its delivery time, sender and text, plus `coverage` (`complete` or `page-limit`), `lookup` (`search`, `list` or `none`), `pagesRead`, `searchPagesRead` and, since 0.9.2, `matchBasis` (`identifier` or `name`), `requestedName` and the matched person's `displayName`. A run passes the output unchanged as `threadEvidence` to `outreach_deposit_conversation`; Mosaico derives each message's direction and time from it. It runs only in Claude's built-in browser pane.
 - Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces, object keys whose value is null or undefined omitted at every depth; array items stay) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
+- `plugins/mosaico-claude/browser/linkedin-salesnav-colleague-connection.js` is the colleague-connection script (0.9.4): it takes the candidate's public identifier on its first line and the colleague's registered public identifier on its second (Mosaico supplies it; the run never chooses it), and asks Sales Navigator's "Connections of" filter whether the candidate is already one of the colleague's connections. It runs only in the signed-in Sales Navigator page (any `https://www.linkedin.com/sales/` page) in Claude's built-in browser pane, calls only LinkedIn's profile query, the filter's typeahead and the lead search, and returns only `{ status, signedIn, capturedAt, state, colleague, candidate, filter, found, resultsTotal, pagesRead }` (each person as `{ input, salesNavId, memberId }`), where `state` is `ok`, `colleague-not-resolved`, `candidate-not-resolved` or `error`. A run passes the output unchanged as `colleagueConnectionEvidence` to `outreach_save_lead`; Mosaico decides whether to skip the candidate. People are found by numeric member id (decoded from LinkedIn's ids), never by name. `found: false` is never proof that two people are not connected.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
-  an approved script word for word (only the values on its leading placeholder lines may change: the first line, and for the thread script the second, the Lead's name), expands a one-line run
+  an approved script word for word (only the values on its leading placeholder lines may change: the first line, for the thread script the second, the Lead's name, and for the colleague-connection script the second, the colleague's identifier), expands a one-line run
   directive (0.8.4, below) into the approved script, and refuses any other script
   that names LinkedIn or reads a credential store. It logs nothing and never echoes a script, header,
   cookie or response.
@@ -105,6 +106,60 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.4
+
+- Source leads checks whether a candidate is already connected to the colleague before saving the candidate for
+  her. New approved script `browser/linkedin-salesnav-colleague-connection.js`. For one candidate and one colleague
+  it makes at most these calls to LinkedIn from the signed-in Sales Navigator page, one after the other with a short
+  pause, and never retries: LinkedIn's profile query for each person (their member id and name); Sales Navigator's
+  "Connections of" typeahead, which searches by text, so the colleague's name is the text and the colleague is the
+  entry whose id decodes to her own member id; the lead search with that one filter and the candidate's name as the
+  keyword (25 results a page, at most 2 pages), where the candidate is the result whose id decodes to the
+  candidate's member id; and, when the filtered search does not list them, one unfiltered keyword page, only to read
+  the candidate's own Sales Navigator id (Mosaico needs it). The API cannot restrict a search to one member, so the
+  keyword narrows it and the member id decides. Nothing is chosen by name: a person with a similar name is never taken.
+- It returns `{ status, signedIn, capturedAt, state, colleague, candidate, filter, found, resultsTotal, pagesRead,
+  integrity }` and nothing else: no name, headline or result row leaves the page. `colleague` and `candidate` are each
+  `{ input, salesNavId, memberId }` (`input` is the identifier it was given, echoed exactly). `found` is true only
+  when `state` is `ok` and the candidate is listed in the colleague's connections. `state` `ok` always carries both
+  Sales Navigator ids and status 200. It fails closed: a signed-out page, an error status, an answer not in the
+  expected shape, results with no readable id, or a filtered answer that does not echo the colleague's id (the filter
+  was not applied) end in `error` with `found` false. The result is sealed with the same `integrity` digest as the
+  other scripts, computed last.
+- It never sets a connection state and never proves that two people are not connected: `found: false` can mean the
+  colleague hides her connections, the candidate hides his, or Sales Navigator does not list everyone. Mosaico saves
+  such a candidate with the connection unknown and says so.
+- The browser-script gate takes one more placeholder, `COLLEAGUE_IDENTIFIER`, on the script's second line, checked
+  exactly like `PUBLIC_IDENTIFIER` (1 to 120 letters, marks and digits of any script, `-`, `.`, `_` and well-formed
+  `%XX`; anything else is refused), word for word and as the directive
+  `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<candidate> COLLEAGUE_IDENTIFIER=<colleague>`.
+  The directive must carry both placeholders once each, in that order. Mosaico supplies the colleague's value in
+  `workflowStatus.colleagueChecks` and a directive with `<candidate>` left to fill.
+- The Claude invite-run skill has a new section, "Check a candidate against the colleague": before saving a
+  candidate for a colleague whose check Mosaico lists as allowed, run the directive for the candidate and pass the
+  output unchanged as `colleagueConnectionEvidence`. A `skipped` answer `already-connected-to-colleague` is not a
+  failure and does not count toward the target: source the next candidate. A `blocked` answer
+  `colleague-check-required` (reasons `evidence-missing`, `evidence-altered`, `colleague-evidence-malformed`,
+  `colleague-evidence-inconsistent`, `observation-stale`, `observation-time-invalid`, `colleague-mismatch`,
+  `candidate-mismatch`, `candidate-is-colleague`) means run the script again and send the new output; never retype it.
+  The notes `colleague-check-negative-unproven` (saved, connection unknown, not a proof),
+  `colleague-check-unavailable` (saved; no evidence needed for that colleague for the rest of the run) and
+  `colleague-check-cap-reached` are explained. The sourcing report now says "skipped as already connected to
+  <owner>: N" for each owner, from Mosaico's counts.
+- The Source leads schedule text (Claude) lists the new script among the approved scripts and the check; both
+  Source leads texts now need plugin 0.9.4 or later: run the installer again to update a saved schedule. The Codex
+  package ships no browser scripts: its skills say Codex cannot run the check, and a Codex save for a colleague that
+  Mosaico blocks with `colleague-check-required` is left for a Claude run.
+- Needs the Mosaico application change that accepts `colleagueConnectionEvidence` (mosaico-app pull request 1811).
+  What the 2026-10-07 captures could not show (the capture tool cut long bodies and hid the query and the
+  `decorationId`): the keyword field's spelling inside the query, the `decorationId` the Sales Navigator page sends
+  and the shape of a result row are the script's best reading, stated in its header. A wrong reading ends in
+  `state` `error`, never in a wrong `found`. The first live check must confirm them.
+- Tests: the new script runs under node against a fake Sales Navigator (found, not found, namesakes, similar-name
+  typeahead entries, hidden list, paging, odd characters, every error path, no name or token in the result, digest
+  recomputed independently); the gate tests cover accepted and refused values in both slots and both forms and the
+  round trip; skill tests check the wording. Manifests are at 0.9.4.
 
 ### 0.9.3
 

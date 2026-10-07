@@ -84,7 +84,7 @@ set it yourself.
 
 Every approved script returns an `integrity` field, `{ algorithm: "fnv1a32", digest }`, computed in the
 page over everything else it returns. Wherever a script's output goes to Mosaico (`identityEvidence` from
-the whoami script, the connection evidence, `sentInvitationEvidence`), pass it exactly as returned: every
+the whoami script, the connection evidence, `sentInvitationEvidence`, `colleagueConnectionEvidence`), pass it exactly as returned: every
 field, `integrity` included, never retyped, trimmed, reformatted, translated or "fixed". Mosaico recomputes
 the digest and refuses an altered copy with `evidence-altered`: nothing is stored, and the recommended
 action is `recapture`. Then run the approved script again and pass the new output unchanged. Never edit
@@ -122,7 +122,8 @@ so the scheduled runs use it too?" The run does not depend on the answer.
    only a few Leads. Loading 3 Leads is not completion; if 17 are still missing, continue until all
    17 are found.
 5. Save each qualified Lead through `outreach_save_lead`, which takes no connection state: the new Lead
-   starts unknown. Then run **Capture connection evidence** for it, so Mosaico records connected,
+   starts unknown. For a candidate you save for a colleague, first run **Check a candidate against the
+   colleague** when it applies. Then run **Capture connection evidence** for the saved Lead, so Mosaico records connected,
    invite-pending or not-connected before any draft is written. Write the missing outbound Invite draft
    only for a Lead Mosaico lists as verified. Do not approve or send any invitation in this scope.
 6. Reread `outreach_get_day` after every saved Lead and draft. Mosaico preserves partial progress and
@@ -143,16 +144,88 @@ their own Agent and voice.
    what remains for each owner; use its counts, and `workflowStatus.counts.readyLeads` for the ready
    Leads, not the prepared count.
 2. Save each qualified Lead with its profile details through `outreach_save_lead`, which takes no
-   connection state, then run **Capture connection evidence** for it. Do not write any invitation draft
+   connection state (for a candidate you save for a colleague, first run **Check a candidate against the
+   colleague** when it applies), then run **Capture connection evidence** for it. Do not write any invitation draft
    in this scope, and do not approve or send anything.
 3. Reread `outreach_get_day` after every saved Lead and continue until Mosaico says the quota is met or
    returns a blocker, `human_decision_required` or `stop_run`.
 4. Finish with **Report a sourcing run**. A run below its quota is not complete.
 
+## Check a candidate against the colleague
+
+This applies in **Source Leads and prepare drafts** and **Source Leads only**, to a candidate you are about to
+save for a colleague (an owner other than the run owner). Whether the candidate is already connected to that
+colleague is a fact in LinkedIn's Sales Navigator, not something to judge. This procedure carries it to
+Mosaico unchanged; Mosaico reads it and decides. Never decide it from the screen, from a result list or from
+a name, and never use it as a connection state: it sets none.
+
+Mosaico tells you when it is needed. When `outreach_get_day` (with `intent: source_invitation_leads` and the
+`runId`) lists the colleague in `workflowStatus.colleagueChecks` with `allowed: true`, run the check for every
+candidate you will save for that colleague, once, right before `outreach_save_lead`. When there is no such
+entry, or `allowed` is false (the entry says why), save as usual with no evidence. A Lead for the run owner
+never needs it. Mosaico supplies the colleague's identifier in that entry; you never choose or retype it.
+
+1. Take the candidate's public identifier: the part of the profile URL you are about to save after `/in/`, with
+   no trailing slash or query, or the opaque id when that is what the URL holds (it starts with `ACoAA`). Use it as it is.
+2. The entry's `directive` is the line to run, with `<candidate>` left for you to fill. Replace only
+   `<candidate>` with that identifier; leave the colleague's identifier exactly as Mosaico wrote it. Send the
+   result as the whole script with the browser pane's `javascript_tool` from a Sales Navigator page (any
+   `https://www.linkedin.com/sales/` page; open `https://www.linkedin.com/sales/home` first when the pane is
+   elsewhere): `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<candidate> COLLEAGUE_IDENTIFIER=<the colleague's identifier from Mosaico>`.
+   The plugin's gate inserts the approved script; never print, retype, paraphrase, reorder, shorten or
+   extend it. It sends LinkedIn's own session and CSRF material to LinkedIn only, never returns it, and
+   returns only ids: no name, headline or result row leaves the page.
+   Fallback, only when the gate refuses the directive: print the approved script without changing it,
+
+   ```bash
+   cat "${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(find ~/.claude/plugins -path '*/mosaico-claude/browser/linkedin-salesnav-colleague-connection.js' -print -quit)")")}/browser/linkedin-salesnav-colleague-connection.js"
+   ```
+
+   then run the printed script with the browser pane's `javascript_tool`, changing only the values on its
+   first two lines (the candidate's identifier on the first, the colleague's on the second), in quotes. The
+   gate refuses anything else.
+3. Pass the script's whole output exactly as returned (every field, `integrity` included) as
+   `colleagueConnectionEvidence` on the `outreach_save_lead` call for this candidate and this colleague, with
+   everything else you pass for a save. Do this whatever its `state` is (`ok`, `colleague-not-resolved`,
+   `candidate-not-resolved` or `error`), and also when `signedIn` is false: Mosaico reads it and decides.
+   Never trim, retype or "fix" it, and never leave a field out.
+4. Mosaico's answer is final:
+   - `skipped` with code `already-connected-to-colleague` (recommended action `continue_sourcing`): the
+     candidate is already connected to the colleague. Nothing was saved. This is not a failure and does not
+     count toward the target. Source the next candidate and keep going.
+   - `blocked` with code `colleague-check-required` (recommended action `run_colleague_check`): nothing was
+     saved and the check was missing or unusable. Its `reason` says which: `evidence-missing`,
+     `evidence-altered`, `colleague-evidence-malformed`, `colleague-evidence-inconsistent`,
+     `observation-stale` (older than ten minutes: run it again just before the save),
+     `observation-time-invalid`, `colleague-mismatch` (it was run for another colleague: use the identifier in
+     Mosaico's directive), `candidate-mismatch` (it was run for another person: run it for this candidate) or
+     `candidate-is-colleague`. Run the script again with the directive Mosaico returned and send the new output
+     unchanged; never retype or edit the old one. Do this once per candidate. If Mosaico still blocks it, list
+     the candidate as skipped with Mosaico's code and reason and continue. For `candidate-is-colleague`
+     running again cannot help: the candidate is the colleague herself, so do not save it, list it as skipped
+     and continue.
+   - Saved, with a note: `colleague-check-negative-unproven` means the candidate was not found in the
+     colleague's connections, or could not be looked up. That is **not** proof that they are not connected
+     (she may hide her connections): the Lead is saved with its connection unknown, so never write "not
+     connected" about it. `colleague-check-unavailable` means the check cannot work for this colleague (the page was signed out,
+     LinkedIn refused it, or she could not be found in Sales Navigator): the candidate was saved without it, and
+     Mosaico asks for no more checks for that colleague in this run, so save her next candidates without
+     evidence. `colleague-check-cap-reached` means this run has used all its checks: save the rest without evidence.
+5. A saved Lead then goes through **Capture connection evidence** as before. The colleague check is never
+   passed to `outreach_record_connection_evidence`.
+
+When the script file is missing or the gate refuses it, do not work around it: do not save the candidate for
+the colleague, list it as skipped with the reason, and continue.
+
 ## Report a sourcing run
 
 Report in plain words, using Mosaico's counts, not memory: for each owner in the quota, the Leads saved
-and the quota remaining (name the owner and the member id), and any shortfall with its blocker. A run
+and the quota remaining (name the owner and the member id), the candidates skipped as already connected
+to that owner ("skipped as already connected to <owner>: N", from `workflowStatus.colleagueSkips` or the
+`colleagueSkips` Mosaico returns with `outreach_get_run`; its entries name the owner), and any shortfall with
+its blocker. Those skips are never failures. Also say, from Mosaico's notes, any colleague whose check was
+unavailable and why, and that a candidate saved after "not found" has its connection unknown, not "not
+connected". A run
 that saved nothing is a failed run: report it as failed with Mosaico's code and message (for example
 `sourcing_participant_required`, `sourcing_quota_invalid` or the blocker that stopped it), including a run
 Mosaico refused at the start. Never report such a run as successful, and never describe a partly filled
