@@ -10,7 +10,7 @@
     {
       "name": "mosaico",
       "source": "./plugins/mosaico-claude",
-      "description": "Manage Mosaico through its authenticated production MCP service."
+      "description": "Manage Mosaico through the person's own production Mosaico connector."
     }
   ]
 }

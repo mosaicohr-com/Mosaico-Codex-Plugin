@@ -476,6 +476,8 @@ yourself. Only Owners and Admins can use Outreach.
 
 This is the Sync data flow of Mosaico Outreach: connections and messaging. It does not source, transfer or draft invitations; the Source leads schedule does that. It uses this skill for the follow-ups and the mosaico:mosaico-outreach-invite-run skill for the approved invitations.
 
+**Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
+
 The schedule's text carries only the person's standing answers: the timezone and the LinkedIn public identifier; the scope is follow-ups across all dates with the action "one pass per thread", then invitations for today with the action "send approved invitations". Take them from there; the schedule supplies the answers to this skill's opening questions, so do not ask them, do not show a menu, and do not ask which days or which scope. If a standing answer is missing, stop and report which one.
 
 Resolve the current business date and time in the timezone from the schedule's standing answers. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.

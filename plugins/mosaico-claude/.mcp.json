@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "mosaico": {
-      "type": "http",
-      "url": "https://app.mosaico.one/api/mcp"
-    }
-  }
-}
