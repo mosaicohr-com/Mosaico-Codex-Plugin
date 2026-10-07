@@ -85,7 +85,7 @@ console.log(JSON.stringify(out));
 
 
 def main() -> None:
-    check(len(SCRIPTS) == 5, "expected the five approved browser scripts")
+    check(len(SCRIPTS) == 6, "expected the six approved browser scripts")
     lines = []
     for script in SCRIPTS:
         source = script.read_text(encoding="utf-8")
@@ -95,7 +95,7 @@ def main() -> None:
         check("Text normalisation (0.8.5" in source and "NFC" in source and "zero-width" in source and "CRLF" in source and "digest is computed after normalisation" in source,
               f"{script.name} header does not state the normalisation rule")
         check(source.index("const normalizeText") < source.index("const payload"), f"{script.name} defines normalizeText after the payload")
-    check(len(set(lines)) == 1, "the five scripts do not carry the same normalizeText")
+    check(len(set(lines)) == 1, "the six scripts do not carry the same normalizeText")
     rule = lines[0]
     for needle in ('normalize("NFC")', '\\u00A0', '\\u2000-\\u200A', '\\u202F', '\\u205F', '\\u3000', '\\u200B-\\u200D', '\\u2060', '\\uFEFF', '\\r\\n?', '\\u007F-\\u009F'):
         check(needle in rule, f"the rule is missing {needle}")
@@ -132,9 +132,12 @@ def main() -> None:
             # Message text, the profile's and the participants' names (search keywords and displayName), the Lead's own name (0.9.2)
             # and the name rule's own parameter (foldName): nothing else.
             check(all(("m.body.text" in use or "firstName" in use or "[" in use or use in ("LEAD_NAME", "s")) for use in uses), f"thread script normalises an unexpected value: {uses}")
+        elif script.name == "linkedin-salesnav-colleague-connection.js":
+            # The two names used as search text (sent back to LinkedIn, never returned): nothing else.
+            check(len(uses) == 1 and "firstName" in uses[0] and "lastName" in uses[0], f"{script.name} normalises an unexpected value: {uses}")
         else:
             check(uses == [], f"{script.name} normalises a value although it returns no free text: {uses}")
-    print("PASS: all five approved scripts carry one normalisation rule, it matches the Python mirror on NBSP, zero-width, CRLF, thin space and control characters, and URNs, URLs and timestamps are untouched.")
+    print("PASS: all six approved scripts carry one normalisation rule, it matches the Python mirror on NBSP, zero-width, CRLF, thin space and control characters, and URNs, URLs and timestamps are untouched.")
 
 
 if __name__ == "__main__":

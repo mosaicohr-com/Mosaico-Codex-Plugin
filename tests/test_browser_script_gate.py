@@ -25,6 +25,7 @@ CONNECTIONS = (BROWSER / "linkedin-recent-connections.js").read_text(encoding="u
 WHOAMI = (BROWSER / "linkedin-whoami.js").read_text(encoding="utf-8")
 THREAD = (BROWSER / "linkedin-thread-messages.js").read_text(encoding="utf-8")
 SENT = (BROWSER / "linkedin-sent-invitations.js").read_text(encoding="utf-8")
+COLLEAGUE = (BROWSER / "linkedin-salesnav-colleague-connection.js").read_text(encoding="utf-8")
 TOOL = "mcp__Claude_Browser__javascript_tool"
 CHROME_TOOL = "mcp__claude-in-chrome__javascript_tool"
 
@@ -150,6 +151,111 @@ def non_ascii_values() -> None:
     check(garbled.returncode == 2, "hook did not refuse input that is not valid UTF-8")
 
 
+def colleague_values() -> None:
+    """0.9.4: the Sales Navigator colleague-connection script takes two identifiers, each checked like any public identifier."""
+
+    def with_values(candidate: str, colleague: str, script: str = COLLEAGUE) -> str:
+        lines = script.split("\n")
+        assert lines[0].startswith("const PUBLIC_IDENTIFIER = ") and lines[1].startswith("const COLLEAGUE_IDENTIFIER = "), "the first two lines are not the two placeholders"
+        lines[0], lines[1] = f"const PUBLIC_IDENTIFIER = {candidate};", f"const COLLEAGUE_IDENTIFIER = {colleague};"
+        return "\n".join(lines)
+
+    def directive(candidate: str, colleague: str) -> str:
+        return f"// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER={candidate} COLLEAGUE_IDENTIFIER={colleague}"
+
+    def expand(text: str, tool: str = TOOL) -> tuple[bool, str, object]:
+        return gate.evaluate({"tool_name": tool, "tool_input": {"action": "javascript_exec", "text": text, "tabId": 5}})
+
+    check(COLLEAGUE.split("\n")[0] == 'const PUBLIC_IDENTIFIER = "";' and COLLEAGUE.split("\n")[1] == 'const COLLEAGUE_IDENTIFIER = "";', "colleague script's first two lines changed")
+    check("linkedin-salesnav-colleague-connection.js" in gate.approved_scripts(), "the gate does not enumerate the colleague-connection script")
+    check(gate.valid_directives(gate.raw_approved_scripts()).count("COLLEAGUE_IDENTIFIER=<colleague identifier>") == 1
+          and "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<public identifier> COLLEAGUE_IDENTIFIER=<colleague identifier>" in gate.valid_directives(gate.raw_approved_scripts()),
+          "the refusal text does not name the colleague-connection directive")
+    pairs = (("jane-doe", "ewa-betkier"), ("ACoAAB1x_y-Z", "ewa-b"), ("josé-garcía-1a2b3c", "王小明-123"), ("Jane-Doe%C3%A9", "ewa.b_1"),
+             ("a", "b"), ("a" * 120, "b" * 120), (unicodedata.normalize("NFD", "zoë"), "søren-ås"))
+    for candidate, colleague in pairs:
+        expected = with_values(f'"{candidate}"', f'"{colleague}"')
+        # Word for word, on either browser, alone or in a batch, with a trailing newline: allowed and not rewritten.
+        for tool in (TOOL, CHROME_TOOL):
+            check(call(tool, {"text": expected})[0] and call(tool, {"text": expected + "\n"})[0], f"colleague script with {candidate!r} and {colleague!r} refused word for word")
+            allowed, _, updated = expand(expected, tool)
+            check(allowed and updated is None, "a word-for-word colleague script was rewritten or refused")
+        check(call("mcp__Claude_Browser__browser_batch", {"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "text": expected}}]})[0], "colleague script in a batch refused")
+        # The directive, bare or quoted: the approved file with only the two value lines changed.
+        for line in (directive(candidate, colleague), directive(f'"{candidate}"', f'"{colleague}"'), directive(candidate, colleague) + "\n"):
+            for tool in (TOOL, CHROME_TOOL):
+                allowed, reason, updated = expand(line, tool)
+                check(allowed and reason == "" and updated == {"action": "javascript_exec", "text": expected, "tabId": 5}, f"directive with {candidate!r} and {colleague!r} was not expanded to the approved script")
+                check(updated["text"].split("\n")[2:] == COLLEAGUE.split("\n")[2:] and len(updated["text"].split("\n")) == len(COLLEAGUE.split("\n")),
+                      "the expanded colleague script differs from the approved file below its second line")
+                check(call(tool, {"text": updated["text"]})[0], "the expanded colleague script is not itself approved")
+        batch = {"actions": [{"name": "navigate", "input": {"url": "https://www.linkedin.com/sales/home"}}, {"name": "javascript_tool", "input": {"text": directive(candidate, colleague)}}]}
+        allowed, _, updated = gate.evaluate({"tool_name": "mcp__claude-in-chrome__browser_batch", "tool_input": batch})
+        check(allowed and updated["actions"][1]["input"]["text"] == expected and updated["actions"][0] == batch["actions"][0], "a batch colleague directive was not expanded in place")
+
+    # Refused in either slot, in both forms: each of these could end the string literal, start code, hide text or change what is read.
+    bad = {
+        "a quote": 'jose"x', "a backslash": "jose\\x", "a newline": "jose\nx", "a carriage return": "jose\rx", "a tab": "jose\tx", "NUL": "jose\x00x",
+        "${}": "${x}", "a template": "a${document.title}b", "a backtick": "jose`x", "a dollar": "jose$x", "a semicolon": "jose;x", "a slash": "jose/x", "a bare percent": "jose%x",
+        "a zero-width space": "jose​x", "a zero-width joiner": "jose‍x", "a word joiner": "jose⁠x", "a byte-order mark": "jose﻿x",
+        "a right-to-left override": "jose‮x", "a lone surrogate": "jose\ud800x", "a private-use character": "josex", "a space": "jose x", "an apostrophe": "jose'x",
+        "an emoji": "jose\U0001f600x", "an injected call": 'x"; fetch("https://example.com"); "', "an equals sign": "x=y", "empty": "", "over-long": "a" * 121,
+    }
+    for label, value in bad.items():
+        for candidate, colleague in ((value, "ewa-betkier"), ("jane-doe", value)):
+            check(not call(TOOL, {"text": with_values(f'"{candidate}"', f'"{colleague}"')})[0], f"colleague script passed word for word with {label} in a value")
+            if not any(c in value for c in "\n\r") and value != "" and " " not in value:
+                allowed, reason, updated = expand(directive(candidate, colleague))
+                check(not allowed and updated is None, f"colleague directive passed with {label} in a value")
+                check(value not in reason, "the refusal echoed the submitted value")
+    # The two values are not interchangeable with other placeholders, and the template (empty values) is not something a run may send.
+    check(not call(TOOL, {"text": COLLEAGUE})[0], "colleague script with empty values passed")
+    check(not call(TOOL, {"text": with_values("1", '"ewa"')})[0] and not call(TOOL, {"text": with_values('"jane"', "0")})[0], "colleague script with a bare number passed")
+    check(not call(TOOL, {"text": with_values('"jane-doe"', '"a\\" + document.cookie + \\""')})[0], "colleague script with an unsafe colleague passed")
+    lines = with_values('"jane-doe"', '"ewa"').split("\n")
+    for label, changed in (
+        ("lines in the other order", [lines[1], lines[0], *lines[2:]]),
+        ("no second line", [lines[0], *lines[2:]]),
+        ("a repeated second line", [lines[0], lines[1], lines[1], *lines[2:]]),
+        ("a repeated first line", [lines[0], lines[0], *lines[1:]]),
+        ("another placeholder second", [lines[0], 'const LEAD_NAME = "Jane";', *lines[2:]]),
+        ("a third placeholder", [*lines[:2], 'const STOP_AT = 0;', *lines[2:]]),
+        ("code on the second line", [lines[0], lines[1] + " document.title;", *lines[2:]]),
+    ):
+        check(not call(TOOL, {"text": "\n".join(changed)})[0], f"colleague script with {label} passed")
+    # The directive must carry both placeholders, once each, in order.
+    for line in (
+        "// mosaico run linkedin-salesnav-colleague-connection.js",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe",
+        "// mosaico run linkedin-salesnav-colleague-connection.js COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-salesnav-colleague-connection.js COLLEAGUE_IDENTIFIER=ewa PUBLIC_IDENTIFIER=jane-doe",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe PUBLIC_IDENTIFIER=jane-doe",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa STOP_AT=1",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa LEAD_NAME=Jane Doe",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe LEAD_NAME=Jane Doe",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER= COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane doe COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa extra",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa\nconsole.log(document.cookie)",
+        "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe; COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-connection-evidence.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa",
+        "// mosaico run linkedin-whoami.js COLLEAGUE_IDENTIFIER=ewa",
+    ):
+        allowed, reason, updated = expand(line)
+        check(not allowed and updated is None, f"invalid colleague directive passed: {line!r}")
+        check("COLLEAGUE_IDENTIFIER=<colleague identifier>" in reason and "console.log" not in reason, "the refusal does not name the colleague directive, or echoed what was sent")
+    # The body is the approved text: any edit, anywhere, is refused.
+    body = with_values('"jane-doe"', '"ewa"')
+    for old, new in (("MAX_FILTERED_PAGES = 2", "MAX_FILTERED_PAGES = 200"), ("type:CONNECTION_OF", "type:ALL"), ("PAGE_SIZE = 25", "PAGE_SIZE = 250"), ("PAUSE_MS = 500", "PAUSE_MS = 0"),
+                     ('found: state === "ok" && found', 'found: found'), ("0x01000193", "0x01000194"), ("sales-api/salesApiLeadSearch", "sales-api/other")):
+        check(not call(TOOL, {"text": edited(body, old, new)})[0], f"edited colleague script passed ({old})")
+    check(not call(TOOL, {"text": body + "\nconsole.log(document.cookie)"})[0], "colleague script with an appended line passed")
+
+
 def main() -> None:
     # Approved scripts pass, with and without a substituted first line, on either browser.
     check(call(TOOL, {"text": EVIDENCE})[0], "approved evidence script refused")
@@ -246,7 +352,7 @@ def main() -> None:
         check(script.count("https://") == (2 if label == "sent" else 1), f"{label} script names more than one address")
     check(call(TOOL, {"text": substituted(CONNECTIONS, "0")})[0] and "pages.push(sealed({ elements, entries }));" in CONNECTIONS, "connections script does not seal each page")
     check(not call(TOOL, {"text": edited(CONNECTIONS, "pages.push(sealed({ elements, entries }));", "pages.push({ elements, entries });")})[0], "connections script without page seals passed")
-    check(sorted(gate.approved_scripts()) == sorted(path.name for path in BROWSER.glob("*.js")) and len(gate.approved_scripts()) == 5, "the gate's approved scripts are not the five scripts in the browser folder")
+    check(sorted(gate.approved_scripts()) == sorted(path.name for path in BROWSER.glob("*.js")) and len(gate.approved_scripts()) == 6, "the gate's approved scripts are not the six scripts in the browser folder")
     check(not call(TOOL, {"text": EVIDENCE + "\nfetch('https://www.linkedin.com/voyager/api/me')"})[0], "evidence script with a second LinkedIn call passed")
 
     # A changed body, an unsafe first-line value or a stray line is not the approved script.
@@ -318,6 +424,8 @@ def main() -> None:
          replaced(SENT, 'const PUBLIC_IDENTIFIER = "ACoAAB1x_y-Z";')),
         ("linkedin-sent-invitations.js", "// mosaico run linkedin-sent-invitations.js PUBLIC_IDENTIFIER=jane-doe",
          replaced(SENT, 'const PUBLIC_IDENTIFIER = "jane-doe";')),
+        ("linkedin-salesnav-colleague-connection.js", "// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=jane-doe COLLEAGUE_IDENTIFIER=ewa-betkier",
+         replaced(replaced(COLLEAGUE, 'const PUBLIC_IDENTIFIER = "jane-doe";').replace('const COLLEAGUE_IDENTIFIER = "";', 'const COLLEAGUE_IDENTIFIER = "ewa-betkier";'), 'const PUBLIC_IDENTIFIER = "jane-doe";')),
     )
     check({name for name, _, _ in directives} == set(gate.approved_scripts()), "the directive checks do not cover every approved script")
     for name, directive, expected in directives:
@@ -390,6 +498,7 @@ def main() -> None:
     check(not call(TOOL, {"text": edited(substituted(THREAD, '"x"'), "MAX_MESSAGES = 98", "MAX_MESSAGES = 99")})[0], "a retyped script with one changed line passed")
 
     non_ascii_values()
+    colleague_values()
 
     # Unreadable calls fail closed.
     check(not call(TOOL, {})[0], "script call without text passed")

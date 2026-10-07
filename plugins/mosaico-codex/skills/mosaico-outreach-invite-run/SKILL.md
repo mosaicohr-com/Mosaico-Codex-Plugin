@@ -127,10 +127,24 @@ their own Agent and voice.
    returns a blocker, `human_decision_required` or `stop_run`.
 4. Finish with **Report a sourcing run**. A run below its quota is not complete.
 
+## The colleague check (Claude only)
+
+When a candidate is saved for a colleague, a Claude run first checks in Sales Navigator whether the
+candidate is already connected to that colleague, with the plugin's approved script, and passes its output to
+Mosaico as `colleagueConnectionEvidence` on `outreach_save_lead`. Mosaico decides: it skips a candidate who is
+already connected (`already-connected-to-colleague`, not a failure and not counted toward the target). This
+package ships no browser scripts, so Codex cannot run that check and cannot pass the evidence. Never
+make up evidence and never work around the answer. When Mosaico blocks a save for a colleague with
+`colleague-check-required`, nothing was saved: do not retry it, list the candidate as skipped with Mosaico's code
+and reason, and say in the report that Leads for that colleague need a Claude run. Saves for the run owner
+need no check. Read `workflowStatus.colleagueChecks` and `workflowStatus.colleagueSkips` only to report them.
+
 ## Report a sourcing run
 
 Report in plain words, using Mosaico's counts, not memory: for each owner in the quota, the Leads saved
-and the quota remaining (name the owner and the member id), and any shortfall with its blocker. A run
+and the quota remaining (name the owner and the member id), the candidates skipped as already connected
+to that owner ("skipped as already connected to <owner>: N", from `workflowStatus.colleagueSkips`; its
+entries name the owner), and any shortfall with its blocker. A run
 that saved nothing is a failed run: report it as failed with Mosaico's code and message (for example
 `sourcing_participant_required`, `sourcing_quota_invalid` or the blocker that stopped it), including a run
 Mosaico refused at the start. Never report such a run as successful, and never describe a partly filled

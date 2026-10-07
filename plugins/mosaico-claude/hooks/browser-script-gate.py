@@ -6,14 +6,15 @@ extension's `javascript_tool`, alone or inside a `browser_batch`). It is the enf
 connection-evidence capability:
 
 * A script that is one of the approved capture scripts under `browser/`, word for word apart from the
-  values on its leading placeholder lines (the first line; for the thread script also the second, `LEAD_NAME`),
-  is allowed.
+  values on its leading placeholder lines (the first line; for the thread script also the second, `LEAD_NAME`; for the
+  Sales Navigator colleague-connection script the second, `COLLEAGUE_IDENTIFIER`), is allowed.
 * A one-line directive, `// mosaico run <script>.js [<PLACEHOLDER>=<value> ...]`, as the whole script is expanded:
   the hook rewrites the call's `text` to the approved script with its placeholder lines set, so a long script is
   never retyped. The thread script takes two: `PUBLIC_IDENTIFIER=<id> LEAD_NAME=<name>` (the name is the rest of the
-  line, so it may hold spaces). Claude Code's PreToolUse contract: print `hookSpecificOutput` with `hookEventName`
-  "PreToolUse", `permissionDecision` "allow" and `updatedInput` (the complete replacement tool input) and
-  exit 0. A malformed directive is refused.
+  line, so it may hold spaces). The Sales Navigator colleague-connection script takes
+  `PUBLIC_IDENTIFIER=<id> COLLEAGUE_IDENTIFIER=<id>`, each checked like any identifier. Claude Code's PreToolUse
+  contract: print `hookSpecificOutput` with `hookEventName` "PreToolUse", `permissionDecision` "allow" and
+  `updatedInput` (the complete replacement tool input) and exit 0. A malformed directive is refused.
 * Any other script that names LinkedIn, its API, its session or CSRF material, or reads a credential
   store (cookies, web storage, IndexedDB, the credentials API, extension APIs) is refused.
 * Every other script is none of this gate's business and passes.
@@ -101,6 +102,7 @@ def _pattern(expression: str):
 # placeholder -> (its canonical value in an approved script, whether a run's value for it is allowed)
 PLACEHOLDERS = {
     "PUBLIC_IDENTIFIER": ('"PUBLIC_IDENTIFIER"', _identifier_literal),
+    "COLLEAGUE_IDENTIFIER": ('"COLLEAGUE_IDENTIFIER"', _identifier_literal),
     "LEAD_NAME": ('"LEAD_NAME"', _name_literal),
     "STOP_AT": ("0", _pattern(r"[0-9]{1,16}")),
     "NOOP": ("0", _pattern(r"0")),
@@ -214,6 +216,8 @@ ASSIGNMENT = re.compile(r" (?P<name>[A-Z_]+)=")
 TOKEN = re.compile(r"\S+")
 # The one placeholder whose value may hold spaces: it is the rest of the line, so it comes last.
 REST_OF_LINE = "LEAD_NAME"
+# The placeholders whose value is a public identifier or member id: one token, checked the same way, written as a quoted literal.
+IDENTIFIER_PLACEHOLDERS = ("PUBLIC_IDENTIFIER", "COLLEAGUE_IDENTIFIER")
 
 
 def _placeholder_names(raw: str) -> list[str]:
@@ -243,7 +247,12 @@ def _assignments(rest: str) -> list[tuple[str, str]] | None:
 def valid_directives(raw_scripts: dict[str, str]) -> str:
     """The directives a run may send, for the refusal message."""
     forms = []
-    meaning = {"PUBLIC_IDENTIFIER": "<public identifier>", "LEAD_NAME": "<name>", "STOP_AT": "<whole number>"}
+    meaning = {
+        "PUBLIC_IDENTIFIER": "<public identifier>",
+        "COLLEAGUE_IDENTIFIER": "<colleague identifier>",
+        "LEAD_NAME": "<name>",
+        "STOP_AT": "<whole number>",
+    }
     for name, raw in sorted(raw_scripts.items()):
         given = " ".join(f"{placeholder}={meaning[placeholder]}" for placeholder in _placeholder_names(raw) if placeholder in meaning)
         forms.append(f"// mosaico run {name}" + (f" {given}" if given else ""))
@@ -285,7 +294,7 @@ def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
     for placeholder, value in given:
         quoted = len(value) >= 2 and value[0] == value[-1] == '"'
         bare = value[1:-1] if quoted else value
-        if placeholder == "PUBLIC_IDENTIFIER":
+        if placeholder in IDENTIFIER_PLACEHOLDERS:
             if not valid_identifier(bare):
                 return None
         elif placeholder == "LEAD_NAME":
@@ -293,7 +302,7 @@ def expand_directive(script: str, raw_scripts: dict[str, str]) -> str | None:
                 return None
         elif not PLACEHOLDERS[placeholder][1](value):
             return None
-        literals.append(f'"{bare}"' if placeholder in ("PUBLIC_IDENTIFIER", "LEAD_NAME") else value)
+        literals.append(f'"{bare}"' if placeholder in (*IDENTIFIER_PLACEHOLDERS, "LEAD_NAME") else value)
     head = [f"const {placeholder} = {literal};" for (placeholder, _), literal in zip(given, literals)]
     return "\n".join([*head, *raw_lines[len(names):]])
 

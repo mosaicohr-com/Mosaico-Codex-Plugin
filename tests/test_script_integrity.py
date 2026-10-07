@@ -24,6 +24,7 @@ SCRIPTS = {
     "connections": "linkedin-recent-connections.js",
     "thread": "linkedin-thread-messages.js",
     "sent": "linkedin-sent-invitations.js",
+    "colleague": "linkedin-salesnav-colleague-connection.js",
 }
 
 HARNESS = r"""
@@ -183,7 +184,7 @@ def main() -> None:
         check("the canonical JSON (keys sorted, no spaces, with null-valued keys omitted) of everything else" in header, f"{name}: header integrity sentence not updated")
         lines = (BROWSER / name).read_text(encoding="utf-8").split("\n")
         helper_texts.add("\n".join(line for line in lines if line.startswith(("const canonical = ", "const fnv1a32 = "))))
-    check(len(helper_texts) == 1 and next(iter(helper_texts)).count("\n") == 1, "the digest helpers are not identical text in all five scripts")
+    check(len(helper_texts) == 1 and next(iter(helper_texts)).count("\n") == 1, "the digest helpers are not identical text in all six scripts")
 
     done = subprocess.run([node, "-e", HARNESS, str(BROWSER)], capture_output=True, text=True, encoding="utf-8", check=False)
     check(done.returncode == 0, f"harness failed: {done.stderr[-500:]}")
@@ -231,7 +232,7 @@ def main() -> None:
     altered["pages"][1]["entries"][0]["createdAt"] += 1
     check(digest_of(altered) != connections["integrity"]["digest"], "altering an entry did not change the whole result's digest")
     check(digest_of(altered["pages"][1]) != connections["pages"][1]["integrity"]["digest"], "altering an entry did not change its page's digest")
-    print("PASS: all five approved scripts seal their result with an FNV-1a digest an independent implementation reproduces; the connections pages are sealed too.")
+    print("PASS: all six approved scripts seal their result with an FNV-1a digest an independent implementation reproduces; the connections pages are sealed too.")
 
 
 if __name__ == "__main__":
