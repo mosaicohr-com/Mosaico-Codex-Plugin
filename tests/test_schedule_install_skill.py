@@ -157,6 +157,10 @@ def main() -> None:
         check(script in repair, f"Repair schedule text does not name the approved script {script}")
     check("browser/linkedin-sent-invitations.js" not in repair, "Repair schedule text names the sent-invitations script, which Repair never needs")
     check("outreach_mark_message_sent" not in repair and "outreach_record_message" not in repair, "Repair schedule text names a sending or drafting tool")
+    READ_SENTENCE = "Read each script file with the file-reading tool, one file at a time, by its path under the installed plugin's browser folder; do not print them with a shell command."
+    for name, text in (("Sync data", sync), ("Source leads", source), ("Repair", repair)):
+        check(" ".join(text.split()).count(READ_SENTENCE) == 1, f"{name} schedule text does not tell the run to read the approved scripts with the file-reading tool")
+    check(READ_SENTENCE not in SKILLS["Codex"], "Codex schedule text has the browser-script reading sentence, but the Codex package ships no browser scripts")
     check("Repair never sends" in claude, "Claude skill does not say Repair never sends")
     check("60 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from Sync data and Source leads")
     check("0 10 * * 0" in claude.split("## Install")[1], "Install readback does not confirm the Repair cron")
