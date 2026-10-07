@@ -58,10 +58,15 @@ Do these checks first. If one fails, install nothing and tell the person what to
    (`mcpServers`; the project entry is the one for the folder the schedules run in). An address that
    contains `amplifyapp.com`, `stage`, `staging`, `test` or `localhost` is not production. If one exists,
    refuse to install. Tell the person to remove it before installing: a scheduled run can pick it
-   because stage and production share organisation ids, and it would then write to stage. Production
-   is `app.mosaico.one`, reached through the plugin's own Mosaico server or the claude.ai Mosaico
-   connector. A stage server needed on purpose can be added back under a distinct name such as
-   `mosaico-stage`, in a session that is not a scheduled run. Check again after they say it is done.
+   because stage and production share organisation ids, and it would then write to stage. A stage
+   server needed on purpose can be added back under a distinct name such as `mosaico-stage`, in a
+   session that is not a scheduled run. Check again after they say it is done.
+5. **Production Mosaico connector.** The plugin ships no Mosaico server of its own, so every run uses
+   the person's own connector. A Mosaico connector pointing at `https://app.mosaico.one` must be
+   connected and signed in, in Claude's connectors (not `/mcp`). Confirm it by looking for a Mosaico tool
+   such as `outreach_start_run` in the available tools. If there is none, install nothing and tell the
+   person to connect it in Claude's connectors, sign in with their own Mosaico account, and run this
+   installer again.
 
 ## Set up a second person
 
@@ -71,9 +76,10 @@ one that fails.
 
 1. **Claude desktop app and plugin.** The Claude desktop app is installed on her Mac, with the Mosaico
    plugin installed from the marketplace, version 0.6.1 or later.
-2. **Her Mosaico account.** The Mosaico connector is signed in as her own Mosaico account, not anyone
-   else's. She must be an active member of the organisation. An Owner or Admin can check this in
-   Outreach, Agent tab.
+2. **Her Mosaico account.** Her own Claude has a Mosaico connector pointing at `https://app.mosaico.one`,
+   connected in Claude's connectors (not `/mcp`) and signed in as her own Mosaico account, not anyone
+   else's. The plugin brings no Mosaico server, so nothing works until she connects it. She must be an
+   active member of the organisation. An Owner or Admin can check this in Outreach, Agent tab.
 3. **Her LinkedIn.** Her LinkedIn is signed in inside Claude's built-in browser pane, not in Chrome or
    any other browser.
 4. **The three allow rules.** The three rules are in her own `~/.claude/settings.json`. Run the

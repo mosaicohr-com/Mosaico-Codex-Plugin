@@ -44,7 +44,9 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 MIN_VERSION = "0.9.6"
 CONNECTOR_RULE = (
-    "Use the Mosaico connector that serves production (app.mosaico.one): the plugin's own Mosaico server or the claude.ai Mosaico connector. "
+    "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
+    "The plugin ships no Mosaico server of its own. "
+    "If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. "
     "Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. "
     "Do not choose a server because its organisation id matches; stage and production share ids."
 )
@@ -263,6 +265,10 @@ def main() -> None:
     check("4. **Non-production Mosaico server.**" in installer, "Claude installer lacks the fourth pre-install check")
     for needle in ("`.mcp.json`", "`~/.claude.json`", "amplifyapp.com", "`localhost`", "refuse to install", "remove it before installing", "stage and production share organisation ids", "`mosaico-stage`", "app.mosaico.one"):
         check(needle in installer, f"Claude installer's fourth check lacks: {needle}")
+    check("5. **Production Mosaico connector.**" in installer, "Claude installer lacks the fifth pre-install check")
+    for needle in ("A Mosaico connector pointing at `https://app.mosaico.one` must be connected and signed in", "Claude's connectors (not `/mcp`)", "ships no Mosaico server of its own"):
+        check(needle in installer, f"Claude installer's fifth check lacks: {needle}")
+    check("reached through the plugin's own Mosaico server" not in installer, "Claude installer still names the plugin's own Mosaico server")
     check("Non-production Mosaico server" not in SKILLS["Codex"], "Codex installer carries the Claude-only connector check")
 
     for provider, root in (("Claude", CLAUDE), ("Codex", CODEX)):
@@ -318,7 +324,18 @@ def main() -> None:
         check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.6", f"{manifest.name} is not at 0.9.6")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.7", f"{manifest.name} is not at 0.9.7")
+    # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
+    for package_root in (CLAUDE, CODEX):
+        check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
+    for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json", ROOT / ".claude-plugin" / "marketplace.json"):
+        check("mcpServers" not in manifest.read_text(encoding="utf-8"), f"{manifest.name} declares a bundled MCP server")
+    for path in sorted(ROOT.rglob("*")):
+        if path.is_file() and ".git" not in path.parts and "tests" not in path.parts and path.suffix in {".md", ".json", ".js", ".py"}:
+            body = path.read_text(encoding="utf-8").lower()
+            check("claude-code-client-metadata" not in body and "oauth_resource" not in body, f"{path.relative_to(ROOT)} still carries bundled-server OAuth wiring")
+    for label, text in (("Claude", SKILLS["Claude"]), *((f"Claude {name}", (CLAUDE / "skills" / name / "SKILL.md").read_text(encoding="utf-8")) for name in OUTREACH_SKILLS)):
+        check("plugin's own Mosaico server" not in " ".join(text.split()), f"{label} still sends people to the plugin's own Mosaico server")
     print("PASS: both schedule-install skills install thin routines (standing answers only, under 200 words, naming the skill, the routine section and the version stamp); the run skills hold each routine section; qualified skill names and the stale-copy checks hold.")
 
 

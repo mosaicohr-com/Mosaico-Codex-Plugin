@@ -1,11 +1,16 @@
 # Mosaico assistant plugins
 
 Public, read-only distribution repository for the official Mosaico plugins for Codex and Claude
-Code. Both packages connect to the production Mosaico MCP service and require each user to sign in
-with their own Mosaico account.
+Code.
 
-The repository intentionally contains only provider manifests, the public MCP endpoint and thin
-interaction skills. Mosaico application code, workflow state, authorization rules, credentials,
+Architecture (0.9.7). The plugins ship no Mosaico server. They contain only skills and, for Claude
+Code, hooks and approved browser scripts. Every Mosaico call goes through the person's own Mosaico
+connector, the one that points at production (`https://app.mosaico.one/api/mcp`) and is signed in with
+their own Mosaico account. Before 0.9.7 the Claude Code plugin also bundled a second Mosaico server that
+reached the same production service through its own, separate sign-in; runs could stall at that sign-in.
+It is gone, so there is one door and one sign-in.
+
+The repository intentionally contains only provider manifests and thin interaction skills. Mosaico application code, workflow state, authorization rules, credentials,
 customer data and deployment configuration are not distributed here.
 
 ## Codex
@@ -17,8 +22,10 @@ codex plugin marketplace add mosaicohr-com/Mosaico-Codex-Plugin
 codex plugin add mosaico@mosaico
 ```
 
-Restart Codex and begin a new conversation after installation. Codex will request authorization
-for `https://app.mosaico.one/api/mcp`; sign in with your own Mosaico account.
+Restart Codex and begin a new conversation after installation. The Codex plugin brings no Mosaico
+server, so add your own Mosaico connector in Codex, pointing at `https://app.mosaico.one/api/mcp`
+(for example `codex mcp add mosaico --url https://app.mosaico.one/api/mcp`), and sign in with your own
+Mosaico account when Codex asks.
 
 ## Claude Code
 
@@ -29,7 +36,20 @@ From Claude Code:
 /plugin install mosaico@mosaico
 ```
 
-Complete Mosaico authorization using your own account when prompted.
+Then connect the Mosaico connector in Claude's connectors (not `/mcp`): add the connector for
+`https://app.mosaico.one`, sign in with your own Mosaico account, and start a new conversation. If a
+Mosaico connector is already connected and signed in, there is nothing more to do. A run with no Mosaico
+connector connected stops and tells you to connect it.
+
+Always use the production connector. A connector whose address contains `amplifyapp.com`, `stage`,
+`staging`, `test` or `localhost` is never used by a run.
+
+### After a Mosaico deploy
+
+Claude keeps a copy of the connector's tool list. After Mosaico deploys a change to a tool, that copy can
+go stale: a tool argument may be refused as unknown, or a new tool may be missing. When that happens,
+disconnect and reconnect the Mosaico connector in Claude's connectors, or restart Claude, then run again.
+Nothing in the plugin needs updating for this.
 
 ## Outreach workflows
 
@@ -38,7 +58,8 @@ Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claud
 action. The schedule option installs three per-user local-time schedules: Sync data (connections and
 messaging, once a day, the only one that sends), Source leads (every two hours in business hours,
 at least 60 minutes from Sync, never sends; each sourcing start carries a quota of who receives the Leads and how many) and Repair (once a week, Sunday 10:00 AM by default, also on
-demand, never sends). Before installing, the Claude package checks that
+demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
+is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
 `~/.claude/settings.json` allows the three browser tools scheduled sessions need
 (`mcp__Claude_Browser__javascript_tool`, `mcp__Claude_Browser__computer` and
 `mcp__Claude_Browser__browser_batch`; the pane batches a click with a wait and a screenshot through the
@@ -61,8 +82,10 @@ A colleague sets up her own schedules on her own Mac:
 
 1. Install the Claude desktop app on her Mac, with the Mosaico plugin from the marketplace, version 0.6.1
    or later.
-2. Sign the Mosaico connector in as her own Mosaico account. She must be an active member of the
-   organisation; an Owner or Admin can check in Outreach, Agent tab.
+2. In her own Claude, connect the Mosaico connector for `https://app.mosaico.one` in Claude's connectors
+   (not `/mcp`) and sign it in as her own Mosaico account. The plugin brings no Mosaico server, so nothing
+   works until she does. She must be an active member of the organisation; an Owner or Admin can check in
+   Outreach, Agent tab.
 3. Sign in to her own LinkedIn inside Claude's built-in browser pane.
 4. Put the three allow rules in her own `~/.claude/settings.json`:
 
@@ -116,9 +139,32 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased
+### 0.9.7
 
-- Production connector only. The Source leads, Sync data and Repair routine sections and the `mosaico-outreach` skill now say which Mosaico connector to use: the one that serves production (app.mosaico.one), either the plugin's own Mosaico server or the claude.ai Mosaico connector. A server whose address contains amplifyapp.com, stage, staging, test or localhost is never used; if it is the only Mosaico server, the run stops and reports it; a server is never chosen because its organisation id matches, because stage and production share ids. The schedule installer has a fourth check before installing: a project or user MCP server that points at a non-production Mosaico address must be removed first. A scheduled Source leads run had started its Mosaico run on a stage server this way.
+- The bundled Mosaico server is removed. `plugins/mosaico-claude/.mcp.json`, `plugins/mosaico-codex/.mcp.json`
+  and the Codex manifest's `mcpServers` entry are gone, and with them the bundled server's sign-in
+  settings. The plugins now ship only skills, hooks and browser scripts.
+- Runs use the person's own Mosaico connector only: the one that serves production (`https://app.mosaico.one`).
+  The Source leads, Sync data and Repair routine sections and the `mosaico-outreach` skill say so. If no Mosaico
+  connector is connected, the run stops and tells the person to connect it in Claude's connectors (not `/mcp`),
+  then rerun. A server whose address contains amplifyapp.com, stage, staging, test or localhost is never used, and
+  a server is never chosen because its organisation id matches, because stage and production share ids. This
+  replaces the "production connector only" wording of the earlier unreleased change (pull request 32), which still
+  allowed the plugin's own server.
+- The schedule installer has two checks before installing: a project or user MCP server that points at a
+  non-production Mosaico address must be removed first (a scheduled Source leads run had started its Mosaico run on a
+  stage server this way), and a Mosaico connector pointing at `https://app.mosaico.one` must be connected and
+  signed in. "Set up a second person" step 2 now says she connects the connector in her own Claude.
+- Nothing in the hooks needed to change: the browser-script gate matches the browser tools, never a Mosaico tool
+  name, and the tool-contract test reads the skills and the application registry, not the plugin's server.
+- README: new architecture paragraph, connector sign-in instructions, and the "After a Mosaico deploy" note above.
+- Issue mosaicohr-com/mosaico#1804 (the bundled server's client-metadata sign-in) becomes moot for the plugin. The
+  server-side allowlist and localhost question stays with the Mosaico application.
+- Consequence: Claude keeps a copy of the connector's tool list, so after a Mosaico deploy it can go stale. Disconnect
+  and reconnect the connector, or restart Claude, if a tool argument is refused as unknown.
+- Codex: the package no longer brings a server. Add your own Mosaico connector in Codex (see the Codex section).
+- What a person does once: nothing, if the Mosaico connector is already connected and signed in in Claude. If it is
+  not, connect it in Claude's connectors and sign in.
 
 ### 0.9.6
 

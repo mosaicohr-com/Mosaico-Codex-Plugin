@@ -1,7 +1,7 @@
 {
   "name": "mosaico",
-  "version": "0.9.6",
-  "description": "Manage Mosaico through its authenticated production MCP service.",
+  "version": "0.9.7",
+  "description": "Manage Mosaico through the person's own production Mosaico connector.",
   "author": {
     "name": "Mosaico Limited",
     "email": "support@mosaico.one",
@@ -12,7 +12,6 @@
   "license": "Proprietary",
   "keywords": ["mosaico", "people", "flows", "domains", "outreach"],
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Mosaico",
     "shortDescription": "Manage your Mosaico organization.",

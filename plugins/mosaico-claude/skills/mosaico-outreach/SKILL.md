@@ -35,7 +35,7 @@ Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead man
 `/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
 schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
 
-**Mosaico connector.** Use the Mosaico connector that serves production (app.mosaico.one): the plugin's own Mosaico server or the claude.ai Mosaico connector. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
+**Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
 
 Use the current application-owned read for the resolved intent. For invitation sourcing call
 `outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
