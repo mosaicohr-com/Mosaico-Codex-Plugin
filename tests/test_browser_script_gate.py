@@ -7,6 +7,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,98 @@ def edited(script: str, old: str, new: str) -> str:
     """`script` with `old` replaced by `new`; fails when `old` is absent, so an edit check can never pass vacuously."""
     check(old in script, f"the text {old!r} is no longer in the script, so this edit check would prove nothing")
     return script.replace(old, new)
+
+
+def non_ascii_values() -> None:
+    """Public identifiers and names with accents, other scripts and apostrophes pass; anything that could change the script's meaning does not."""
+    NFD = unicodedata.normalize("NFD", "jos\u00e9-garc\u00eda-1a2b3c")
+    identifiers = ("jos\u00e9-garc\u00eda-1a2b3c", NFD, "s\u00f8ren-\u00e5s", "zo\u00eb-o-brien", "\u738b\u5c0f\u660e-123", "\u0430\u043d\u043d\u0430-\u043f\u0435\u0442\u0440\u043e\u0432\u0430",
+                   "\u0e2a\u0e21\u0e0a\u0e32\u0e22", "ACoAAB1x_y-Z", "jane.doe_42", "Jane-Doe%C3%A9")
+    check(NFD != "jos\u00e9-garc\u00eda-1a2b3c" and any(unicodedata.category(c) == "Mn" for c in NFD), "the decomposed accent test value holds no combining mark")
+    names = ("Zo\u00eb O'Brien", "S\u00f8ren \u00c5s", "Ren\u00e9e Dupr\u00e9 - Coach, MBA", "\u738b\u5c0f\u660e", "\u674e \u96f7", "Jos\u00e9 Garc\u00eda Jr.", "Mar\u00eda O\u2019Neil",
+             unicodedata.normalize("NFD", "Zo\u00eb"), "Lauren Ross", "A" * 120)
+    check(gate.valid_identifier("a") and not gate.valid_identifier("") and not gate.valid_identifier("a" * 121), "identifier length bounds are not 1 to 120")
+    check(gate.valid_name("", minimum=0) and not gate.valid_name("", minimum=1) and not gate.valid_name("a" * 121, minimum=1), "name length bounds are not 0 or 1 to 120")
+
+    def run_directive(identifier: str, name: str | None, script: str, tool: str = TOOL) -> tuple[bool, str, object]:
+        line = f"// mosaico run {'linkedin-thread-messages.js' if name is not None else 'linkedin-connection-evidence.js'} PUBLIC_IDENTIFIER={identifier}"
+        line += f" LEAD_NAME={name}" if name is not None else ""
+        return gate.evaluate({"tool_name": tool, "tool_input": {"text": line}})
+
+    # Accepted, in both forms. The expanded script is the approved file with only the value lines changed, as plain text.
+    for identifier in identifiers:
+        for label, script in (("evidence", EVIDENCE), ("thread", THREAD), ("sent", SENT)):
+            check(call(TOOL, {"text": substituted(script, f'"{identifier}"')})[0], f"{label} script with identifier {identifier!r} refused")
+        allowed, reason, updated = run_directive(identifier, None, EVIDENCE)
+        check(allowed and updated == {"text": substituted(EVIDENCE, f'"{identifier}"')}, f"directive with identifier {identifier!r} was not expanded to the approved script")
+        check(updated["text"].split("\n")[1:] == EVIDENCE.split("\n")[1:], "the expanded evidence script differs from the approved file below its first line")
+    for name in names:
+        for identifier in ("jos\u00e9-garc\u00eda-1a2b3c", "ACoAAB1x_y-Z"):
+            check(call(TOOL, {"text": named(substituted(THREAD, f'"{identifier}"'), f'"{name}"')})[0], f"thread script with name {name!r} refused")
+            allowed, reason, updated = run_directive(identifier, name, THREAD)
+            expected = named(substituted(THREAD, f'"{identifier}"'), f'"{name}"')
+            check(allowed and updated == {"text": expected}, f"directive with name {name!r} was not expanded to the approved script")
+            check(updated["text"].split("\n")[2:] == THREAD.split("\n")[2:], "the expanded thread script differs from the approved file below its second line")
+            check(len(updated["text"].split("\n")) == len(THREAD.split("\n")), "the expanded thread script has another number of lines")
+    # Inside a batch, on the other browser's tool.
+    allowed, reason, updated = gate.evaluate({"tool_name": "mcp__claude-in-chrome__browser_batch", "tool_input": {"actions": [
+        {"name": "navigate", "input": {"url": "https://example.com"}},
+        {"name": "javascript_tool", "input": {"text": "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jos\u00e9-garc\u00eda LEAD_NAME=Zo\u00eb O'Brien"}}]}})
+    check(allowed and updated["actions"][1]["input"]["text"] == named(substituted(THREAD, '"jos\u00e9-garc\u00eda"'), '"Zo\u00eb O\'Brien"') and updated["actions"][0] == {"name": "navigate", "input": {"url": "https://example.com"}},
+          "a batch directive with non-ASCII values was not expanded in place")
+
+    # Refused: each of these could end the string literal, start code, hide text or change what is read.
+    bad = {
+        "a quote": 'jose"x', "a backslash": "jose\\x", "a newline": "jose\nx", "a carriage return": "jose\rx", "a tab": "jose\tx", "NUL": "jose\x00x",
+        "a zero-width space": "jose\u200bx", "a zero-width joiner": "jose\u200dx", "a word joiner": "jose\u2060x", "a byte-order mark": "jose\ufeffx",
+        "a right-to-left override": "jose\u202ex", "a left-to-right isolate": "jose\u2066x", "a line separator": "jose\u2028x",
+        "a grapheme joiner": "jose\u034fx", "a variation selector": "jose\ufe0fx", "a Hangul filler": "jose\u3164x",
+        "a lone surrogate": "jose\ud800x", "a private-use character": "jose\ue000x", "a non-breaking space": "jose\u00a0x", "a space": "jose x",
+        "${}": "${x}", "a template": "a${document.title}b", "a backtick": "jose`x", "a dollar": "jose$x", "a semicolon": "jose;x", "a brace": "jose{x", "a parenthesis": "jose(x",
+        "an angle bracket": "jose<x", "a slash": "jose/x", "a bare percent": "jose%x", "a short percent": "jose%C", "a non-hex percent": "jose%GZ", "an apostrophe": "jose'x", "an emoji": "jose\U0001f600x",
+        "an injected call": 'x"; fetch("https://example.com"); "', "a comment": "x//y", "an equals sign": "x=y", "empty": "", "over-long": "a" * 121,
+    }
+    for label, identifier in bad.items():
+        for script_name, script in (("evidence", EVIDENCE), ("thread", THREAD)):
+            check(not call(TOOL, {"text": substituted(script, f'"{identifier}"')})[0], f"{script_name} script passed with an identifier holding {label}")
+        if "\n" not in identifier and "\r" not in identifier and identifier != "" and " " not in identifier:
+            allowed, reason, updated = run_directive(identifier, None, EVIDENCE)
+            check(not allowed and updated is None, f"directive passed with an identifier holding {label}")
+    bad_names = {k: v for k, v in bad.items() if k not in ("a space", "an apostrophe", "a non-breaking space") and not k.startswith("over")}
+    bad_names.update({"a dollar-brace": "Zo\u00eb ${1}", "a quote after an accent": 'Zo\u00eb"', "a slash": "Zo\u00eb/Ross", "a pipe": "Zo\u00eb | Coach", "empty": "x" * 121})
+    for label, name in bad_names.items():
+        check(not call(TOOL, {"text": named(substituted(THREAD, '"jose"'), f'"{name}"')})[0], f"thread script passed with a name holding {label}")
+        if "\n" not in name and "\r" not in name and name != "":
+            allowed, reason, updated = run_directive("jose", name, THREAD)
+            check(not allowed and updated is None, f"directive passed with a name holding {label}")
+    allowed, _, _ = run_directive("jose", " Zo\u00eb", THREAD)
+    check(not allowed, "directive passed with a name that starts with a space")
+    allowed, _, updated = run_directive("jose", "Zo\u00eb ", THREAD)  # the line's trailing space is dropped before the name is read
+    check(allowed and updated["text"].split("\n")[1] == 'const LEAD_NAME = "Zo\u00eb";', "a trailing space was kept in the name")
+    # The refusal never echoes the submitted value.
+    allowed, reason, _ = run_directive('x"\u200b\u00e9', None, EVIDENCE)
+    check(not allowed and "\u00e9" not in reason and "\u200b" not in reason, "the refusal echoed the submitted identifier")
+
+    # The hook itself, as Claude Desktop runs it: UTF-8 bytes on stdin whatever the locale, and the answer decodes to the same text.
+    for label, env in (("C locale", {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "PYTHONCOERCECLOCALE": "0", "PYTHONUTF8": "0"}),
+                       ("Latin-1 locale", {"PATH": "/usr/bin:/bin", "LC_ALL": "en_US.ISO8859-1", "PYTHONCOERCECLOCALE": "0", "PYTHONUTF8": "0", "PYTHONIOENCODING": "latin-1"}),
+                       ("UTF-8 locale", {"PATH": "/usr/bin:/bin", "LC_ALL": "en_US.UTF-8"})):
+        text = "// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=jos\u00e9-garc\u00eda-1a2b3c LEAD_NAME=Zo\u00eb O'Brien \u738b\u5c0f\u660e"
+        run = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"action": "javascript_exec", "text": text, "tabId": 3}}, ensure_ascii=False).encode("utf-8"),
+                             capture_output=True, env=env, check=False)
+        check(run.returncode == 0, f"hook refused a UTF-8 identifier and name under the {label}: {run.stderr!r}")
+        check(run.stdout.isascii(), f"hook printed non-ASCII bytes under the {label}")
+        out = json.loads(run.stdout.decode("utf-8"))["hookSpecificOutput"]
+        check(out["updatedInput"] == {"action": "javascript_exec", "tabId": 3, "text": named(substituted(THREAD, '"jos\u00e9-garc\u00eda-1a2b3c"'), '"Zo\u00eb O\'Brien \u738b\u5c0f\u660e"')},
+              f"the script the hook returned is not the approved script with only the two values changed, under the {label}")
+        word = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": named(substituted(THREAD, '"jos\u00e9-garc\u00eda"'), '"S\u00f8ren"')}}, ensure_ascii=False).encode("utf-8"),
+                              capture_output=True, env=env, check=False)
+        check(word.returncode == 0 and word.stdout == b"", f"hook refused the approved script word for word with accented values under the {label}: {word.stderr!r}")
+        refused = subprocess.run([sys.executable, str(GATE)], input=json.dumps({"tool_name": TOOL, "tool_input": {"text": substituted(THREAD, '"jos\u00e9\u200b"')}}, ensure_ascii=False).encode("utf-8"),
+                                 capture_output=True, env=env, check=False)
+        check(refused.returncode == 2 and refused.stdout == b"" and "\u200b".encode("utf-8") not in refused.stderr, f"hook did not refuse a zero-width character cleanly under the {label}")
+    garbled = subprocess.run([sys.executable, str(GATE)], input=b'{"tool_name": "x", "tool_input": {"text": "jos\xe9"}}', capture_output=True, check=False)
+    check(garbled.returncode == 2, "hook did not refuse input that is not valid UTF-8")
 
 
 def main() -> None:
@@ -295,6 +388,8 @@ def main() -> None:
     check(not call("mcp__Claude_Browser__browser_batch", mixed)[0], "batch with a directive and a cookie read passed")
     # Retyped with a change is still refused.
     check(not call(TOOL, {"text": edited(substituted(THREAD, '"x"'), "MAX_MESSAGES = 98", "MAX_MESSAGES = 99")})[0], "a retyped script with one changed line passed")
+
+    non_ascii_values()
 
     # Unreadable calls fail closed.
     check(not call(TOOL, {})[0], "script call without text passed")

@@ -108,6 +108,18 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ### 0.9.3
 
+- The browser-script gate accepts non-ASCII public identifiers and Lead names. Until now it refused a first-line
+  identifier with any accented or non-Latin letter (for example `josé-garcía-1a2b3c`), so a Sync data run could not
+  verify that Lead's connection or read its thread. The identifier and the Lead's name are now checked against what
+  may appear, not what may not: letters and combining marks of any script and decimal digits, plus `-`, `.` and `_`
+  for an identifier (opaque member ids need them) and spaces, hyphens, apostrophes (`'` or `’`), periods and commas
+  for a name, each 1 to 120 characters. Quotes, backslashes, line breaks and other control characters, `$`, backticks,
+  brackets, parentheses, `;`, `/`, `<`, `>`, zero-width, joiner and direction-changing characters, lone surrogates and
+  private-use characters are refused, which also closes a gap: a zero-width character in a name used to pass.
+  A well-formed `%XX` sequence in an identifier is still accepted but never decoded; the application hands the decoded
+  identifier. The hook now reads its input as UTF-8 bytes whatever the machine's locale, so a UTF-8 value survives the
+  round trip. A name with other punctuation (a pipe, parentheses, a slash, an emoji) is now refused; it used to pass.
+  Tests cover accepted and refused values in both forms and the hook under a C and a Latin-1 locale.
 - Source leads sends the sourcing quota the server now requires. Since 2026-10-04 Mosaico refuses
   `outreach_start_run` with `intent: source_invitation_leads` (code `sourcing_participant_required`, recommended
   action `name_sourcing_colleague`) unless the call carries `colleagueOwnerUserId` (an active member distinct from
@@ -146,7 +158,7 @@ The Codex package ships no such capability, so its Outreach skills do not captur
   no longer matched what LinkedIn returns. The script now takes the Lead's name on a second placeholder line
   (`const LEAD_NAME = "";`) and the directive becomes
   `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<id> LEAD_NAME=<name>` (the name is the rest of
-  the line, so it may hold spaces; it cannot hold a quote, a backslash or a control character, and the gate still
+  the line, so it may hold spaces; it holds only letters, marks, digits, spaces, hyphens, apostrophes, periods and commas (0.9.3), and the gate still
   refuses every other edit). The lookup order is unchanged (identifier, then the search by name, then the
   list). When the identifier resolves nothing, or no participant of any search result carries its member URN,
   the script matches the search results by name: case and accents folded, spaces collapsed, the Lead's name
