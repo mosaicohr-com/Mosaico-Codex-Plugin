@@ -66,7 +66,7 @@ Resolve the current business date and time in <timezone>. The person has supplie
 
 Use the authenticated LinkedIn browser. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself.
 
-Step 1. Open LinkedIn's Me page once and read the profile URL of the signed-in account. Report it as observedLinkedInProfile to outreach_start_run, together with the quota <quota map> as quota. Start one run per scope, each with the same quota <quota map>, and pass its runId on every read and write. If Mosaico blocks the start, stop and report the blocker; do not work around it. If it answers sourcing_participant_required or sourcing_quota_invalid, stop and report that code and what Mosaico says to fix; never start a run without the quota, and never name a colleague that is not in the quota above.
+Step 1. Open LinkedIn's Me page once and read the profile URL of the signed-in account. Report it as observedLinkedInProfile to outreach_start_run, together with the quota <quota map> as quota. Start one run per scope, each with the same quota <quota map>, and pass its runId on every read and write. If Mosaico blocks the start, stop and report the blocker; do not work around it. If it answers sourcing_participant_required or sourcing_quota_invalid, stop and report that code and what Mosaico says to fix; never start a run without the quota, and never name a colleague that is not in the quota above. When a run stops because no quota or colleague was sent, quote Mosaico's code and message verbatim when Mosaico gave one, then end the report with this sentence: "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
 
 Step 2. Run the $mosaico:mosaico-outreach-invite-run skill with the selected day the next business day and the selected action "source Leads only", using the quota sent at the start. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead.
 
@@ -94,7 +94,16 @@ name anyone but the run owner in the map. If an id is not found among the active
 ask again. If the person does not say who receives the Leads or how many, do not install Source leads.
 Mosaico refuses a sourcing run that carries neither a quota map nor a colleague, and the application never
 guesses one. A Source leads schedule saved before 0.9.3 has no quota map: update it in place with these
-answers.
+answers, as described under **Update the Source leads quota in place** below.
+
+### Update the Source leads quota in place
+
+Use this when a Source leads automation is already installed and only its quota has to be set or changed: one saved before 0.9.3, one whose run stopped for want of a quota, or a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the Source leads automation and nothing else.
+
+1. Ask only the two questions under **Who receives the Leads** (skip any the person already answered in this conversation), read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
+2. Find the installed "Mosaico Outreach — Source leads" automation, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
+3. Change only the quota map and the per-owner wording in its text. If its text predates 0.9.3, replace it with the Source leads text above, filled with the automation's own timezone and the new map. Keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
+4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged) and the quota map it now holds. A write without readback is not completion.
 
 Each scheduled run starts its own Outreach run through the invite-run skill. If Mosaico returns a
 blocker, the run stops and reports it; it does not work around it.

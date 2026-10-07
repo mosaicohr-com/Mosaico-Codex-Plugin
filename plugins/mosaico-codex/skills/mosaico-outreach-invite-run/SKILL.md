@@ -31,12 +31,14 @@ throughout the run. Accept one action and run only the selected scope.
    The person's standing answer says who receives Leads and how many; use it as given. Member ids come
    from `get_team_profiles` (each person's "Person ID"); never invent one or take one from memory. If
    neither a quota nor a colleague is known, do not start the run: ask the person who receives the Leads
-   and how many each, and a scheduled run that cannot ask stops and reports that the quota is missing. If
+   and how many each. A scheduled run cannot ask: it stops, quotes Mosaico's code and message verbatim when
+   Mosaico gave one, and ends its report with this sentence: "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule." If
    Mosaico answers `sourcing_participant_required`, the start needs `colleagueOwnerUserId` or `quota`; if it
    answers `sourcing_quota_invalid`, the map is wrong (an id that is not an active member, the run owner
    missing, or a target outside 1 to 100). Mosaico's answer says what to fix: fix exactly that from the
    person's answer and start again once, never with a guessed colleague or number. The quota decides when
-   the run is complete.
+   the run is complete. When the person answered those two questions in this run, make the offer in
+   **Offer to save the quota into the Source leads schedule**, below.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
    `outreach_deposit_conversation`, `outreach_mark_message_sent`, `outreach_record_delivery_block`
@@ -64,6 +66,22 @@ when Mosaico returns a blocker, `human_decision_required` or `stop_run`; then sh
 owner, Lead and status it returned. `outreach_deposit_conversation` returns such a blocker for a new
 Lead. Re-send with `acknowledgeProfileOnOtherOwner: true` only after the person decides to; never
 set it yourself.
+
+## Offer to save the quota into the Source leads schedule
+
+Do this only when the person answered who receives the Leads and how many each during this run. It does
+not apply when the quota came from a schedule's standing answer. Once you have the answer, ask once,
+before you start the run or straight after: "Do you want me to save this into your Source leads schedule,
+so the scheduled runs use it too?" The run does not depend on the answer.
+
+- Yes: follow "Update the Source leads quota in place" in the `$mosaico:mosaico-outreach-schedule-install`
+  skill, which updates the Codex Source leads automation, for that automation only. Ask nothing else,
+  change nothing else in it, and keep its times. Read the saved automation back and tell the person what
+  it now holds.
+- No: use the answer for this run only, and say in the report that the quota was used for this run only and
+  the Source leads schedule is unchanged.
+- If no Source leads automation is installed, say so and offer to install one with
+  `$mosaico:mosaico-outreach-schedule-install`. Do not skip the offer silently.
 
 ## Source Leads and prepare drafts
 
@@ -116,7 +134,8 @@ and the quota remaining (name the owner and the member id), and any shortfall wi
 that saved nothing is a failed run: report it as failed with Mosaico's code and message (for example
 `sourcing_participant_required`, `sourcing_quota_invalid` or the blocker that stopped it), including a run
 Mosaico refused at the start. Never report such a run as successful, and never describe a partly filled
-quota as complete.
+quota as complete. If the person answered the quota questions in this run, say whether the quota was saved into the
+Source leads automation or used for this run only.
 
 ## Send approved invitations
 

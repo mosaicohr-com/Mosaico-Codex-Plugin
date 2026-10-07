@@ -27,6 +27,7 @@ OUTREACH_SKILLS = (
     "mosaico-outreach-agent-management",
     "mosaico-outreach-repair-run",
 )
+FIX_SENTENCE = "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
 FORBIDDEN = ("Connect means", "Message means", "Pending means", "already-connected", "invite-pending")
 ALLOW_RULES = (
     "mcp__Claude_Browser__javascript_tool",
@@ -194,11 +195,25 @@ def main() -> None:
         check("quota remaining for each owner" in flat_text and "failed run" in flat_text and "never as successful" in flat_text, f"{package} Source leads Step 5 lacks the per-owner report or the failed-run rule")
         for needle in ("get_team_profiles", "Person ID", "sourcing_participant_required", "sourcing_quota_invalid", '{"<run owner member id>": 3, "<colleague member id>": 3}'):
             check(needle in flat_text, f"{package} Source leads installer text lacks: {needle}")
+        check(FIX_SENTENCE in flat_text, f"{package} Source leads text lacks the exact Fix sentence for a run that stopped without a quota")
+        check("quote Mosaico's code and message verbatim" in flat_text, f"{package} Source leads text does not quote Mosaico's code and message before the Fix sentence")
+        update = flat_text[flat_text.index("### Update the Source leads quota in place") :] if "### Update the Source leads quota in place" in flat_text else ""
+        check(update != "", f"{package} schedule-install skill lacks the named sub-section: Update the Source leads quota in place")
+        for needle in ("Ask nothing else", "Keep its", "enabled state", "quota map and the per-owner wording", "Read the saved", "A write without readback is not completion"):
+            check(needle in update, f"{package} 'Update the Source leads quota in place' lacks: {needle}")
+        check('as described under **Update the Source leads quota in place**' in flat_text, f"{package} installer text does not point at the named sub-section from the pre-0.9.3 note")
     check("her own member id in its quota map" in " ".join(second_person(claude).split()), "Second-person section does not say her schedule needs her own id in the quota map")
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         invite = " ".join((root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").split())
         for needle in ("`quota`", "`colleagueOwnerUserId`", "get_team_profiles", "sourcing_participant_required", "sourcing_quota_invalid", "never guesses a colleague", "A run that saved nothing is a failed run", "never report such a run as successful", "Report a sourcing run"):
             check(needle in invite or needle.lower() in invite.lower(), f"{package} invite-run skill lacks: {needle}")
+        check(FIX_SENTENCE in invite, f"{package} invite-run skill lacks the exact Fix sentence for a scheduled run without a quota")
+        check("quotes Mosaico's code and message verbatim" in invite, f"{package} invite-run skill does not quote Mosaico's code and message before the Fix sentence")
+        check("## Offer to save the quota into the Source leads schedule" in (root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8"), f"{package} invite-run skill lacks the save-to-schedule offer section")
+        for needle in ("ask once", "Do you want me to save this into your Source leads schedule, so the scheduled runs use it too?", '"Update the Source leads quota in place"', "Ask nothing else, change nothing else in", "keep its times", "tell the person what it now holds", "used for this run only", "If no Source leads", "Do not skip the offer silently"):
+            check(needle in invite, f"{package} invite-run save-to-schedule offer lacks: {needle}")
+        check("mosaico:mosaico-outreach-schedule-install" in invite, f"{package} invite-run offer does not name the qualified installer skill")
+        check("`/mosaico:mosaico-outreach-schedule-install`" in invite if package == "Claude" else "`$mosaico:mosaico-outreach-schedule-install`" in invite and "Codex Source leads automation" in invite, f"{package} invite-run offer does not point at the right installer")
         check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):

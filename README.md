@@ -126,6 +126,10 @@ The Codex package ships no such capability, so its Outreach skills do not captur
   member ids, and the second-person section says her schedule needs her own id in the map. A Source leads schedule
   saved before 0.9.3 has no quota map: run the installer again to update it in place. The Source leads text now
   needs plugin 0.9.3 or later. The Sync data and Repair texts are unchanged.
+- A run that has no quota ends with one plain "Fix:" sentence naming the installer skill. When a person answers who
+  receives the Leads in an interactive run, the invite-run skill offers once to save that answer into the installed
+  Source leads schedule (the installer's new "Update the Source leads quota in place" steps), or says no schedule is
+  installed and offers to install one.
 - The overview skills mention the quota on the sourcing start. Tests check the manifests at 0.9.3 and that the
   Source leads schedule and the invite-run skill carry the quota.
 
