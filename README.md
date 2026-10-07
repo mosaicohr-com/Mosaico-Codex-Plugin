@@ -116,7 +116,7 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased
+### 0.9.6
 
 - Thin routines. The schedule installer now saves, for each of Sync data, Source leads and Repair, a short text
   (under 200 words) that holds only the person's standing answers and tells the run to follow the installed plugin's
@@ -134,8 +134,8 @@ The Codex package ships no such capability, so its Outreach skills do not captur
   keeping the cron times, enabled state, name and answers.
 - What a person does once: run the schedule installer again. It swaps each saved long text for the thin one and
   keeps the times, enabled state, name and answers. After that, plugin releases are picked up without reinstalling.
-- The approved browser scripts and the application contract are unchanged. The version is not bumped here; the
-  release that carries this change must be 0.9.6 or later so the stamp is true.
+- The approved browser scripts and the application contract are unchanged. Existing schedules keep their long
+  texts until the installer is run again once; the thin texts need plugin 0.9.6 or later.
 
 ### 0.9.5
 

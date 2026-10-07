@@ -301,7 +301,7 @@ def main() -> None:
         check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.5", f"{manifest.name} is not at 0.9.5")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.6", f"{manifest.name} is not at 0.9.6")
     print("PASS: both schedule-install skills install thin routines (standing answers only, under 200 words, naming the skill, the routine section and the version stamp); the run skills hold each routine section; qualified skill names and the stale-copy checks hold.")
 
 
