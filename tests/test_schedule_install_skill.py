@@ -193,7 +193,7 @@ def main() -> None:
     # 0.9.3: the sourcing start carries the quota Mosaico requires, in both packages' Source leads text and invite-run skill.
     for package, text in (("Claude", source), ("Codex", SKILLS["Codex"][SKILLS["Codex"].index("## The Source leads schedule") :])):
         flat_text = " ".join(text.split())
-        check("0.9.4 or later" in text and "0.9.3 or later" not in text and "0.5.0 or later" not in text, f"{package} Source leads text does not need plugin 0.9.4")
+        check("0.9.5 or later" in text and "0.9.3 or later" not in text and "0.5.0 or later" not in text, f"{package} Source leads text does not need plugin 0.9.5")
         check("quota <quota map> as quota" in flat_text and "each with the same quota <quota map>" in flat_text, f"{package} Source leads Step 1 does not send the quota map")
         check("using the quota sent at the start" in text and "using the quota Mosaico reports" not in text, f"{package} Source leads Step 2 still relies on a quota Mosaico reports")
         check("quota remaining for each owner" in flat_text and "failed run" in flat_text and "never as successful" in flat_text, f"{package} Source leads Step 5 lacks the per-owner report or the failed-run rule")
@@ -221,7 +221,7 @@ def main() -> None:
         check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.4", f"{manifest.name} is not at 0.9.4")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.5", f"{manifest.name} is not at 0.9.5")
     print("PASS: both schedule-install skills describe the three schedules (Sync data, Source leads, Repair), qualified skill names, the post-send check and the stale-copy checks.")
 
 

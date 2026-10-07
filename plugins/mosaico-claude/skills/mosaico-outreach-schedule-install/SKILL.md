@@ -139,7 +139,7 @@ Guards: pacing between page loads, the weekly invitation ceiling and run expiry 
 approves or sends anything. Its text is:
 
 ```text
-Use the installed mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.9.4 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
+Use the installed mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.9.5 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
 
 Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
 
@@ -181,7 +181,7 @@ Use this when a Source leads schedule is already installed and only its quota ha
 
 1. Ask only the two questions under **Source leads: who receives the Leads** (skip any the person already answered in this conversation), read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
 2. Find the installed "Mosaico Outreach — Source leads" scheduled task, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
-3. Change only the quota map and the per-owner wording in its text. If its text predates 0.9.4, replace it with the Source leads text above, filled with the schedule's own public identifier and timezone and the new map. Keep its cron times, timezone, public identifier, name, enabled state, working folder and every other saved setting exactly as they are.
+3. Change only the quota map and the per-owner wording in its text. If its text predates 0.9.5, replace it with the Source leads text above, filled with the schedule's own public identifier and timezone and the new map. Keep its cron times, timezone, public identifier, name, enabled state, working folder and every other saved setting exactly as they are.
 4. Read the saved schedule back and confirm to the person its name, timezone, enabled state, times (unchanged) and the quota map it now holds. A write without readback is not completion.
 
 **Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
