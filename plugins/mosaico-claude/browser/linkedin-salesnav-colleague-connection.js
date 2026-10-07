@@ -1,14 +1,16 @@
 const PUBLIC_IDENTIFIER = "";
 const COLLEAGUE_IDENTIFIER = "";
 // Mosaico Outreach: is one sourcing candidate already a connection of a colleague, according to Sales Navigator's "Connections of" filter.
-// Approved capture script (0.9.4). The plugin's browser-script gate allows it only word for word, with the first line's value changed to
+// Approved capture script (0.9.5). The plugin's browser-script gate allows it only word for word, with the first line's value changed to
 // the candidate's public identifier (the part of the profile address after /in/, or the opaque member id Mosaico hands over as the
 // script identifier) and the second line's value changed to the colleague's registered LinkedIn public identifier, which Mosaico
 // supplies (outreach_get_day, workflowStatus.colleagueChecks): the run never chooses the colleague.
 // It runs inside the signed-in Sales Navigator page (any https://www.linkedin.com/sales/ page): the CSRF token is read here, sent only to
 // LinkedIn's own endpoints listed below, and never returned. It makes at most these calls to LinkedIn, one after the other with a short
 // pause between the Sales Navigator ones, and never retries:
-//   1. LinkedIn's profile query (voyager/api/graphql, the one linkedin-connection-evidence.js uses) once for the colleague and once for the
+//   1. LinkedIn's profile query (voyager/api/graphql), asked exactly as linkedin-connection-evidence.js asks it (same address, same query id,
+//      same headers, same reading of the answer; since 0.9.5, including the normalized-JSON accept header the answer's `included` list needs: 0.9.4
+//      sent a plain JSON accept header, LinkedIn answered without `included`, and every person looked unknown) once for the colleague and once for the
 //      candidate. It gives each person's member URN (urn:li:fsd_profile:ACoAA...), from which the numeric member id is decoded, and the
 //      name. The name never leaves the page except as the search text sent back to LinkedIn.
 //   2. sales-api/salesApiFacetTypeahead?type=CONNECTION_OF: the picker behind the "Connections of" filter. It searches by text, not by
@@ -85,6 +87,7 @@ const resolveProfile = (profiles, requested) => {
 const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1] || "";
 const capturedAt = new Date().toISOString();
 const HEADERS = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/json" };
+const PROFILE_HEADERS = { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" };
 const colleague = { input: COLLEAGUE_IDENTIFIER, salesNavId: null, memberId: OPAQUE_ID.test(COLLEAGUE_IDENTIFIER) ? memberIdOfOpaque(COLLEAGUE_IDENTIFIER) : null };
 const candidate = { input: PUBLIC_IDENTIFIER, salesNavId: null, memberId: OPAQUE_ID.test(PUBLIC_IDENTIFIER) ? memberIdOfOpaque(PUBLIC_IDENTIFIER) : null };
 let status = 0;
@@ -93,18 +96,18 @@ let found = false;
 let resultsTotal = null;
 let pagesRead = 0;
 let calls = 0;
-const get = async (url) => {
+const get = async (url, headers) => {
   if (calls > 0 && url.indexOf("/sales-api/") > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
   calls++;
   let r;
-  try { r = await fetch(url, { credentials: "include", headers: HEADERS }); } catch (e) { status = 0; throw "no-answer"; }
+  try { r = await fetch(url, { credentials: "include", headers }); } catch (e) { status = 0; throw "no-answer"; }
   status = r.status;
   if (!r.ok) throw "http";
   try { return await r.json(); } catch (e) { status = 0; throw "not-json"; }
 };
 const lookup = async (identifier) => {
-  // The profile query, as linkedin-connection-evidence.js asks it. null when LinkedIn knows no such profile; a thrown status on an error.
-  const j = await get(PROFILE_ENDPOINT + "?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(identifier) + ")&queryId=" + PROFILE_QUERY_ID);
+  // The profile query, request and reading exactly as linkedin-connection-evidence.js does them. null when LinkedIn knows no such profile; a thrown status on an error.
+  const j = await get(PROFILE_ENDPOINT + "?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(identifier) + ")&queryId=" + PROFILE_QUERY_ID, PROFILE_HEADERS);
   const hit = resolveProfile(listOf(j && j.included).filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e))), identifier);
   const id = hit === null ? null : profileUrnId(hit.entityUrn);
   return id === null ? null : { memberId: memberIdOfOpaque(id), name: nameOf(hit) };
@@ -121,7 +124,7 @@ const rowOf = (e) => {
 };
 const search = async (name, filterId, filterText, start) => {
   const filter = filterId === null ? "" : "filters:List((type:CONNECTION_OF,values:List((id:" + filterId + ",text:" + restli(filterText) + ",selectionType:INCLUDED)))),";
-  const j = await get(SEARCH_ENDPOINT + "?q=searchQuery&query=(" + filter + "keywords:" + restli(name) + ")&start=" + start + "&count=" + PAGE_SIZE + "&decorationId=" + DECORATION);
+  const j = await get(SEARCH_ENDPOINT + "?q=searchQuery&query=(" + filter + "keywords:" + restli(name) + ")&start=" + start + "&count=" + PAGE_SIZE + "&decorationId=" + DECORATION, HEADERS);
   pagesRead++;
   if (!isObj(j)) throw "shape";
   const elements = listOf(j.elements);
@@ -139,7 +142,7 @@ try {
     if (c !== null) colleague.memberId = c.memberId;
     let entry = null;
     if (c !== null && c.memberId !== null && c.name !== "") {
-      const t = await get(TYPEAHEAD_ENDPOINT + "?q=query&start=0&count=10&type=CONNECTION_OF&query=" + restli(c.name));
+      const t = await get(TYPEAHEAD_ENDPOINT + "?q=query&start=0&count=10&type=CONNECTION_OF&query=" + restli(c.name), HEADERS);
       // Only an entry whose id decodes to her own member id is her; a similar name is not.
       entry = listOf(isObj(t) ? t.elements : null).find((x) => isObj(x) && salesId(x.id) !== null && memberIdOfOpaque(x.id) === c.memberId) || null;
     }

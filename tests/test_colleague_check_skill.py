@@ -70,11 +70,11 @@ def main() -> None:
         check(needle in codex, f"Codex invite-run colleague note lacks: {needle}")
     check("browser/" not in codex and SCRIPT not in codex_text, "the Codex package refers to a browser script it does not ship")
 
-    # The Source leads schedule texts: the Claude text names the script and the directive; both need 0.9.4 and report the skips.
+    # The Source leads schedule texts: the Claude text names the script and the directive; both need 0.9.5 and report the skips.
     for package, root, marker in (("Claude", CLAUDE, "**Mosaico Outreach — Source leads**"), ("Codex", CODEX, "**Mosaico Outreach — Source leads**")):
         install = flat((root / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md").read_text(encoding="utf-8"))
-        source = install[install.index("0.9.4 or later") - 200 : install.index("**Source leads: who receives the Leads.**" if package == "Claude" else "**Who receives the Leads.**")]
-        check("0.9.4 or later" in source and "colleagueSkips" in source and "skipped as already connected to each owner" in source, f"{package} Source leads text lacks the 0.9.4 requirement or the skip count")
+        source = install[install.index("0.9.5 or later") - 200 : install.index("**Source leads: who receives the Leads.**" if package == "Claude" else "**Who receives the Leads.**")]
+        check("0.9.5 or later" in source and "colleagueSkips" in source and "skipped as already connected to each owner" in source, f"{package} Source leads text lacks the 0.9.5 requirement or the skip count")
         if package == "Claude":
             check("browser/linkedin-salesnav-colleague-connection.js" in source and f"// mosaico run {SCRIPT} PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=" in source
                   and "colleagueConnectionEvidence" in source and "https://www.linkedin.com/sales/home" in source and "workflowStatus.colleagueChecks" in source,
@@ -85,9 +85,9 @@ def main() -> None:
     check("the Sales Navigator colleague check" in flat((CLAUDE / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")), "the Claude overview skill does not list the colleague check output")
     # Manifests and the README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.4", f"{manifest.name} is not at 0.9.4")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.5", f"{manifest.name} is not at 0.9.5")
     readme = flat((ROOT / "README.md").read_text(encoding="utf-8"))
-    check("### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
+    check("### 0.9.5" in readme and "### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
     print("PASS: the invite-run skills run the colleague check before a colleague save, pass its output unchanged, handle every Mosaico answer, and never treat 'not found' as 'not connected'; Codex says it cannot run it.")
 
 

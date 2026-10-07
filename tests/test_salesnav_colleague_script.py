@@ -6,6 +6,13 @@ against a fake page and a fake LinkedIn: no network, no real cookie, no real per
 installed. The fake answers in the shapes the 2026-10-07 capture notes record; the parts the captures could not show (the keywords field,
 the decorationId, the result row) are stated in the script header and are only as true as that.
 
+Profile lookups (0.9.5): the live test of 0.9.4 ended at the first call with "colleague-not-resolved" because the script asked LinkedIn's profile
+query with a plain JSON accept header, and LinkedIn then answers without the `included` list the profile is read from. The fake LinkedIn here
+answers a profile query with `included` only when the request carries the normalized-JSON accept header the proven connection-evidence script
+sends (and with an answer that has no `included` list otherwise), and the profile requests made for a vanity and for an opaque id are compared,
+parameter for parameter, with the ones linkedin-connection-evidence.js makes for the same identifier. The answer shapes are the ones that script's
+own tests use; no real LinkedIn answer is recorded in this repository.
+
 Member ids: LinkedIn's opaque ids are 29 bytes, 4 prefix bytes (00 2A 00 00 for ACoAA..., 00 2C 00 00 for Sales Navigator's ACw...), the
 numeric member id as 4 big-endian bytes, then 21 more. The fake builds them the same way, so the script decodes them as it would real ones.
 """
@@ -22,6 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins" / "mosaico-claude"
 SCRIPT = PLUGIN / "browser" / "linkedin-salesnav-colleague-connection.js"
+EVIDENCE = PLUGIN / "browser" / "linkedin-connection-evidence.js"
 
 spec = importlib.util.spec_from_file_location("gate", PLUGIN / "hooks" / "browser-script-gate.py")
 gate = importlib.util.module_from_spec(spec)
@@ -30,11 +38,14 @@ spec.loader.exec_module(gate)
 
 SOURCE = SCRIPT.read_text(encoding="utf-8")
 TOOL = "mcp__Claude_Browser__javascript_tool"
+NORMALIZED_ACCEPT = "application/vnd.linkedin.normalized+json+2.1"
 
 HARNESS = r"""
 const fs = require('fs');
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const SRC = fs.readFileSync(process.argv[1], 'utf8');
+const EVIDENCE_SRC = fs.readFileSync(process.argv[2], 'utf8');
+const NORMALIZED_ACCEPT = 'application/vnd.linkedin.normalized+json+2.1';
 const TOKEN = 'ajax:SECRET-TOKEN';
 
 // Opaque ids as LinkedIn builds them: 00 <kind> 00 00, the member id as 4 big-endian bytes, 21 more bytes.
@@ -55,7 +66,8 @@ const PEOPLE = {
   strange: { vanity: 'zoe-obrien', first: "Zoë (Z.)", last: "O'Brien*", member: 500005 },
 };
 const byVanity = (v) => Object.values(PEOPLE).find((p) => p.vanity.toLowerCase() === v.toLowerCase());
-const profileAnswer = (p) => ({ included: [{ $type: 'com.linkedin.voyager.dash.identity.profile.Profile', publicIdentifier: p.vanity, entityUrn: 'urn:li:fsd_profile:' + fsd(p.member), firstName: p.first, lastName: p.last, headline: 'Secret headline' }] });
+// The Profile entity as the evidence script's tests fixture it (the shape linkedin-connection-evidence.js reads), with the names the thread script reads from the same query.
+const profileAnswer = (p, vanity = p.vanity) => ({ included: [{ $type: 'com.linkedin.voyager.dash.identity.profile.Profile', publicIdentifier: vanity, entityUrn: 'urn:li:fsd_profile:' + fsd(p.member), firstName: p.first, lastName: p.last, headline: 'Secret headline' }] });
 
 const ok = (j) => ({ ok: true, status: 200, json: async () => j });
 const bad = (s) => ({ ok: false, status: s, json: async () => ({}) });
@@ -70,6 +82,9 @@ const route = (world = {}) => (url, init) => {
   if (url.includes('voyagerIdentityDashProfiles')) {
     const v = decodeURIComponent(/vanityName:([^)]*)\)/.exec(url)[1]);
     if (world.profileStatus) return bad(world.profileStatus);
+    // Without the normalized-JSON accept header LinkedIn answers with a document that has no `included` list (what 0.9.4 got).
+    if (!init || !init.headers || init.headers.accept !== NORMALIZED_ACCEPT) return ok({ data: { data: { identityDashProfilesByMemberIdentity: { '*elements': [] } } } });
+    if (world.redirects && world.redirects[v]) return ok(profileAnswer(world.redirects[v].person, world.redirects[v].vanity));
     const p = byVanity(v) || (v.startsWith('ACoAA') ? Object.values(PEOPLE).find((q) => fsd(q.member) === v) : undefined);
     if (world.noProfile && world.noProfile.includes(v)) return ok({ included: [] });
     return ok(p ? profileAnswer(p) : { included: [] });
@@ -111,6 +126,16 @@ async function run(candidate, colleague, world = {}, cookie = 'JSESSIONID="' + T
   const router = world.router || route(world);
   const result = await wrapped({ cookie }, async (url, init) => { calls.push({ url, init }); const r = router(url, init); if (r instanceof Error) throw r; return r; }, (fn, ms) => { delays.push(ms); fn(); });
   return { result, calls, delays };
+}
+// The proven connection-evidence script, run for one identifier against the same fake LinkedIn: the request it makes is the reference.
+async function evidence(id, world = {}) {
+  const calls = [];
+  world.calls = calls;
+  const router = route(world);
+  const body = EVIDENCE_SRC.replace('const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";', 'const PUBLIC_IDENTIFIER = ' + JSON.stringify(id) + ';');
+  const wrapped = new AsyncFunction('document', 'fetch', 'return await (async () => {' + body.replace(/\n\(\{/, '\nreturn ({') + '})();');
+  const result = await wrapped({ cookie: 'JSESSIONID="' + TOKEN + '"' }, async (url, init) => { calls.push({ url, init }); return router(url, init); });
+  return { result, calls };
 }
 const urls = (r) => r.calls.map((c) => c.url.replace('https://www.linkedin.com', ''));
 const shortUrls = (r) => urls(r).map((u) => u.replace(/\?.*/, ''));
@@ -155,6 +180,20 @@ const shortUrls = (r) => urls(r).map((u) => u.replace(/\?.*/, ''));
   r = await run('jane-doe', 'ewa-colleague', { extraNamesakes: 30, connectedFiller: 30, connected: [J.member] }); out.secondPageFound = r.result; out.secondPageUrls = urls(r);
   // Identifiers: opaque member id for the candidate; a vanity given in other letter case is echoed as given.
   r = await run(fsd(J.member), 'ewa-colleague', { connected: [J.member] }); out.opaque = r.result; out.opaqueUrls = urls(r);
+  // Profile lookups equal the proven script's, parameter for parameter, for a vanity and for an opaque id (the colleague's and the candidate's are looked up alike).
+  const profileCall = (c) => ({ url: c.url, credentials: c.init.credentials, headers: c.init.headers, method: c.init.method || null });
+  const profileCallsOf = (rr) => rr.calls.filter((c) => c.url.includes('voyager/api/graphql')).map(profileCall);
+  r = await run('jane-doe', 'ewa-colleague', { connected: [J.member] });
+  out.vanityRun = profileCallsOf(r); out.vanityEvidence = [profileCall((await evidence('ewa-colleague')).calls[0]), profileCall((await evidence('jane-doe')).calls[0])];
+  r = await run(fsd(J.member), fsd(C.member), { connected: [J.member] });
+  out.opaqueRun = profileCallsOf(r); out.opaqueEvidence = [profileCall((await evidence(fsd(C.member))).calls[0]), profileCall((await evidence(fsd(J.member))).calls[0])];
+  out.opaqueBoth = r.result; out.opaqueBothShort = shortUrls(r);
+  // The vanity the live test used was a real one: the colleague's, in a plain vanity form like the live one, and the candidate an opaque id (the form Mosaico hands over).
+  r = await run(fsd(J.member), 'ewa-colleague', { connected: [J.member] }); out.vanityColleagueOpaqueCandidate = r.result; out.vanityColleagueOpaqueCandidateShort = shortUrls(r);
+  // A redirected vanity: LinkedIn answers the old vanity with the one Profile of the new one (the evidence script accepts it, so does this one).
+  r = await run('jane-doe', 'ewa-old-vanity', { connected: [J.member], redirects: { 'ewa-old-vanity': { person: C, vanity: 'ewa-colleague' } } }); out.redirected = r.result; out.redirectedShort = shortUrls(r);
+  // The 0.9.4 failure: a profile answer without `included` (what a plain accept header gets) is the colleague not resolved after one call, and nothing is searched.
+  r = await run('jane-doe', 'ewa-colleague', { router: (url, init) => (url.includes('voyagerIdentityDashProfiles') ? ok({ data: { data: {} } }) : bad(500)) }); out.noIncluded = r.result; out.noIncludedCalls = r.calls.length;
   out.upper = (await run('Jane-Doe', 'EWA-Colleague', { connected: [J.member] })).result;
   // Odd characters in a name go to LinkedIn encoded and never as raw brackets, quotes or stars.
   r = await run('zoe-obrien', 'ewa-colleague', { connected: [] }); out.strange = r.result; out.strangeUrls = urls(r);
@@ -273,6 +312,7 @@ def check_behaviour(out: dict) -> None:
     check(out["secrets"] is False, "a name, headline, picture or company reached the result")
     check(all(c == "include" for c in out["foundCreds"]), "a call did not use the page's own session")
     check(all(h["csrf-token"] == "ajax:SECRET-TOKEN" and h["x-restli-protocol-version"] == "2.0.0" for h in out["foundHeaders"]), "request headers are not the documented ones")
+    check([h["accept"] for h in out["foundHeaders"]] == [NORMALIZED_ACCEPT, "application/json", NORMALIZED_ACCEPT, "application/json"], f"accept headers wrong (the profile query needs the normalized one): {out['foundHeaders']}")
     # The calls, in order: the colleague's profile, her typeahead entry, the candidate's profile, the filtered search. Nothing else.
     check(out["foundShort"] == ["/voyager/api/graphql", "/sales-api/salesApiFacetTypeahead", "/voyager/api/graphql", "/sales-api/salesApiLeadSearch"], f"unexpected calls {out['foundShort']}")
     check("vanityName:ewa-colleague" in out["foundUrls"][0] and "vanityName:jane-doe" in out["foundUrls"][2], "profiles were not looked up by the two identifiers")
@@ -281,6 +321,21 @@ def check_behaviour(out: dict) -> None:
     check(search.startswith("/sales-api/salesApiLeadSearch?q=searchQuery&query=(filters:List((type:CONNECTION_OF,values:List((id:" + ids["colleagueSales"] + ",text:Ewa%20Colleague,selectionType:INCLUDED)))),keywords:Jane%20Doe)&start=0&count=25&decorationId="),
           f"filtered search call wrong: {search}")
     check(out["foundDelays"] == [500, 500], f"calls to Sales Navigator were not spaced: {out['foundDelays']}")
+
+    # Profile lookups: the same request, parameter for parameter, as the proven connection-evidence script makes for the same identifier.
+    check(len(out["vanityRun"]) == 2 and out["vanityRun"] == out["vanityEvidence"], f"vanity profile requests differ from the evidence script's: {out['vanityRun']} vs {out['vanityEvidence']}")
+    check(len(out["opaqueRun"]) == 2 and out["opaqueRun"] == out["opaqueEvidence"], f"opaque-id profile requests differ from the evidence script's: {out['opaqueRun']} vs {out['opaqueEvidence']}")
+    check(out["vanityRun"][0]["headers"]["accept"] == NORMALIZED_ACCEPT and out["vanityRun"][0]["credentials"] == "include" and "queryId=voyagerIdentityDashProfiles.34ead06db82a2cc9a778fac97f69ad6a" in out["vanityRun"][0]["url"],
+          "the profile request is not the documented one")
+    both = out["opaqueBoth"]
+    check(both["state"] == "ok" and both["found"] is True and both["colleague"]["memberId"] == 300001 and both["candidate"]["memberId"] == 553472255
+          and out["opaqueBothShort"] == ["/voyager/api/graphql", "/sales-api/salesApiFacetTypeahead", "/voyager/api/graphql", "/sales-api/salesApiLeadSearch"], f"two opaque ids were not resolved through to the search: {both}")
+    mixed = out["vanityColleagueOpaqueCandidate"]
+    check(mixed["state"] == "ok" and mixed["found"] is True and mixed["candidate"]["memberId"] == 553472255 and out["vanityColleagueOpaqueCandidateShort"][-1] == "/sales-api/salesApiLeadSearch", f"a vanity colleague with an opaque candidate was not resolved: {mixed}")
+    redirected = out["redirected"]
+    check(redirected["state"] == "ok" and redirected["colleague"]["input"] == "ewa-old-vanity" and redirected["colleague"]["memberId"] == 300001
+          and out["redirectedShort"] == ["/voyager/api/graphql", "/sales-api/salesApiFacetTypeahead", "/voyager/api/graphql", "/sales-api/salesApiLeadSearch"], f"a redirected vanity was not resolved: {redirected}")
+    check(out["noIncluded"]["state"] == "colleague-not-resolved" and out["noIncluded"]["found"] is False and out["noIncludedCalls"] == 1, "a profile answer without included was not a clean colleague-not-resolved")
 
     # Not found: the search ran, the candidate is real and their own id is read from the unfiltered results. Never "found".
     nf = out["notFound"]
@@ -362,7 +417,7 @@ def main() -> None:
     if node is None:
         print("SKIP: node is not installed, so the colleague-connection script was not run against a fake LinkedIn (static and gate checks passed).")
         return
-    done = subprocess.run([node, "-e", HARNESS, str(SCRIPT)], capture_output=True, text=True, check=False)
+    done = subprocess.run([node, "-e", HARNESS, str(SCRIPT), str(EVIDENCE)], capture_output=True, text=True, check=False)
     check(done.returncode == 0, f"harness failed: {done.stderr[-600:]}")
     check_behaviour(json.loads(done.stdout))
     print("PASS: the colleague-connection script is gated word for word, resolves both people by member id (never by name), returns only ids, seals its record last, and fails closed.")
