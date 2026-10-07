@@ -11,7 +11,7 @@ to do in Mosaico Outreach?" and present these action headers and descriptions. P
 recommended actions may be mentioned inside the matching action, but must never replace the two
 all-dates follow-up actions:
 
-- **Source invitation Leads** — Fill today or selected days to exactly 20 qualified Leads and save
+- **Source invitation Leads** — Source Leads up to the Leads per day set on each Agent and save
   personalized invitation drafts. Never approve or send.
 - **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
   for the selected day. Verify each one on LinkedIn before marking it sent.
@@ -38,8 +38,7 @@ schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
 **Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
 
 Use the current application-owned read for the resolved intent. For invitation sourcing call
-`outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
-`targetCount` (20 for the standard run); start the sourcing run with `quota` or `colleagueOwnerUserId`, as the invite-run skill describes, or Mosaico refuses it with `sourcing_participant_required`. For approved invitation delivery use
+`outreach_get_day` with the preserved `day`, `intent: source_invitation_leads` and the sourcing `runId`, never a `targetCount`; start the sourcing run with no quota and no colleague, as the invite-run skill describes. For approved invitation delivery use
 `intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
 checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. For repair start the run with
 `intent: repair` and read `outreach_get_repair_queue`. Before any of
@@ -51,6 +50,11 @@ not ask the menu again when the person's intent is explicit. The schedule action
 Outreach read before its installer. Follow the returned recommended action and reread status after
 every transition. Call `outreach_get_agents` before qualification or writing and use the selected
 active Agent's search instructions, message instructions and Messaging Checklist for judgment only.
+
+The sourcing plan lives on each Agent in Outreach (Agent tab): Leads per day, and Sourced by (a colleague, or the
+owner when empty). Mosaico works out how many Leads each person still needs today, so a run only tops up, and the
+skills and schedules carry no numbers. If no Agent has Leads per day, Mosaico says so and the run tells the person to
+set it there.
 
 Human approval applies to the exact current message. For LinkedIn delivery, perform the authorized
 browser action, verify the external result, report evidence through the tool named by Mosaico and

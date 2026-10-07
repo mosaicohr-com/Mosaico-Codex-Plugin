@@ -27,7 +27,8 @@ OUTREACH_SKILLS = (
     "mosaico-outreach-agent-management",
     "mosaico-outreach-repair-run",
 )
-FIX_SENTENCE = "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
+SET_SENTENCE = "Set Leads per day on an Agent in Outreach (Agent tab), then rerun."
+PLAN_SENTENCE = "The number of Leads per day and who sources them are set on each Agent in Outreach, Agent tab (Leads per day and Sourced by), not in the schedule."
 FORBIDDEN = ("Connect means", "Message means", "Pending means", "already-connected", "invite-pending")
 ALLOW_RULES = (
     "mcp__Claude_Browser__javascript_tool",
@@ -43,6 +44,7 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 
 MIN_VERSION = "0.9.6"
+SOURCE_MIN_VERSION = "0.9.8"
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -125,24 +127,27 @@ def main() -> None:
     codex_text = codex_texts[0]
     THIN = (
         ("Claude Sync data", sync_text, "mosaico:mosaico-outreach-follow-up-run", "Sync data routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
-        ("Claude Source leads", source_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>", "<quota map>"), "built-in browser pane"),
+        ("Claude Source leads", source_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Claude Repair", repair_text, "mosaico:mosaico-outreach-repair-run", "Repair routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
-        ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<quota map>"), "authenticated LinkedIn browser"),
+        ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>",), "authenticated LinkedIn browser"),
     )
     for label, text, skill_name, section_name, placeholders, browser in THIN:
+        min_version = SOURCE_MIN_VERSION if "Source leads" in label else MIN_VERSION
         words = len(text.split())
         check(words <= THIN_CAP, f"{label} schedule text is {words} words, over the {THIN_CAP}-word cap: it must be thin")
-        check(f"Use the installed {skill_name} skill from the mosaico plugin ({MIN_VERSION} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
+        check(f"Use the installed {skill_name} skill from the mosaico plugin ({min_version} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
         check(f"Follow that skill's \"{section_name}\" section exactly" in text, f"{label} text does not name the routine section it follows")
         check("Standing answers for this recurring automation, supplied once by the person:" in text, f"{label} text lacks the standing answers")
         for placeholder in placeholders:
             check(placeholder in text, f"{label} text lacks the placeholder {placeholder}")
-        check(f"is older than {MIN_VERSION} or has no \"{section_name}\" section, stop and report that the plugin needs updating" in text, f"{label} text lacks the version stamp stop")
+        check(f"is older than {min_version} or has no \"{section_name}\" section, stop and report that the plugin needs updating" in text, f"{label} text lacks the version stamp stop")
         check("Report as the skill says." in text, f"{label} text does not hand the report to the skill")
         check(browser in text, f"{label} text lacks the browser line ({browser})")
         check("A LinkedIn warning or captcha stops the run, which then reports." in text, f"{label} text lacks the LinkedIn warning guard")
         for procedure in ("Step 1", "Step 2", "Step 3", "outreach_start_run", "outreach_get_", "outreach_record", "identityEvidence", "// mosaico run", "browser/linkedin-", "file-reading tool"):
             check(procedure not in text, f"{label} text holds procedure ({procedure}); it belongs in the skill's routine section")
+    for label, text in (("Claude Source leads", source_text), ("Codex Source leads", codex_text)):
+        check("<quota map>" not in text and "quota" not in text.lower() and "who receives" not in text.lower(), f"{label} thin text still carries a quota standing answer")
     check("Proceed without asking which days or which scope" in sync_text and "Proceed without asking which days or which scope" in source_text and "Proceed without asking which scope" in repair_text, "A thin text does not say to proceed without asking")
     check('"one pass per thread"' in sync_text and '"send approved invitations"' in sync_text, "Sync data text lacks its scope answers")
     check('"source Leads only"' in source_text and "next business day" in source_text, "Source leads text lacks its scope answers")
@@ -152,6 +157,8 @@ def main() -> None:
     for package, text in SKILLS.items():
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
+        check("The Source leads text needs 0.9.8, the first release where the sourcing plan on the Agents drives it" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.8")
+        check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say the number and the sourcer are set on each Agent, not in the schedule")
         check("Never copy any step of the procedure into" in flat_installer, f"{package} skill does not forbid copying procedure into a schedule text")
         update = flat_installer[flat_installer.index("### Update the standing answers in place") :] if "### Update the standing answers in place" in flat_installer else ""
         check(update != "", f"{package} schedule-install skill lacks the named sub-section: Update the standing answers in place")
@@ -160,7 +167,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6", "the version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.8", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -292,39 +299,58 @@ def main() -> None:
     codex_overview = (CODEX / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
-    # Source leads routine: the sourcing start carries the quota Mosaico requires, in both packages' routine section and invite-run skill.
+    # Source leads routine (0.9.8): the application's sourcing plan on the Agents drives it; the run is started with no quota and no colleague.
     for package, text in (("Claude", source), ("Codex", codex_source)):
         flat_text = " ".join(text.split())
-        check("the quota map from the schedule's standing answers as quota" in flat_text and "each with the same quota map" in flat_text, f"{package} Source leads Step 1 does not send the quota map from the standing answers at the start")
-        check("using the quota sent at the start" in text and "using the quota Mosaico reports" not in text, f"{package} Source leads Step 2 still relies on a quota Mosaico reports")
-        check("quota remaining for each owner" in flat_text and "A run that saved nothing is a failed run" in flat_text and "never as successful" in flat_text, f"{package} Source leads Step 5 lacks the per-owner report or the failed-run rule")
-        for needle in ("sourcing_participant_required", "sourcing_quota_invalid", "never start a run without the quota", "never name a colleague that is not in the quota map from the schedule's standing answers"):
-            check(needle in flat_text, f"{package} Source leads routine lacks: {needle}")
-        check(FIX_SENTENCE in flat_text, f"{package} Source leads routine lacks the exact Fix sentence for a run that stopped without a quota")
-        check("quote Mosaico's code and message verbatim" in flat_text, f"{package} Source leads routine does not quote Mosaico's code and message before the Fix sentence")
+        check("Send no quota and no colleague" in flat_text and "Mosaico derives the quota from the sourcing plan on the Agents" in flat_text, f"{package} Source leads Step 1 does not start the run with no quota and no colleague")
+        check("run.quota" in flat_text and "run.sourcingPlan" in flat_text, f"{package} Source leads Step 1 does not read run.quota and run.sourcingPlan")
+        check("the quota map" not in flat_text and "the same quota map" not in flat_text and "using the quota sent at the start" not in flat_text, f"{package} Source leads routine still sends a quota map")
+        check("sourcing_plan_empty" in flat_text and "set_leads_per_day_in_outreach" in flat_text and SET_SENTENCE in flat_text, f"{package} Source leads Step 1 does not handle sourcing_plan_empty with the exact sentence")
+        check("quote Mosaico's code and message verbatim" in flat_text, f"{package} Source leads routine does not quote Mosaico's code and message before the sentence")
+        check("sourcing-plan-already-met" in flat_text and "short report" in flat_text and "sourcing-quota-met" in flat_text, f"{package} Source leads Step 1 does not handle sourcing-plan-already-met")
+        check("Never send targetCount for sourcing" in flat_text, f"{package} Source leads Step 2 does not forbid targetCount")
+        for needle in ("workflowStatus.sourcingPlan", "workflowStatus.agentId", "workflowStatus.nextAgentId", "pass the agentId", "agent-not-in-sourcing-plan", "planned-agent-quota-met", "agent-required"):
+            check(needle in flat_text, f"{package} Source leads Step 2 lacks: {needle}")
+        check("Do not ask the person for numbers" in flat_text, f"{package} Source leads routine may ask the person for numbers")
+        check("Leads remaining today for each owner and each of their Agents" in flat_text and "A run that saved nothing is a failed run" in flat_text and "never as successful" in flat_text, f"{package} Source leads Step 5 lacks the per-owner and per-Agent report or the failed-run rule")
+        for stale in ("sourcing_participant_required", "sourcing_quota_invalid", "never start a run without the quota", "Fix: run /mosaico:mosaico-outreach-schedule-install"):
+            check(stale not in flat_text, f"{package} Source leads routine still holds the old quota wording: {stale}")
     for script in SCRIPTS[:2]:
         check(script in source, f"Claude Source leads routine does not name the approved script {script}")
-    check("browser/linkedin-salesnav-colleague-connection.js" in source and "the colleague-connection check" in source, "Claude Source leads routine lacks the colleague check hand-off")
+    check("browser/linkedin-salesnav-colleague-connection.js" in source and "the colleague-connection check" in source and "workflowStatus.colleagueChecks" in source, "Claude Source leads routine lacks the colleague check hand-off")
     check("cannot run the colleague-connection check" in codex_source and "colleague-check-required" in codex_source, "Codex Source leads routine lacks the colleague check refusal")
-    check("her own member id in its quota map" in " ".join(second_person(claude).split()), "Second-person section does not say her schedule needs her own id in the quota map")
-    for needle in ("get_team_profiles", "Person ID", '{"<run owner member id>": 3, "<colleague member id>": 3}'):
-        for package, text in SKILLS.items():
-            check(needle in " ".join(text.split()), f"{package} Source leads installer text lacks: {needle}")
+    check("needs no\n   quota" in second_person(claude) or "needs no quota" in " ".join(second_person(claude).split()), "Second-person section does not say her Source leads schedule needs no quota")
+    check("Leads per day on her Agent in Outreach (Agent tab)" in " ".join(second_person(claude).split()) and '"Sourced by"' in second_person(claude), "Second-person section does not point at Leads per day and Sourced by on her Agent")
+    for package, text in SKILLS.items():
+        flat_installer = " ".join(text.split())
+        for gone in ("get_team_profiles", "Person ID", "<quota map>", "Who receives the Leads this schedule sources", "How many accepted Leads should each of them reach", "who receives the Leads and how many"):
+            check(gone not in flat_installer, f"{package} installer still holds the old quota wording: {gone}")
+        check("Never ask for a quota" in flat_installer and "drop any quota map" in flat_installer, f"{package} installer does not drop the quota from an older Source leads text")
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
-        invite = " ".join((root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").split())
-        for needle in ("`quota`", "`colleagueOwnerUserId`", "get_team_profiles", "sourcing_participant_required", "sourcing_quota_invalid", "never guesses a colleague", "A run that saved nothing is a failed run", "never report such a run as successful", "Report a sourcing run"):
-            check(needle in invite or needle.lower() in invite.lower(), f"{package} invite-run skill lacks: {needle}")
-        check(FIX_SENTENCE in invite, f"{package} invite-run skill lacks the exact Fix sentence for a scheduled run without a quota")
-        check("quotes Mosaico's code and message verbatim" in invite, f"{package} invite-run skill does not quote Mosaico's code and message before the Fix sentence")
-        check("## Offer to save the quota into the Source leads schedule" in (root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8"), f"{package} invite-run skill lacks the save-to-schedule offer section")
-        for needle in ("ask once", "Do you want me to save this into your Source leads schedule, so the scheduled runs use it too?", '"Update the standing answers in place"', "Ask nothing else, change nothing else in", "keep its times", "tell the person what it now holds", "used for this run only", "If no Source leads", "Do not skip the offer silently"):
-            check(needle in invite, f"{package} invite-run save-to-schedule offer lacks: {needle}")
-        check("mosaico:mosaico-outreach-schedule-install" in invite, f"{package} invite-run offer does not name the qualified installer skill")
-        check("`/mosaico:mosaico-outreach-schedule-install`" in invite if package == "Claude" else "`$mosaico:mosaico-outreach-schedule-install`" in invite and "Codex Source leads automation" in invite, f"{package} invite-run offer does not point at the right installer")
+        raw_invite = (root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8")
+        invite = " ".join(raw_invite.split())
+        start_block = invite[invite.index("A sourcing start sends no quota"):invite.index("3. Keep the returned `runId`")]
+        for needle in ("sends no quota and no colleague", "Never send `quota` or `colleagueOwnerUserId`", "never ask the person for numbers", "`run.quota`", "`run.sourcingPlan`", "`sourcing_plan_empty`", "`set_leads_per_day_in_outreach`", SET_SENTENCE, "`sourcing-plan-already-met`", "short report", "`sourcing-quota-met`", "quotes Mosaico's code and message verbatim"):
+            check(needle in start_block, f"{package} invite-run start does not say: {needle}")
+        check("Never send `targetCount` for sourcing" in invite and "`targetCount: 20`" not in invite, f"{package} invite-run skill still sends targetCount for sourcing")
+        check("## Which Agent a Lead goes to" in raw_invite, f"{package} invite-run skill lacks the Which Agent section")
+        agent_section = invite[invite.index("## Which Agent a Lead goes to"):invite.index("## The colleague check") if "## The colleague check" in invite else invite.index("## Check a candidate against the colleague")]
+        for needle in ("`workflowStatus.sourcingPlan`", "the owner", "`agentId`", "`agentName`", "`leadsPerDay`", "`acceptedToday`", "`remainingToday`", "`workflowStatus.agentId`", "`workflowStatus.nextAgentId`", "`nextOwnerUserId`", "`agent-not-in-sourcing-plan`", "`planned-agent-quota-met`", "`agent-required`", "Pass the `agentId` the read gave for that owner on every save"):
+            check(needle in agent_section, f"{package} Which Agent section lacks: {needle}")
+        check("Report a sourcing run" in invite and "for each owner and each of their Agents" in invite and "Leads remaining today" in invite and "A run that saved nothing is a failed run" in invite and "never report such a run as successful" in invite.lower().replace("never report such a run as successful", "never report such a run as successful"), f"{package} invite-run report is not per owner and per Agent or lost the failed-run rule")
+        check("`sourcing-plan-already-met` saved nothing because every Agent was already at its number: report it as complete, not failed" in invite, f"{package} invite-run report does not treat sourcing-plan-already-met as complete")
+        check("## Offer to save the quota" not in raw_invite and "Do you want me to save this into your Source leads schedule" not in invite, f"{package} invite-run skill still offers to save a quota into the schedule")
+        for stale in ("sourcing_participant_required", "sourcing_quota_invalid", "who receives the Leads and how many", "get_team_profiles", "never guesses a colleague", "Fix: run /mosaico:mosaico-outreach-schedule-install"):
+            check(stale not in invite, f"{package} invite-run skill still holds the old quota wording: {stale}")
         check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
+        agents = " ".join((root / "skills" / "mosaico-outreach-agent-management" / "SKILL.md").read_text(encoding="utf-8").split())
+        for needle in ("`leadsPerDay`", "`sourcedByUserId`", "`outreach_update_agent`", "Owner or Admin, or the Agent's owner", "Sourced by must be an active member"):
+            check(needle in agents, f"{package} agent-management skill lacks: {needle}")
+        overview = " ".join((root / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8").split())
+        check("The sourcing plan lives on each Agent in Outreach (Agent tab)" in overview and "never a `targetCount`" in overview and "no quota and no colleague" in overview and "`targetCount` (20" not in overview, f"{package} overview skill does not describe the sourcing plan")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.7", f"{manifest.name} is not at 0.9.7")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.8", f"{manifest.name} is not at 0.9.8")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

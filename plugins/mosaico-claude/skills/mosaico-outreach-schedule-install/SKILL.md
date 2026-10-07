@@ -104,10 +104,8 @@ one that fails.
    Owner to do it, and check again after she says it is done. Do not install anything until the check
    passes.
 6. **Run this installer.** It installs her Sync data schedule and her Repair schedule. Ask once whether
-   she sources Leads herself; only if she does, also install her Source leads schedule. Her schedule needs
-   her own member id in its quota map (she is the run owner of her runs), plus any colleague who
-   receives Leads with her: ask her the two questions under the Source leads schedule and read the ids
-   with `get_team_profiles`.
+   she sources Leads herself; only if she does, also install her Source leads schedule. Her Source leads schedule needs no
+   quota: she sets Leads per day on her Agent in Outreach (Agent tab) and may name a colleague as "Sourced by".
 
 Each person's Sync data schedule runs on that person's own Mac, in that person's own browser pane, and
 sends only from that person's account. Her Repair schedule works only her own backlog and never sends.
@@ -121,15 +119,13 @@ reports it; it does not work around it.
 
 Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved schedule stale. Never copy any step of the procedure into a schedule text.
 
-**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
+**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads text needs 0.9.8, the first release where the sourcing plan on the Agents drives it. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
 
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<public identifier>` is the last part of the person's LinkedIn profile address (the part after
 `/in/`); `<timezone>` is their local timezone. Ask only if one of them cannot be found.
 
-The Source leads schedule also needs `<quota map>`, the quota map of member ids to accepted-Lead targets
-(1 to 100 each, always including the run owner). Ask once for it, as described under the Source leads
-schedule below.
+The number of Leads per day and who sources them are set on each Agent in Outreach, Agent tab (Leads per day and Sourced by), not in the schedule. A schedule saved with a quota map needs no change, but to drop it follow **Update the standing answers in place** below.
 
 **Mosaico Outreach — Sync data (connections and messaging)** — once a day, at 1:00 PM local time unless
 the person chose another time. This is the only schedule that clicks Connect or sends a message. Its
@@ -150,40 +146,23 @@ If the installed plugin is older than 0.9.6 or has no "Sync data routine" sectio
 approves or sends anything. Its text is:
 
 ```text
-Use the installed mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.6 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
+Use the installed mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.8 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
 
-Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; quota map <quota map> (who receives the Leads and how many each per run); day: the next business day; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; day: the next business day; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
 
 Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com page, signed in to my LinkedIn (<public identifier>). A LinkedIn warning or captcha stops the run, which then reports.
 
-If the installed plugin is older than 0.9.6 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
+If the installed plugin is older than 0.9.8 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
 ```
-
-**Source leads: who receives the Leads.**
-Ask these two questions once at install time, only if you install or update the Source leads schedule,
-and keep the answers as the schedule's standing answers:
-
-1. "Who receives the Leads this schedule sources: only you, you and a colleague, or several members?"
-2. "How many accepted Leads should each of them reach per run (1 to 100 each)?"
-
-Read the member ids with `get_team_profiles`: each person's "Person ID" is their member id. The run owner
-is the person whose LinkedIn this schedule uses, so their own id is always in the map. Build `<quota map>`
-from the answers, for example `{"<run owner member id>": 3, "<colleague member id>": 3}`, and write the
-real map into the saved text; never leave a placeholder or an id from memory. Only an Owner or Admin can
-name anyone but the run owner in the map. If an id is not found among the active members,
-ask again. If the person does not say who receives the Leads or how many, do not install Source leads.
-Mosaico refuses a sourcing run that carries neither a quota map nor a colleague, and the application never
-guesses one. A Source leads schedule saved before 0.9.3 has no quota map: update it in place with these
-answers, as described under **Update the standing answers in place** below.
 
 ### Update the standing answers in place
 
-Use this when a schedule is already installed and only its standing answers have to be set or changed: its timezone, its LinkedIn public identifier or, for Source leads, its quota map. It also covers a schedule saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text; a Source leads schedule saved before 0.9.3 or one whose run stopped for want of a quota; and a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the one schedule and nothing else.
+Use this when a schedule is already installed and only its standing answers have to be set or changed: its timezone or its LinkedIn public identifier. It also covers a schedule saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, and a Source leads schedule saved before 0.9.8 that still carries a quota map (the thin text drops it; if it is left, Mosaico ignores the extra standing answer). Another skill may follow these steps; they touch the one schedule and nothing else.
 
-1. Ask only for the answer that is missing or changing. For the quota that is the two questions under **Source leads: who receives the Leads** (skip any the person already answered in this conversation); read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
+1. Ask only for the answer that is missing or changing (the timezone or the LinkedIn public identifier). Ask nothing else. Never ask for a quota: the number of Leads per day and who sources them are set on each Agent in Outreach, Agent tab (Leads per day and Sourced by), not in the schedule.
 2. Find the installed task, for example "Mosaico Outreach — Source leads", matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
-3. Replace the whole text with the thin text for that routine above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in", the public identifier in the brackets after "signed in to my LinkedIn", and the quota map after "quota"; carry them over unchanged unless the person gave a new one. Change nothing else: keep its cron times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
-4. Read the saved task back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds (for Source leads, the quota map). A write without readback is not completion.
+3. Replace the whole text with the thin text for that routine above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in" and the public identifier in the brackets after "signed in to my LinkedIn"; carry them over unchanged unless the person gave a new one, and drop any quota map. Change nothing else: keep its cron times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
+4. Read the saved task back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion.
 
 **Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
 `0 10 * * 0`) unless the person chose another day or time, and also whenever the person asks for it. It

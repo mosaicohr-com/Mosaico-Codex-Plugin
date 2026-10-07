@@ -57,7 +57,7 @@ The provider packages include dedicated invitation, follow-up and schedule-insta
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
 action. The schedule option installs three per-user local-time schedules: Sync data (connections and
 messaging, once a day, the only one that sends), Source leads (every two hours in business hours,
-at least 60 minutes from Sync, never sends; each sourcing start carries a quota of who receives the Leads and how many) and Repair (once a week, Sunday 10:00 AM by default, also on
+at least 60 minutes from Sync, never sends; how many Leads it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
 demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
 is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
 `~/.claude/settings.json` allows the three browser tools scheduled sessions need
@@ -67,8 +67,14 @@ last one, so without it every Connect or Send click is blocked), and both packag
 refuse while stale `mosaico-outreach-*` skill copies or the old Codex automations exist; Codex installs
 only Source leads. Plugin installation never creates or enables a user's schedules silently.
 
+**Sourcing plan.** How many Leads Source leads finds each day, and for whom, is set on each Agent in Outreach
+(Agent tab): Leads per day (1 to 100) and Sourced by (an active colleague, or the owner when empty). Mosaico works
+out how many Leads each person still needs today (Leads per day minus the Leads already accepted today), so each
+run only tops up. The schedule and the skills carry no numbers. If no Agent has Leads per day, Mosaico answers
+`sourcing_plan_empty` and the run reports: "Set Leads per day on an Agent in Outreach (Agent tab), then rerun."
+
 Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
-LinkedIn public identifier and, for Source leads, the quota map) and tells the run to follow a named routine
+LinkedIn public identifier) and tells the run to follow a named routine
 section in the installed plugin's skill: "Sync data routine" in the follow-up-run skill, "Source leads routine"
 in the invite-run skill and "Repair routine" in the repair-run skill. The procedure is therefore always the one
 in the plugin you have installed, so a plugin release no longer leaves a saved schedule stale. A saved text
@@ -105,8 +111,8 @@ A colleague sets up her own schedules on her own Mac:
    it with `outreach_start_run` (intent `inspect_day`); if Mosaico answers
    `linkedin_identity_not_registered`, register the profile there, or have an Owner do it, and check again.
 6. Run the schedule installer. It installs her Sync data schedule, and Source leads only if she sources
-   Leads herself Her Source leads schedule needs her own member id in its quota map (the installer asks who receives
-   the Leads and how many each, and reads the ids with `get_team_profiles`).
+   Leads herself. Her Source leads schedule needs no quota: she sets Leads per day on her Agent in Outreach
+   (Agent tab) and may name a colleague as "Sourced by".
 
 Each person's Sync data schedule runs on that person's own Mac, in that person's own pane, and sends only
 from that person's account. Nobody's run touches another owner's Leads.
@@ -138,6 +144,27 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.8
+
+- Source leads now follows the sourcing plan on the Agents. Each Agent in Outreach has two new fields, Leads per day
+  (`leadsPerDay`, 1 to 100) and Sourced by (`sourcedByUserId`, an active member, empty means the owner). The
+  invite-run skills (Claude and Codex) start a sourcing run with no quota and no colleague; Mosaico works out how
+  many Leads each owner still needs today and returns it as `run.quota` with `run.sourcingPlan`. They never send
+  `targetCount` for sourcing, read `workflowStatus.sourcingPlan`, `agentId` and `nextAgentId` from the day, and pass
+  the `agentId` on every save. They handle `agent-not-in-sourcing-plan`, `planned-agent-quota-met` and `agent-required`.
+- Two new outcomes at the start: `sourcing_plan_empty` stops the run with "Set Leads per day on an Agent in Outreach
+  (Agent tab), then rerun." and a run issued with the note `sourcing-plan-already-met` ends with a short report.
+  The report now gives Leads saved and Leads remaining today per owner and per Agent, from Mosaico's counts. The
+  failed-run rule and the colleague check are unchanged (Codex still cannot run the colleague check).
+- The quota is gone from the schedules. The Source leads text drops the quota map and needs plugin 0.9.8 or later;
+  the "Offer to save the quota into the Source leads schedule" section and the quota questions are removed. The
+  Agent skill and the overview skill describe the two new Agent fields; `outreach_update_agent` sets them (Owner,
+  Admin or the Agent's owner; Sourced by must be an active member).
+- What a person does once: set Leads per day (and, if wanted, Sourced by) on an Agent in Outreach. Run the installer
+  once to drop the quota from the Source leads schedule, or leave it: the extra standing answer is ignored.
+- Depends on the Mosaico application change that adds the sourcing plan (mosaicohr-com/mosaico pull request 1815)
+  being deployed first.
 
 ### 0.9.7
 
