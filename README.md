@@ -37,7 +37,7 @@ The provider packages include dedicated invitation, follow-up and schedule-insta
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
 action. The schedule option installs three per-user local-time schedules: Sync data (connections and
 messaging, once a day, the only one that sends), Source leads (every two hours in business hours,
-at least 60 minutes from Sync, never sends) and Repair (once a week, Sunday 10:00 AM by default, also on
+at least 60 minutes from Sync, never sends; each sourcing start carries a quota of who receives the Leads and how many) and Repair (once a week, Sunday 10:00 AM by default, also on
 demand, never sends). Before installing, the Claude package checks that
 `~/.claude/settings.json` allows the three browser tools scheduled sessions need
 (`mcp__Claude_Browser__javascript_tool`, `mcp__Claude_Browser__computer` and
@@ -73,7 +73,8 @@ A colleague sets up her own schedules on her own Mac:
    it with `outreach_start_run` (intent `inspect_day`); if Mosaico answers
    `linkedin_identity_not_registered`, register the profile there, or have an Owner do it, and check again.
 6. Run the schedule installer. It installs her Sync data schedule, and Source leads only if she sources
-   Leads herself.
+   Leads herself Her Source leads schedule needs her own member id in its quota map (the installer asks who receives
+   the Leads and how many each, and reads the ids with `get_team_profiles`).
 
 Each person's Sync data schedule runs on that person's own Mac, in that person's own pane, and sends only
 from that person's account. Nobody's run touches another owner's Leads.
@@ -104,6 +105,29 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.3
+
+- Source leads sends the sourcing quota the server now requires. Since 2026-10-04 Mosaico refuses
+  `outreach_start_run` with `intent: source_invitation_leads` (code `sourcing_participant_required`, recommended
+  action `name_sourcing_colleague`) unless the call carries `colleagueOwnerUserId` (an active member distinct from
+  the run owner; both then get 5) or `quota` (a map from active owner member ids to whole-number targets from 1
+  to 100 that includes the run owner's own id; naming anyone else needs an Owner or Admin). A wrong map is refused
+  with `sourcing_quota_invalid`. The skills never sent either, so every scheduled Source leads run was refused.
+- The invite-run skills (Claude and Codex) now say a sourcing start must carry `quota` or `colleagueOwnerUserId`,
+  that the person's standing answer supplies who receives Leads and how many, that member ids come from
+  `get_team_profiles` ("Person ID"), that a run which knows neither stops and asks instead of guessing, and what
+  to do on `sourcing_participant_required` and `sourcing_quota_invalid`. "Source Leads only" no longer assumes a
+  colleague: it covers the person alone, a colleague or a map of several members, and its target is the quota.
+  The run report gives Leads saved and quota remaining per owner, and a run that saved nothing is reported as
+  failed with Mosaico's code, never as successful.
+- The Source leads schedule texts (Claude and Codex) send `<quota map>` on every sourcing start and say "using the
+  quota sent at the start"; the installers ask once who receives the Leads and how many each, and how to read the
+  member ids, and the second-person section says her schedule needs her own id in the map. A Source leads schedule
+  saved before 0.9.3 has no quota map: run the installer again to update it in place. The Source leads text now
+  needs plugin 0.9.3 or later. The Sync data and Repair texts are unchanged.
+- The overview skills mention the quota on the sourcing start. Tests check the manifests at 0.9.3 and that the
+  Source leads schedule and the invite-run skill carry the quota.
 
 ### 0.9.2
 

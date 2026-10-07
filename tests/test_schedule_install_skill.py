@@ -185,8 +185,24 @@ def main() -> None:
     codex_overview = (CODEX / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
     check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
 
+    # 0.9.3: the sourcing start carries the quota Mosaico requires, in both packages' Source leads text and invite-run skill.
+    for package, text in (("Claude", source), ("Codex", SKILLS["Codex"][SKILLS["Codex"].index("## The Source leads schedule") :])):
+        flat_text = " ".join(text.split())
+        check("0.9.3 or later" in text and "0.5.0 or later" not in text, f"{package} Source leads text does not need plugin 0.9.3")
+        check("quota <quota map> as quota" in flat_text and "each with the same quota <quota map>" in flat_text, f"{package} Source leads Step 1 does not send the quota map")
+        check("using the quota sent at the start" in text and "using the quota Mosaico reports" not in text, f"{package} Source leads Step 2 still relies on a quota Mosaico reports")
+        check("quota remaining for each owner" in flat_text and "failed run" in flat_text and "never as successful" in flat_text, f"{package} Source leads Step 5 lacks the per-owner report or the failed-run rule")
+        for needle in ("get_team_profiles", "Person ID", "sourcing_participant_required", "sourcing_quota_invalid", '{"<run owner member id>": 3, "<colleague member id>": 3}'):
+            check(needle in flat_text, f"{package} Source leads installer text lacks: {needle}")
+    check("her own member id in its quota map" in " ".join(second_person(claude).split()), "Second-person section does not say her schedule needs her own id in the quota map")
+    for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
+        invite = " ".join((root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").split())
+        for needle in ("`quota`", "`colleagueOwnerUserId`", "get_team_profiles", "sourcing_participant_required", "sourcing_quota_invalid", "never guesses a colleague", "A run that saved nothing is a failed run", "never report such a run as successful", "Report a sourcing run"):
+            check(needle in invite or needle.lower() in invite.lower(), f"{package} invite-run skill lacks: {needle}")
+        check("shared with a colleague" not in invite and "the number of ready Leads the person named" not in invite, f"{package} invite-run skill still assumes a colleague")
+
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.2", f"{manifest.name} is not at 0.9.2")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.3", f"{manifest.name} is not at 0.9.3")
     print("PASS: both schedule-install skills describe the three schedules (Sync data, Source leads, Repair), qualified skill names, the post-send check and the stale-copy checks.")
 
 

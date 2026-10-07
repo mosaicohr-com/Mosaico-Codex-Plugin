@@ -37,7 +37,7 @@ schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
 
 Use the current application-owned read for the resolved intent. For invitation sourcing call
 `outreach_get_day` with the preserved `day`, `intent: source_invitation_leads`, and the requested
-`targetCount` (20 for the standard run). For approved invitation delivery use
+`targetCount` (20 for the standard run); start the sourcing run with `quota` or `colleagueOwnerUserId`, as the invite-run skill describes, or Mosaico refuses it with `sourcing_participant_required`. For approved invitation delivery use
 `intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
 checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. For repair start the run with
 `intent: repair` and read `outreach_get_repair_queue`. Before any of

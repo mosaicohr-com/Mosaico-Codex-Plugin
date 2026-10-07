@@ -45,6 +45,8 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    The invite and follow-up skills give the exact steps. Do not ask the menu again when the person's intent is already explicit:
    - Invitation sourcing: call `outreach_get_day` with the preserved `day`,
      `intent: source_invitation_leads`, and the requested `targetCount` (20 for the standard run).
+     Start that run with `quota` or `colleagueOwnerUserId`, as the invite-run skill describes, or Mosaico
+     refuses it with `sourcing_participant_required`.
    - Approved invitation delivery: call `outreach_get_day` with the preserved `day` and
      `intent: send_approved_invitations`.
    - Day inspection: call `outreach_get_day` with the preserved `day` and `intent: inspect_day`.
