@@ -107,7 +107,7 @@ def main() -> None:
         check("`errorStep`" in text, f"Claude {name} does not name errorStep")
         check("`scriptIdentifier` from the Mosaico read when it is present" in text and "otherwise the part of the Lead's `linkedInProfileUrl` after `/in/`" in text,
               f"Claude {name} does not take the first-line value from scriptIdentifier, else the part after /in/")
-    for path in ("mosaico-outreach", "mosaico-outreach-schedule-install"):
+    for path in ("mosaico-outreach",):
         text = flat((CLAUDE / f"skills/{path}/SKILL.md").read_text(encoding="utf-8"))
         check("scriptIdentifier" in text and "after `/in/`" in text.replace("after /in/", "after `/in/`"), f"Claude {path} does not name scriptIdentifier")
 

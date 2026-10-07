@@ -50,6 +50,13 @@ Do these checks first. If one fails, install nothing and tell the person what to
 
 ## The Source leads schedule
 
+Each scheduled run starts its own Outreach run through the invite-run skill. If Mosaico returns a
+blocker, the run stops and reports it; it does not work around it.
+
+Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved automation stale. Never copy any step of the procedure into an automation text.
+
+**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
+
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<timezone>` is their local timezone. Ask only if it cannot be found.
 
@@ -60,23 +67,13 @@ Install **Mosaico Outreach — Source leads** every two hours during business ho
 to 6:00 PM local time, unless the person chose other hours. Its text is:
 
 ```text
-Use the installed $mosaico:mosaico-outreach-invite-run skill (plugin mosaico, 0.9.5 or later). This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule, installed from Claude, does that.
+Use the installed $mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.6 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
 
-Resolve the current business date and time in <timezone>. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; quota map <quota map> (who receives the Leads and how many each per run); day: the next business day; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
 
-Use the authenticated LinkedIn browser. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself.
+Use the authenticated LinkedIn browser. A LinkedIn warning or captcha stops the run, which then reports.
 
-Step 1. Open LinkedIn's Me page once and read the profile URL of the signed-in account. Report it as observedLinkedInProfile to outreach_start_run, together with the quota <quota map> as quota. Start one run per scope, each with the same quota <quota map>, and pass its runId on every read and write. If Mosaico blocks the start, stop and report the blocker; do not work around it. If it answers sourcing_participant_required or sourcing_quota_invalid, stop and report that code and what Mosaico says to fix; never start a run without the quota, and never name a colleague that is not in the quota above. When a run stops because no quota or colleague was sent, quote Mosaico's code and message verbatim when Mosaico gave one, then end the report with this sentence: "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
-
-Step 2. Run the $mosaico:mosaico-outreach-invite-run skill with the selected day the next business day and the selected action "source Leads only", using the quota sent at the start. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. This package cannot run the colleague-connection check (it ships no browser scripts): when Mosaico blocks a save for a colleague with colleague-check-required, do not retry or work around it; list the candidate as skipped and say that Leads for that colleague need a Claude run.
-
-Step 3. Run the $mosaico:mosaico-outreach-invite-run skill again with the same day and the selected action "source Leads and prepare invitation drafts". This package cannot capture connection evidence. Do not draft for a Lead Mosaico lists as connection unverified; leave it unverified and list it as skipped. Write a missing invitation draft only for a Lead Mosaico lists as verified. Never approve or send an invitation.
-
-Step 4. Stop only when Mosaico says the quota is met, or when Mosaico reports stop_run after the tenth failure. In that case write the sourcing report Mosaico asks for. A skipped candidate or a refused write for one Lead is not a reason to stop.
-
-Step 5. Report separately, using Mosaico's counts, not memory: Leads saved and quota remaining for each owner in the quota map (name and member id), candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), drafts written, candidates skipped with reasons, Leads left unverified, blockers. A run that saved nothing is a failed run: report it as failed with Mosaico's code (for example sourcing_participant_required or sourcing_quota_invalid) and message, also when Mosaico refused the start, and never as successful. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
-
-Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
+If the installed plugin is older than 0.9.6 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
 ```
 
 **Who receives the Leads.**
@@ -94,19 +91,16 @@ name anyone but the run owner in the map. If an id is not found among the active
 ask again. If the person does not say who receives the Leads or how many, do not install Source leads.
 Mosaico refuses a sourcing run that carries neither a quota map nor a colleague, and the application never
 guesses one. A Source leads schedule saved before 0.9.3 has no quota map: update it in place with these
-answers, as described under **Update the Source leads quota in place** below.
+answers, as described under **Update the standing answers in place** below.
 
-### Update the Source leads quota in place
+### Update the standing answers in place
 
-Use this when a Source leads automation is already installed and only its quota has to be set or changed: one saved before 0.9.3, one whose run stopped for want of a quota, or a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the Source leads automation and nothing else.
+Use this when a Source leads automation is already installed and only its standing answers have to be set or changed: its timezone or its quota map. It also covers an automation saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text; one saved before 0.9.3 or whose run stopped for want of a quota; and a person who answered the two questions in an invite run and asked to save the answer. Another skill may follow these steps; they touch the Source leads automation and nothing else.
 
-1. Ask only the two questions under **Who receives the Leads** (skip any the person already answered in this conversation), read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
+1. Ask only for the answer that is missing or changing. For the quota that is the two questions under **Who receives the Leads** (skip any the person already answered in this conversation); read the ids with `get_team_profiles` and build the real `<quota map>` as described there. Ask nothing else.
 2. Find the installed "Mosaico Outreach — Source leads" automation, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
-3. Change only the quota map and the per-owner wording in its text. If its text predates 0.9.5, replace it with the Source leads text above, filled with the automation's own timezone and the new map. Keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
-4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged) and the quota map it now holds. A write without readback is not completion.
-
-Each scheduled run starts its own Outreach run through the invite-run skill. If Mosaico returns a
-blocker, the run stops and reports it; it does not work around it.
+3. Replace the whole text with the Source leads text above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in" and the quota map after "quota"; carry them over unchanged unless the person gave a new one. Change nothing else: keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
+4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the quota map it now holds. A write without readback is not completion.
 
 ## Keep it apart from Sync data
 
@@ -120,12 +114,15 @@ time at least 60 minutes before or after the Sync time. The default Sync time is
 2. Match existing automations by their Mosaico Outreach purpose and instructions, not name alone. An
    older "Prepare invitations" automation matches Source leads. Do not touch an older "Send approved
    invitations" automation here; tell the person to replace it with Sync data from Claude.
+   A saved thin text matches the routine it names ("This is the Source leads routine").
 3. If an equivalent schedule already exists, do not duplicate it. Report its name, timezone, enabled
    status and next runs.
-4. If a matching schedule exists but differs, update it in place while preserving unrelated supported
-   metadata and notification preferences.
+4. If a matching schedule exists but differs, update it in place as under **Update the standing answers in
+   place**: a text in the older long form is replaced by the thin text, carrying its answers over and keeping
+   its times, enabled state, name and every unrelated supported metadata and notification preference.
 5. Use the current project or thread context required by the host. Do not ask the person to repeat
    the dates, actions, times or timezone. Ask only when a host-required human decision cannot be
    derived from the current context.
-6. Read back the saved automation state and confirm name, local timezone, enabled status and next run
-   times. A write attempt without readback is not completion.
+6. Read back the saved automation state and confirm name, local timezone, enabled status, next run
+   times and that the saved text is the thin text (it names the skill and its routine section and holds no
+   steps). A write attempt without readback is not completion.

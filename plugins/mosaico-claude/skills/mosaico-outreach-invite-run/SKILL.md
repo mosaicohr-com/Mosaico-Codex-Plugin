@@ -12,7 +12,7 @@ provided the answer as part of the current invocation:
 2. "For those days, do you want to source Leads and prepare invitation drafts, source Leads only, send approved invitations, or both?"
 
 Resolve today and tomorrow using the person's local business date. Preserve the exact selected dates
-throughout the run. Accept one action and run only the selected scope.
+throughout the run. Accept one action and run only the selected scope. A scheduled run does not ask these questions: the **Source leads routine** section at the end of this skill carries its answers.
 
 ## Start the run
 
@@ -97,7 +97,7 @@ not apply when the quota came from a schedule's standing answer. Once you have t
 before you start the run or straight after: "Do you want me to save this into your Source leads schedule,
 so the scheduled runs use it too?" The run does not depend on the answer.
 
-- Yes: follow "Update the Source leads quota in place" in the `/mosaico:mosaico-outreach-schedule-install`
+- Yes: follow "Update the standing answers in place" in the `/mosaico:mosaico-outreach-schedule-install`
   skill, for the Source leads schedule only. Ask nothing else, change nothing else in that schedule, and
   keep its times. Read the saved schedule back and tell the person what it now holds.
 - No: use the answer for this run only, and say in the report that the quota was used for this run only and
@@ -392,3 +392,25 @@ For every scope, Mosaico is the workflow authority for stored state, target comp
 validation, allowed actions and recovery. Stop only when the selected scope is complete, Mosaico
 reports a genuine blocker, or a human decision is required. Mosaico decides which member a record belongs to from the run; do not try to work that out yourself.
 Only Owners and Admins can use Outreach.
+
+## Source leads routine
+
+This is the Source leads flow of Mosaico Outreach. It only finds Leads and writes invitation drafts. It never approves, sends or messages; the Sync data schedule does that.
+
+The schedule's text carries only the person's standing answers: the timezone, the LinkedIn public identifier, and the quota map (who receives the Leads and how many each per run); the day is the next business day and the actions are "source Leads only", then "source Leads and prepare invitation drafts". Take them from there; the schedule supplies the answers to this skill's opening questions, so do not ask them, do not show a menu, and do not ask which days or which scope. If a standing answer is missing, stop and report which one.
+
+Resolve the current business date and time in the timezone from the schedule's standing answers. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com page, signed in to the person's LinkedIn (the public identifier from the schedule's standing answers). Obtain connection evidence and identity only through the plugin's approved capture scripts, run by sending the browser javascript tool the one-line directive `// mosaico run <script>.js <PLACEHOLDER>=<value>` (the plugin's gate inserts the approved script; never retype a script), exactly as the skills describe; if the gate refuses the directive, run the approved script word for word with only the first line's value changed (the thread script's second line holds the Lead's name). The first-line value for every per-Lead script is the Lead's scriptIdentifier from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its linkedInProfileUrl after /in/. The thread script also takes the Lead's name from the Mosaico read, so its directive is `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<the Lead's name>`. The approved scripts are browser/linkedin-whoami.js, browser/linkedin-connection-evidence.js and browser/linkedin-salesnav-colleague-connection.js; read each from the installed plugin. Read each script file with the file-reading tool, one file at a time, by its path under the installed plugin's browser folder; do not print them with a shell command. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
+
+Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile) and the quota map from the schedule's standing answers as quota. Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run per scope, each with the same quota map, and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. If it answers sourcing_participant_required or sourcing_quota_invalid, stop and report that code and what Mosaico says to fix; never start a run without the quota, and never name a colleague that is not in the quota map from the schedule's standing answers. When a run stops because no quota or colleague was sent, quote Mosaico's code and message verbatim when Mosaico gave one, then end the report with this sentence: "Fix: run /mosaico:mosaico-outreach-schedule-install (Codex: the mosaico-outreach-schedule-install skill), answer who receives the Leads and how many each, and it will put the quota map into this schedule."
+
+Step 2. Run this skill with the selected day the next business day and the selected action "source Leads only", using the quota sent at the start. Mosaico assigns the day and keeps the quota. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. Before saving a candidate for a colleague, when outreach_get_day lists that colleague in workflowStatus.colleagueChecks with allowed true, run the colleague-connection check as this skill describes: send the directive from that entry, `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=<the colleague's identifier from workflowStatus.colleagueChecks>`, from a Sales Navigator page (open https://www.linkedin.com/sales/home first), and pass its whole output unchanged as colleagueConnectionEvidence on outreach_save_lead. Mosaico's answer is final: a skipped candidate (already connected to the colleague) is not a failure, and a candidate saved after "not found" is not proven unconnected.
+
+Step 3. Run this skill again with the same day and the selected action "source Leads and prepare invitation drafts". For each Lead Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. Never approve or send an invitation.
+
+Step 4. Stop only when Mosaico says the quota is met, or when Mosaico reports stop_run after the tenth failure. In that case write the sourcing report Mosaico asks for. A skipped candidate or a refused write for one Lead is not a reason to stop.
+
+Step 5. Report separately, using Mosaico's counts, not memory: Leads saved and quota remaining for each owner in the quota map (name and member id), candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), drafts written, candidates skipped with reasons, Leads left unverified, blockers. A run that saved nothing is a failed run: report it as failed with Mosaico's code (for example sourcing_participant_required or sourcing_quota_invalid) and message, also when Mosaico refused the start, and never as successful. Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+
+Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
