@@ -70,17 +70,17 @@ def main() -> None:
         check(needle in codex, f"Codex invite-run colleague note lacks: {needle}")
     check("browser/" not in codex and SCRIPT not in codex_text, "the Codex package refers to a browser script it does not ship")
 
-    # The Source leads schedule texts: the Claude text names the script and the directive; both need 0.9.5 and report the skips.
-    for package, root, marker in (("Claude", CLAUDE, "**Mosaico Outreach — Source leads**"), ("Codex", CODEX, "**Mosaico Outreach — Source leads**")):
-        install = flat((root / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md").read_text(encoding="utf-8"))
-        source = install[install.index("0.9.5 or later") - 200 : install.index("**Source leads: who receives the Leads.**" if package == "Claude" else "**Who receives the Leads.**")]
-        check("0.9.5 or later" in source and "colleagueSkips" in source and "skipped as already connected to each owner" in source, f"{package} Source leads text lacks the 0.9.5 requirement or the skip count")
+    # The Source leads routine section (the schedule text is thin and names it): the Claude section names the script and the directive and
+    # reports the skips; the Codex section says it cannot run the check. The schedule text itself is checked in test_schedule_install_skill.py.
+    for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
+        source = flat(section((root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8"), "Source leads routine"))
+        check("colleagueSkips" in source and "skipped as already connected to each owner" in source, f"{package} Source leads routine lacks the skip count")
         if package == "Claude":
             check("browser/linkedin-salesnav-colleague-connection.js" in source and f"// mosaico run {SCRIPT} PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=" in source
                   and "colleagueConnectionEvidence" in source and "https://www.linkedin.com/sales/home" in source and "workflowStatus.colleagueChecks" in source,
-                  "Claude Source leads text does not describe the colleague check")
+                  "Claude Source leads routine does not describe the colleague check")
         else:
-            check("cannot run the colleague-connection check" in source and "colleague-check-required" in source and "Claude run" in source, "Codex Source leads text does not say it cannot run the check")
+            check("cannot run the colleague-connection check" in source and "colleague-check-required" in source and "Claude run" in source, "Codex Source leads routine does not say it cannot run the check")
     # The overview skill lists the new script's output among those passed unchanged.
     check("the Sales Navigator colleague check" in flat((CLAUDE / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")), "the Claude overview skill does not list the colleague check output")
     # Manifests and the README.

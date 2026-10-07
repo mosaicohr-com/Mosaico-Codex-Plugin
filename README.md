@@ -46,6 +46,15 @@ last one, so without it every Connect or Send click is blocked), and both packag
 refuse while stale `mosaico-outreach-*` skill copies or the old Codex automations exist; Codex installs
 only Source leads. Plugin installation never creates or enables a user's schedules silently.
 
+Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
+LinkedIn public identifier and, for Source leads, the quota map) and tells the run to follow a named routine
+section in the installed plugin's skill: "Sync data routine" in the follow-up-run skill, "Source leads routine"
+in the invite-run skill and "Repair routine" in the repair-run skill. The procedure is therefore always the one
+in the plugin you have installed, so a plugin release no longer leaves a saved schedule stale. A saved text
+names the minimum plugin version it needs; a run on an older plugin stops and reports that the plugin needs
+updating. Run the installer again only to change an answer or a time, or once to replace a schedule saved in the
+older long form.
+
 ## Set up a second person
 
 A colleague sets up her own schedules on her own Mac:
@@ -106,6 +115,27 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### Unreleased
+
+- Thin routines. The schedule installer now saves, for each of Sync data, Source leads and Repair, a short text
+  (under 200 words) that holds only the person's standing answers and tells the run to follow the installed plugin's
+  skill: the "Sync data routine" section of `mosaico-outreach-follow-up-run`, the "Source leads routine" section of
+  `mosaico-outreach-invite-run` and the "Repair routine" section of `mosaico-outreach-repair-run`. Before this, each
+  schedule text held the whole procedure, so every release left saved schedules stale until someone ran the installer
+  again (a Mac was still running 0.5.0-era Source leads text with 0.9.3 installed).
+- The procedure itself moved, word for word except that the placeholders now refer to the schedule's standing
+  answers, from the schedule texts into those three named sections. Nothing about what a run does changes.
+- Version stamp: each thin text names the minimum plugin version it needs (0.9.6, the first release that contains
+  the routine sections). A run on an older plugin, or on one without the section, stops and reports that the plugin
+  needs updating. The Codex package gets the same for its Source leads automation.
+- "Update the Source leads quota in place" is now "Update the standing answers in place": it changes the timezone,
+  the LinkedIn public identifier or the quota map of any schedule and replaces a long-form text with the thin text,
+  keeping the cron times, enabled state, name and answers.
+- What a person does once: run the schedule installer again. It swaps each saved long text for the thin one and
+  keeps the times, enabled state, name and answers. After that, plugin releases are picked up without reinstalling.
+- The approved browser scripts and the application contract are unchanged. The version is not bumped here; the
+  release that carries this change must be 0.9.6 or later so the stamp is true.
 
 ### 0.9.5
 
