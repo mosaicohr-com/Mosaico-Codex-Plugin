@@ -125,13 +125,19 @@ The Codex package ships no such capability, so its Outreach skills do not captur
   quota sent at the start"; the installers ask once who receives the Leads and how many each, and how to read the
   member ids, and the second-person section says her schedule needs her own id in the map. A Source leads schedule
   saved before 0.9.3 has no quota map: run the installer again to update it in place. The Source leads text now
-  needs plugin 0.9.3 or later. The Sync data and Repair texts are unchanged.
+  needs plugin 0.9.3 or later. The Sync data and Repair texts are unchanged apart from the sentence in the last point.
 - A run that has no quota ends with one plain "Fix:" sentence naming the installer skill. When a person answers who
   receives the Leads in an interactive run, the invite-run skill offers once to save that answer into the installed
   Source leads schedule (the installer's new "Update the Source leads quota in place" steps), or says no schedule is
   installed and offers to install one.
 - The overview skills mention the quota on the sourcing start. Tests check the manifests at 0.9.3 and that the
   Source leads schedule and the invite-run skill carry the quota.
+- The three Claude schedule texts (Sync data, Source leads, Repair) now say: read each approved script file with the
+  file-reading tool, one file at a time, by its path under the installed plugin's browser folder, and do not print
+  them with a shell command. A scheduled run had joined several `cat` and `echo =====` commands into one line, and
+  zsh failed on `=====` (it reads a word starting with `=` as a command name), so the run saw an error although
+  nothing was wrong. Run the installer again to update a saved schedule. The Codex package ships no browser scripts
+  and is unchanged.
 
 ### 0.9.2
 
