@@ -7,21 +7,30 @@ description: Review, update, or create owned Mosaico Outreach Agents without cha
 
 At the start of every run, read `outreach_get_agents` and show a complete report of all loaded owned
 Agents. Include each Agent's name, Agent id, active state, search instructions, message
-instructions, `leadsPerDay` (Leads per day) and `sourcedByUserId` (Sourced by).
+instructions, `leadsPerDay` (Leads per day), `leadsPerRun` (Leads per run), `sourcedByUserId` (Sourced by) and
+whether it is sourced (`sourcing`, with `sourcingReason` as Mosaico wrote it).
 
-Explain that only name, search instructions, message instructions, active state, `leadsPerDay` and
-`sourcedByUserId` can be changed.
+Explain that only name, search instructions, message instructions, active state, `leadsPerDay`,
+`leadsPerRun` and `sourcedByUserId` can be changed.
 Ask whether the person wants to update an existing Agent or create a new Agent. Do not offer changes
 to ownership, ids, timestamps, Leads or Messages.
 
 ## Sourcing plan fields
 
-Each Agent carries two fields that drive the Source leads routine. `leadsPerDay` is how many Leads (1 to 100)
-Source leads tops the Agent up to each day; empty means it is not sourced automatically. `sourcedByUserId`
-("Sourced by") is the active member whose Source leads run sources it; empty means the Agent's owner.
-`outreach_update_agent` and `outreach_create_agent` set them. Only an Owner or Admin, or the Agent's owner,
-can; Sourced by must be an active member, so take the member from `get_team_profiles` ("Person ID") and never
-guess one. Mosaico works out from them how many Leads each person still needs today.
+Each Agent carries three fields that drive the Source leads routine. `leadsPerDay` is the most Leads (1 to 100)
+the Agent may hold on one day. `leadsPerRun` is how many Leads (1 to 100) one Source leads run must deliver for
+it. `sourcedByUserId` ("Sourced by") is the active member whose Source leads run sources it; empty means the
+Agent's owner. `outreach_update_agent` and `outreach_create_agent` set them. Only an Owner or Admin, or the
+Agent's owner, can; Sourced by must be an active member, so take the member from `get_team_profiles`
+("Person ID") and never guess one.
+
+Every read of an Agent also says whether it is sourced. `sourcing` is `sourced` (the Agent is on and has both
+numbers), `not-configured` (it is on but Leads per day or Leads per run is missing) or `off`; `sourcingMissing`
+lists the numbers still to set and `sourcingReason` says why in one sentence. Report that sentence as Mosaico
+wrote it. Turning an Agent on needs no numbers, and an Agent that is on without them still works for
+follow-ups; Source leads sources it only when both numbers are set. Setting one number without the other is
+allowed and leaves the Agent not sourced until both are set. Mosaico files each Lead on a free day itself and
+never puts more than the Agent's Leads per day on one day.
 
 ## Update an existing Agent
 
@@ -34,7 +43,8 @@ guess one. Mosaico works out from them how many Leads each person still needs to
 ## Create a new Agent
 
 1. Ask for the Agent name, search instructions, message instructions and initial active state, and, if the
-   person wants it sourced automatically, Leads per day and Sourced by.
+   person wants it sourced automatically, Leads per day, Leads per run and Sourced by (both numbers are needed
+   for it to be sourced).
 2. Do not ask the person to invent an Agent id; Mosaico generates it.
 3. Summarize the complete new Agent and ask for confirmation immediately before calling
    `outreach_create_agent`.
