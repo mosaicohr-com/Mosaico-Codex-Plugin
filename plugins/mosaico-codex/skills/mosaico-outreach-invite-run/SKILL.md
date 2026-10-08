@@ -75,7 +75,8 @@ set it yourself.
    recommended action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or
    unverified in `workflowStatus.unverifiedLeads`, each with its profile URL: for each one run
    **Capture connection evidence**, then reread `outreach_get_day`. Never guess a connection and never
-   skip to drafting for a listed Lead.
+   skip to drafting for a listed Lead. A colleague's Lead is never in that list for your run: only her own run
+   verifies it.
 3. Mosaico decides when sourcing ends, never your own judgement. While any line in
    `workflowStatus.sourcingPlan` has status `open`, keep sourcing: search, broaden suitable searches, check
    profiles and save qualified Leads with their profile details, following `nextOwnerUserId` and
@@ -92,9 +93,10 @@ set it yourself.
    **Which Agent a Lead goes to**), which takes no connection state: the new Lead
    starts unknown. Never send `scheduledDate`: Mosaico ignores a day you send (warning
    `scheduled-date-ignored`) and files the Lead on the first business day with room; the answer's `placement`
-   says the day it chose. Then run **Capture connection evidence** for it, so Mosaico records connected,
-   invite-pending or not-connected before any draft is written. Write the missing outbound Invite draft
-   only for a Lead Mosaico lists as verified. Do not approve or send any invitation in this scope.
+   says the day it chose. For your own Lead, then run **Capture connection evidence** for it, so Mosaico records
+   connected, invite-pending or not-connected before any draft is written; never for a colleague's Lead (only her own
+   run verifies it). Write the missing outbound Invite draft only for a Lead Mosaico lists as verified. Do not
+   approve or send any invitation in this scope.
 6. Reread `outreach_get_day` after every saved Lead and draft. Mosaico preserves partial progress and
    owns the completion predicate; a valid partial save is not a completed run.
 7. After sourcing, verify and draft across every day in `workflowStatus.runDays`, not just one day:
@@ -157,6 +159,11 @@ make up evidence and never work around the answer. When Mosaico blocks a save fo
 `colleague-check-required`, nothing was saved: do not retry it, list the candidate as skipped with Mosaico's code
 and reason, and say in the report that Leads for that colleague need a Claude run. Saves for the run owner
 need no check. Read `workflowStatus.colleagueChecks` and `workflowStatus.colleagueSkips` only to report them.
+Since plugin 0.9.11 a Claude run can save a colleague's Lead as verified not connected by the colleague check
+(note `colleague-check-negative-proven`) and draft her invitation, or save it with its connection unknown (note
+`colleague-check-negative-unproven`) and leave it undrafted. Codex never records connection evidence for a
+colleague's Lead and never drafts one that Mosaico marks as awaiting her own check (`lead-awaiting-owner-check`);
+only her own run verifies it, and her invitation is not sent before that (`own-evidence-required`).
 
 ## Report a sourcing run
 

@@ -1,7 +1,7 @@
 const PUBLIC_IDENTIFIER = "";
 const COLLEAGUE_IDENTIFIER = "";
 // Mosaico Outreach: is one sourcing candidate already a connection of a colleague, according to Sales Navigator's "Connections of" filter.
-// Approved capture script (0.9.5). The plugin's browser-script gate allows it only word for word, with the first line's value changed to
+// Approved capture script (0.9.5; 0.9.11 adds the proof fields). The plugin's browser-script gate allows it only word for word, with the first line's value changed to
 // the candidate's public identifier (the part of the profile address after /in/, or the opaque member id Mosaico hands over as the
 // script identifier) and the second line's value changed to the colleague's registered LinkedIn public identifier, which Mosaico
 // supplies (outreach_get_day, workflowStatus.colleagueChecks): the run never chooses the colleague.
@@ -22,6 +22,10 @@ const COLLEAGUE_IDENTIFIER = "";
 //      the candidate's numeric member id (bytes 00 2C 00 00, then the member id as 4 big-endian bytes, then 21 more bytes).
 //   4. When step 3 does not list the candidate: the same keyword search without the filter, one page, only to read the candidate's
 //      Sales Navigator id (the result whose id decodes to the candidate's member id). Mosaico requires that id when the search completed.
+//   5. (0.9.11) When the candidate was not listed and the check completed: the control search, the SAME "Connections of" filter with NO keyword,
+//      count 1, one call. It reads only paging.total (and that the answer echoes the colleague's id). It shows whether the search can see any of her
+//      connections at all, which is what makes "not listed" mean something. If this call fails in any way, controlTotal is null and nothing else
+//      changes (found stays as it was); Mosaico then treats a not-found as unproven.
 // Output: state "ok", "colleague-not-resolved" (the colleague has no profile, name or typeahead entry with her member id),
 // "candidate-not-resolved" (the candidate has no profile, name or member id, is the colleague, or is not in the unfiltered results) or
 // "error" (the page is signed out, LinkedIn answered with an error status, an answer was not in the expected shape, or the filter was not
@@ -32,7 +36,20 @@ const COLLEAGUE_IDENTIFIER = "";
 // search's metadata.totalDisplayCount as text ("2K+" when large), or null. pagesRead counts every Sales Navigator results page read.
 // status is the HTTP status of the last call LinkedIn answered (200 when all went well), or 0 when no call was made, a call got no
 // answer, or an answer was not JSON. The script never throws and never returns a name, headline, picture, URL or any other result row.
-// Checks that fail closed (state "error", found false): the filtered answer does not echo the colleague's id in its metadata (the
+// Proof fields (0.9.11; inside the sealed object, null allowed, covered by the digest). Mosaico accepts a "not found" as a proven negative only
+// when all of them agree (it checks them; the script only reports):
+//   complete: true when the name-narrowed "Connections of" search was read to its end: its last page held fewer results than a page (25), or
+//     start + count reached paging.total. false when it stopped at the page cap (2 pages), was never run, or failed.
+//   controlTotal: paging.total of the control search (step 5) as text, e.g. "1432"; null when the control search was not run (the candidate
+//     was listed, or the check did not complete) or failed. "0" is a real answer: none of her connections were listed.
+//   visibility: "visible" when controlTotal is above 0 (the search lists some of her connections, so her list is open to this account);
+//     "hidden" only on a proven hidden-list marker; otherwise "unknown". No such marker is known: the 2026-10-07 captures show an
+//     empty list as a plain 200 answer with paging.total 0 and no notice (the case of a colleague changing the setting was not captured),
+//     so this script never says "hidden"; a controlTotal of 0 is "unknown", and Mosaico treats it as unproven all the same.
+//   unreadableRows: how many result rows of the narrowed pages had no readable id (an element the script could not decode). Zero is needed
+//     for a proof, because an unreadable row could have been the candidate. (An answer whose rows are ALL unreadable is still an error.)
+//   resultsTotal and pagesRead are as before; pagesRead now also counts the control search.
+// Checks that fail closed (state "error", found false; the control search is the exception, it can only empty controlTotal): the filtered answer does not echo the colleague's id in its metadata (the
 // filter was not applied, so a "found" could be wrong); the answer has results but none whose id can be read; an id and its numeric
 // member id disagree.
 // What the 2026-10-07 captures did not show (the capture tool cut long bodies and hid the query and decorationId): the exact spelling
@@ -94,6 +111,10 @@ let status = 0;
 let state = "error";
 let found = false;
 let resultsTotal = null;
+let complete = false;
+let controlTotal = null;
+let visibility = "unknown";
+let unreadableRows = 0;
 let pagesRead = 0;
 let calls = 0;
 const get = async (url, headers) => {
@@ -122,9 +143,12 @@ const rowOf = (e) => {
   const o = typeof e.objectUrn === "string" ? /^urn:li:member:([0-9]+)$/.exec(e.objectUrn) : null;
   return o !== null && Number(o[1]) !== member ? null : { id, member };
 };
-const search = async (name, filterId, filterText, start) => {
-  const filter = filterId === null ? "" : "filters:List((type:CONNECTION_OF,values:List((id:" + filterId + ",text:" + restli(filterText) + ",selectionType:INCLUDED)))),";
-  const j = await get(SEARCH_ENDPOINT + "?q=searchQuery&query=(" + filter + "keywords:" + restli(name) + ")&start=" + start + "&count=" + PAGE_SIZE + "&decorationId=" + DECORATION, HEADERS);
+const search = async (name, filterId, filterText, start, size) => {
+  // name null: no keyword (the control search). filterId null: no filter (the candidate's own id).
+  const parts = [];
+  if (filterId !== null) parts.push("filters:List((type:CONNECTION_OF,values:List((id:" + filterId + ",text:" + restli(filterText) + ",selectionType:INCLUDED))))");
+  if (name !== null) parts.push("keywords:" + restli(name));
+  const j = await get(SEARCH_ENDPOINT + "?q=searchQuery&query=(" + parts.join(",") + ")&start=" + start + "&count=" + size + "&decorationId=" + DECORATION, HEADERS);
   pagesRead++;
   if (!isObj(j)) throw "shape";
   const elements = listOf(j.elements);
@@ -133,7 +157,8 @@ const search = async (name, filterId, filterText, start) => {
   if (elements.length > 0 && rows.every((r) => r === null)) throw "shape";
   const meta = isObj(j.metadata) ? j.metadata : {};
   if (filterId !== null && JSON.stringify(meta).indexOf(filterId) < 0) throw "filter-not-applied";
-  return { rows: rows.filter((r) => r !== null), count: elements.length, total: typeof meta.totalDisplayCount === "string" ? meta.totalDisplayCount : null };
+  const paging = isObj(j.paging) && Number.isInteger(j.paging.total) && j.paging.total >= 0 ? j.paging.total : null;
+  return { rows: rows.filter((r) => r !== null), count: elements.length, total: typeof meta.totalDisplayCount === "string" ? meta.totalDisplayCount : null, pagingTotal: paging };
 };
 try {
   if (csrf !== "" && PUBLIC_IDENTIFIER !== "" && COLLEAGUE_IDENTIFIER !== "") {
@@ -156,24 +181,35 @@ try {
         let hit = null;
         let page = null;
         for (let n = 0; n < MAX_FILTERED_PAGES && hit === null; n++) {
-          page = await search(p.name, colleague.salesNavId, filterText, n * PAGE_SIZE);
+          page = await search(p.name, colleague.salesNavId, filterText, n * PAGE_SIZE, PAGE_SIZE);
+          unreadableRows += page.count - page.rows.length;
           hit = page.rows.find((r) => r.member === p.memberId) || null;
-          if (page.count < PAGE_SIZE) break;
+          // The narrowed search is read to its end when this page is short or reaches the total LinkedIn reports.
+          if (page.count < PAGE_SIZE || (page.pagingTotal !== null && n * PAGE_SIZE + page.count >= page.pagingTotal)) { complete = true; break; }
         }
         resultsTotal = page === null ? null : page.total;
         if (hit === null) {
           // Not listed: read the candidate's own Sales Navigator id from the unfiltered keyword results (one page).
-          const plain = await search(p.name, null, "", 0);
+          const plain = await search(p.name, null, "", 0, PAGE_SIZE);
           hit = plain.rows.find((r) => r.member === p.memberId) || null;
           found = false;
         } else {
           found = true;
         }
         if (hit !== null) { candidate.salesNavId = hit.id; state = "ok"; } else { found = false; }
+        if (state === "ok" && !found) {
+          // The control search: the same filter with no keyword, one result. Any failure only empties controlTotal; found and status stay as they were.
+          const kept = status;
+          try {
+            const control = await search(null, colleague.salesNavId, filterText, 0, 1);
+            if (control.pagingTotal !== null) { controlTotal = String(control.pagingTotal); if (control.pagingTotal > 0) visibility = "visible"; }
+          } catch (e) { controlTotal = null; visibility = "unknown"; }
+          status = kept;
+        }
       }
     }
     status = state === "error" ? status : 200;
   }
-} catch (e) { state = "error"; found = false; resultsTotal = null; }
-const payload = { status, signedIn: csrf !== "", capturedAt, state, colleague, candidate, filter: { type: "CONNECTION_OF" }, found: state === "ok" && found, resultsTotal, pagesRead };
+} catch (e) { state = "error"; found = false; resultsTotal = null; complete = false; controlTotal = null; visibility = "unknown"; }
+const payload = { status, signedIn: csrf !== "", capturedAt, state, colleague, candidate, filter: { type: "CONNECTION_OF" }, found: state === "ok" && found, resultsTotal, pagesRead, complete, controlTotal, visibility, unreadableRows };
 ({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

@@ -57,6 +57,17 @@ both numbers are set. Every run delivers its Leads per run and Mosaico files the
 schedules carry no numbers and no days. If no Agent has both numbers, Mosaico says so and the run tells the person to set
 them there; if every Agent is full for the next 10 business days, there is nothing to source.
 
+A candidate saved for a colleague first goes through the Sales Navigator colleague check (invite-run skill). From
+plugin 0.9.11 its output also carries `complete`, `controlTotal`, `visibility` and `unreadableRows`, and it goes to
+Mosaico unchanged. Mosaico, not the model, decides what it proves. When the check shows the search could have found
+the candidate and did not (a proven negative), Mosaico saves the Lead as verified not connected by the colleague
+check and the run drafts her invitation at once; otherwise the Lead is saved with its connection unknown, stays
+undrafted, and her own run verifies it first. The send guard: a colleague's invitation is never sent on that check
+alone; her own Sync run must record her own connection evidence first (`own-evidence-required`). A run never
+records connection evidence for a colleague's Lead (`evidence-owner-mismatch`). The risk accepted: nobody has yet
+tested a colleague who hides her connections, so a proven negative could in rare cases be wrong; the send guard
+contains it, because nothing goes out before her own check.
+
 Human approval applies to the exact current message. For LinkedIn delivery, perform the authorized
 browser action, verify the external result, report evidence through the tool named by Mosaico and
 reread status. Never infer delivery from a click or reconstruct workflow state from conversation

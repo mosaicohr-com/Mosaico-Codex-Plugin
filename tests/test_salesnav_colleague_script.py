@@ -100,19 +100,32 @@ const route = (world = {}) => (url, init) => {
     if (world.searchStatus) return bad(world.searchStatus);
     const raw = /query=(.*)&start=/.exec(url)[1];
     const start = Number(/start=(\d+)/.exec(url)[1]);
-    const keywords = decodeURIComponent(/keywords:([^)]*?)\)$/.exec(raw)[1].replace(/%2[89]/g, (m) => m)); // restli-encoded text
+    const keywordMatch = /keywords:([^)]*?)\)$/.exec(raw);
+    const keywords = keywordMatch === null ? null : decodeURIComponent(keywordMatch[1].replace(/%2[89]/g, (m) => m)); // restli-encoded text
     const filtered = raw.includes('type:CONNECTION_OF');
     const filterId = filtered ? /id:([A-Za-z0-9_-]+),text:/.exec(raw)[1] : null;
+    const size = Number(/count=(\d+)/.exec(url)[1]);
+    if (keywords === null) {
+      // The control search (0.9.11): the filter alone, count 1. The answer carries paging.total: how many of her connections the account can see.
+      if (world.controlStatus) return bad(world.controlStatus);
+      if (world.controlNetwork) return new Error('net');
+      if (world.controlBadBody) return ok([1, 2]);
+      const total = world.hidden ? 0 : (world.controlTotal === undefined ? 1432 : world.controlTotal);
+      const shown = Array.from({ length: Math.min(size, total) }, (_, i) => row({ member: 800000 + i }));
+      const cmeta = { totalDisplayCount: total >= 1000 ? '1K+' : String(total), ...(world.controlNoEcho ? {} : { filters: [{ type: 'CONNECTION_OF', values: [{ id: filterId, selectionType: 'INCLUDED' }] }] }) };
+      return ok({ metadata: cmeta, elements: shown, paging: world.controlNoPaging ? { count: size, start: 0, links: [] } : { total, count: size, start, links: [] } });
+    }
     let people = Object.values(PEOPLE).filter((p) => fullName(p) === keywords);
     if (world.extraNamesakes) people = [...Array.from({ length: world.extraNamesakes }, (_, i) => ({ vanity: 'x' + i, first: 'Jane', last: 'Doe', member: 700000 + i })), ...people];
     if (world.candidateFirst) people = [...people.filter((p) => p.member === PEOPLE.candidate.member), ...people.filter((p) => p.member !== PEOPLE.candidate.member)];
     if (filtered) people = world.hidden ? [] : people.filter((p) => (world.connected || []).includes(p.member) || (world.connectedFiller && p.member >= 700000 && p.member < 700000 + world.connectedFiller));
     if (world.noCandidateUnfiltered && !filtered) people = people.filter((p) => p.member !== PEOPLE.candidate.member);
     const page = people.slice(start, start + 25);
-    const elements = world.unreadable ? page.map(() => ({ entityUrn: 'urn:li:fs_salesProfile:(nothing)' })) : page.map((p) => row(p, world.mismatchObject ? { objectUrn: 'urn:li:member:1' } : {}));
+    const nothing = () => ({ entityUrn: 'urn:li:fs_salesProfile:(nothing)' });
+    const elements = world.unreadable ? page.map(nothing) : page.map((p, i) => (filtered && i < (world.unreadableCount || 0) ? nothing() : row(p, world.mismatchObject ? { objectUrn: 'urn:li:member:1' } : {})));
     const meta = { totalDisplayCount: people.length >= 2000 ? '2K+' : String(people.length), keywords, ...(filtered && !world.noEcho ? { filters: [{ type: 'CONNECTION_OF', values: [{ id: filterId, selectionType: 'INCLUDED' }] }] } : {}) };
     if (world.badSearchBody) return ok([1, 2]);
-    return ok({ metadata: meta, elements, paging: { total: people.length, count: 25, start, links: [] } });
+    return ok({ metadata: meta, elements, paging: world.noPagingTotal ? { count: 25, start, links: [] } : { total: people.length, count: 25, start, links: [] } });
   }
   return bad(404);
 };
@@ -198,6 +211,32 @@ const shortUrls = (r) => urls(r).map((u) => u.replace(/\?.*/, ''));
   // Odd characters in a name go to LinkedIn encoded and never as raw brackets, quotes or stars.
   r = await run('zoe-obrien', 'ewa-colleague', { connected: [] }); out.strange = r.result; out.strangeUrls = urls(r);
 
+  // Proof fields (0.9.11).
+  r = await run('jane-doe', 'ewa-colleague', { connected: [] }); out.notFoundFull = r.result; out.notFoundFullUrls = urls(r); out.notFoundFullDelays = r.delays; out.notFoundFullSecrets = ['Secret', 'Jane', 'Doe', 'Ewa', 'Colleague', 'headline'].some((x) => JSON.stringify(r.result).includes(x));
+  r = await run('jane-doe', 'ewa-colleague', { connected: [], controlTotal: 7 }); out.smallControl = r.result;
+  r = await run('jane-doe', 'ewa-colleague', { connected: [], controlTotal: 0 }); out.zeroControl = r.result;
+  out.hiddenFull = (await run('jane-doe', 'ewa-colleague', { hidden: true })).result;
+  // The page cap: three filtered pages exist, two are read, so the search is not complete.
+  out.capped = (await run('jane-doe', 'ewa-colleague', { ...filler, candidateFirst: true })).result;
+  // Exactly one full page whose start + count reaches paging.total: complete although the page is full, and no second page is read.
+  r = await run('jane-doe', 'ewa-colleague', { extraNamesakes: 25, connectedFiller: 25, connected: [], candidateFirst: true }); out.exactPage = r.result; out.exactPageUrls = urls(r);
+  // A full first page and a second short page: complete after two pages.
+  r = await run('jane-doe', 'ewa-colleague', { extraNamesakes: 30, connectedFiller: 30, connected: [], candidateFirst: true }); out.shortSecondPage = r.result; out.shortSecondPageUrls = urls(r);
+  // No paging.total at all: only a short page can end the search. A full page after a full page at the cap is not the end; a short one is.
+  out.noPagingTotal = (await run('jane-doe', 'ewa-colleague', { extraNamesakes: 60, connectedFiller: 60, connected: [], candidateFirst: true, noPagingTotal: true })).result;
+  out.noPagingTotalShort = (await run('jane-doe', 'ewa-colleague', { extraNamesakes: 25, connectedFiller: 25, connected: [], candidateFirst: true, noPagingTotal: true })).result;
+  // Unreadable rows among the narrowed results are counted (2 of 5), on every narrowed page.
+  out.unreadableSome = (await run('jane-doe', 'ewa-colleague', { extraNamesakes: 5, connectedFiller: 5, connected: [], unreadableCount: 2 })).result;
+  // The control search fails: the proof field is empty, nothing else moves.
+  out.controlForbidden = (await run('jane-doe', 'ewa-colleague', { connected: [], controlStatus: 403 })).result;
+  out.control500 = (await run('jane-doe', 'ewa-colleague', { connected: [], controlStatus: 500 })).result;
+  out.controlNetwork = (await run('jane-doe', 'ewa-colleague', { connected: [], controlNetwork: true })).result;
+  out.controlBadBody = (await run('jane-doe', 'ewa-colleague', { connected: [], controlBadBody: true })).result;
+  out.controlNoEcho = (await run('jane-doe', 'ewa-colleague', { connected: [], controlNoEcho: true })).result;
+  out.controlNoPaging = (await run('jane-doe', 'ewa-colleague', { connected: [], controlNoPaging: true })).result;
+  // A found candidate needs no control search, and one who could not be looked up is not searched at all.
+  r = await run('jane-doe', 'ewa-colleague', { connected: [J.member] }); out.foundNoControlCalls = r.calls.length;
+
   // Fail closed.
   out.signedOut = await run('jane-doe', 'ewa-colleague', { connected: [J.member] }, ''); out.signedOutCalls = out.signedOut.calls.length; out.signedOut = out.signedOut.result;
   out.emptyCandidate = await run('', 'ewa-colleague', {}); out.emptyCandidateCalls = out.emptyCandidate.calls.length; out.emptyCandidate = out.emptyCandidate.result;
@@ -271,7 +310,7 @@ def check_static() -> None:
     payload_line = next(line for line in body_lines if line.startswith("const payload = "))
     check(body_lines.index(payload_line) == len(body_lines) - 2, "something is computed between the payload and its seal")
     check("integrity" not in payload_line, "the payload holds the integrity field before it is computed")
-    check(payload_line == 'const payload = { status, signedIn: csrf !== "", capturedAt, state, colleague, candidate, filter: { type: "CONNECTION_OF" }, found: state === "ok" && found, resultsTotal, pagesRead };',
+    check(payload_line == 'const payload = { status, signedIn: csrf !== "", capturedAt, state, colleague, candidate, filter: { type: "CONNECTION_OF" }, found: state === "ok" && found, resultsTotal, pagesRead, complete, controlTotal, visibility, unreadableRows };',
           "the payload is not exactly the contract's fields, with found false unless state is ok")
     check("csrf:" not in last and "csrf," not in last and "csrf }" not in payload_line, "the token is returned")
     # Only LinkedIn's own endpoints: the profile query, the typeahead and the lead search.
@@ -289,7 +328,17 @@ def check_static() -> None:
     check("MAX_FILTERED_PAGES = 2;" in code and "PAGE_SIZE = 25;" in code and "type=CONNECTION_OF" in code and "type:CONNECTION_OF" in code, "the page or filter bounds changed")
     check("selectionType:INCLUDED" in code and "decorationId=" in code, "the search query lost its filter value or decoration")
     check("found = false" in code and code.count("found = true") == 1, "found is set to true in more than one place")
+    # 0.9.11: one control search (same filter, no keyword, count 1), never "hidden" (no hidden-list marker is known), fail closed.
+    check(code.count("search(null,") == 1 and "search(null, colleague.salesNavId, filterText, 0, 1)" in code, "the control search is not one call of the same filter with no keyword and count 1")
+    check('"hidden"' not in code, "the script says hidden although no hidden-list marker is known")
+    check("controlTotal = null; visibility = \"unknown\"; }" in code, "a failed control search does not empty controlTotal")
+    for field in ("complete", "controlTotal", "visibility", "unreadableRows"):
+        check(f"{field}" in payload_line, f"the payload lacks {field}")
     check("normalizeText" in SOURCE and "const normalizeText = " in SOURCE, "the script lost the shared normalisation rule")
+    # The header says what the proof fields are, that the control search is the sixth call, and that no hidden-list marker is known.
+    header = "\n".join(line for line in body_lines if line.startswith("//"))
+    for needle in ("Proof fields (0.9.11", "complete:", "controlTotal:", "visibility:", "unreadableRows:", "the control search", "No such marker is known", "never says \"hidden\"", "its last page held fewer results than a page"):
+        check(needle in header, f"the script header lacks: {needle}")
     check("never retries" in SOURCE and "Never a wrong" in SOURCE.replace("never in a wrong", "Never a wrong") or "never in a wrong" in SOURCE, "the header lost its fail-closed statement")
     # Nothing from a result row is copied into the output except ids: the output is built from these fields only.
     for forbidden in ("fullName", "headline", "displayValue }", "firstName }", "lastName }"):
@@ -298,7 +347,7 @@ def check_static() -> None:
 
 def check_behaviour(out: dict) -> None:
     ids = out["ids"]
-    keys = ["status", "signedIn", "capturedAt", "state", "colleague", "candidate", "filter", "found", "resultsTotal", "pagesRead", "integrity"]
+    keys = ["status", "signedIn", "capturedAt", "state", "colleague", "candidate", "filter", "found", "resultsTotal", "pagesRead", "complete", "controlTotal", "visibility", "unreadableRows", "integrity"]
     found = out["found"]
     check(sorted(found) == sorted(keys), f"unexpected keys {sorted(found)}")
     check(found["integrity"]["algorithm"] == "fnv1a32" and re.fullmatch(r"[0-9a-f]{8}", found["integrity"]["digest"]) is not None, "the record is not sealed with an fnv1a32 digest")
@@ -339,9 +388,9 @@ def check_behaviour(out: dict) -> None:
 
     # Not found: the search ran, the candidate is real and their own id is read from the unfiltered results. Never "found".
     nf = out["notFound"]
-    check(nf["state"] == "ok" and nf["found"] is False and nf["resultsTotal"] == "0" and nf["pagesRead"] == 2 and nf["status"] == 200, f"not-found record wrong: {nf}")
+    check(nf["state"] == "ok" and nf["found"] is False and nf["resultsTotal"] == "0" and nf["pagesRead"] == 3 and nf["status"] == 200, f"not-found record wrong: {nf}")
     check(nf["candidate"]["salesNavId"] == ids["candidateSales"] and nf["candidate"]["memberId"] == 553472255, "a not-found candidate's own ids were not read")
-    check(out["notFoundShort"][-2:] == ["/sales-api/salesApiLeadSearch", "/sales-api/salesApiLeadSearch"] and "filters:List" in out["notFoundUrls"][3] and "filters:List" not in out["notFoundUrls"][4]
+    check(out["notFoundShort"][-3:] == ["/sales-api/salesApiLeadSearch"] * 3 and "filters:List" in out["notFoundUrls"][3] and "filters:List" not in out["notFoundUrls"][4]
           and out["notFoundUrls"][4].startswith("/sales-api/salesApiLeadSearch?q=searchQuery&query=(keywords:Jane%20Doe)&start=0&count=25"), f"the unfiltered resolution search is wrong: {out['notFoundUrls']}")
     # Names are never matched: a connected namesake is not the candidate.
     check(out["namesakeConnected"]["state"] == "ok" and out["namesakeConnected"]["found"] is False, "a connected namesake was taken for the candidate")
@@ -364,8 +413,8 @@ def check_behaviour(out: dict) -> None:
 
     # Paging: at most two filtered pages, and the candidate on page 2 is found.
     two = out["twoPages"]
-    check(two["state"] == "ok" and two["found"] is False and two["pagesRead"] == 3, f"two filtered pages and one unfiltered page were not read: {two}")
-    check(sum("filters:List" in u for u in out["twoPagesUrls"]) == 2 and [u.rsplit("&start=", 1)[1].split("&")[0] for u in out["twoPagesUrls"] if "salesApiLeadSearch" in u] == ["0", "25", "0"], f"start did not move by 25 or a third page was read: {out['twoPagesUrls']}")
+    check(two["state"] == "ok" and two["found"] is False and two["pagesRead"] == 4, f"two filtered pages, one unfiltered page and the control search were not read: {two}")
+    check(sum("filters:List" in u for u in out["twoPagesUrls"]) == 3 and [u.rsplit("&start=", 1)[1].split("&")[0] for u in out["twoPagesUrls"] if "salesApiLeadSearch" in u] == ["0", "25", "0", "0"], f"start did not move by 25 or a third narrowed page was read: {out['twoPagesUrls']}")
     lost = out["lostInNamesakes"]
     check(lost["state"] == "candidate-not-resolved" and lost["found"] is False and lost["candidate"]["salesNavId"] is None and lost["pagesRead"] == 3, f"a candidate lost among namesakes was guessed: {lost}")
     check(out["onePageFound"]["found"] is True and out["onePageFound"]["pagesRead"] == 1 and out["onePageFoundCalls"] == 4, "a short first page was read past its end")
@@ -378,6 +427,44 @@ def check_behaviour(out: dict) -> None:
     # A name with brackets, quotes and stars goes to LinkedIn encoded: no raw bracket, quote or star in the keyword.
     keyword = [u for u in out["strangeUrls"] if "salesApiLeadSearch" in u][0].split("keywords:", 1)[1].split(")&start=")[0]
     check(keyword == "Zo%C3%AB%20%28Z.%29%20O%27Brien%2A" and out["strange"]["state"] == "ok", f"a name with odd characters was not encoded: {keyword}")
+
+
+    # Proof fields (0.9.11): inside the sealed record, each computed from LinkedIn's own paging.
+    check(found["complete"] is True and found["controlTotal"] is None and found["visibility"] == "unknown" and found["unreadableRows"] == 0 and out["foundNoControlCalls"] == 4,
+          f"a listed candidate should read its one page to the end and need no control search: {found}")
+    full = out["notFoundFull"]
+    control = out["notFoundFullUrls"][5]
+    check(full["complete"] is True and full["controlTotal"] == "1432" and full["visibility"] == "visible" and full["unreadableRows"] == 0 and full["pagesRead"] == 3 and full["resultsTotal"] == "0",
+          f"a completed not-found did not carry its proof fields: {full}")
+    check(len(out["notFoundFullUrls"]) == 6 and out["notFoundFullDelays"] == [500, 500, 500, 500], f"the control search is not the sixth call, or Sales Navigator calls were not spaced: {out['notFoundFullDelays']}")
+    check(control == "/sales-api/salesApiLeadSearch?q=searchQuery&query=(filters:List((type:CONNECTION_OF,values:List((id:" + ids["colleagueSales"] + ",text:Ewa%20Colleague,selectionType:INCLUDED)))))&start=0&count=1&decorationId=com.linkedin.sales.deco.desktop.searchv2.LeadSearchResult-14",
+          f"the control search is not the same filter with no keyword and count 1: {control}")
+    check(out["notFoundFullSecrets"] is False, "a name or headline reached a not-found record")
+    check(out["smallControl"]["controlTotal"] == "7" and out["smallControl"]["visibility"] == "visible", "a small control total is not reported as it is")
+    check(out["zeroControl"]["controlTotal"] == "0" and out["zeroControl"]["visibility"] == "unknown" and out["zeroControl"]["state"] == "ok" and out["zeroControl"]["found"] is False,
+          f"a control total of 0 should be reported as 0 and not called visible: {out['zeroControl']}")
+    hid = out["hiddenFull"]
+    check(hid["complete"] is True and hid["controlTotal"] == "0" and hid["visibility"] == "unknown" and hid["found"] is False, f"an empty list is not reported as total 0, visibility unknown: {hid}")
+    # complete: the page cap, an exact full page, a short second page, a missing paging.total.
+    check(out["capped"]["complete"] is False and out["capped"]["state"] == "ok" and out["capped"]["controlTotal"] == "1432", f"stopping at the page cap was reported as complete: {out['capped']}")
+    ex = out["exactPage"]
+    check(ex["complete"] is True and sum("filters:List" in u and "keywords" in u for u in out["exactPageUrls"]) == 1, f"a full page that reaches paging.total was not complete after one page: {ex}")
+    sp = out["shortSecondPage"]
+    check(sp["complete"] is True and sum("filters:List" in u and "keywords" in u for u in out["shortSecondPageUrls"]) == 2, f"a short second page did not end the search as complete: {sp}")
+    check(out["noPagingTotal"]["complete"] is False and out["noPagingTotal"]["state"] == "ok", "a capped read with no paging.total was reported as complete")
+    check(out["noPagingTotalShort"]["complete"] is True and out["noPagingTotalShort"]["state"] == "ok", "a short page after a full one, with no paging.total, did not end the search")
+    # unreadableRows counts rows without a readable id among the narrowed pages.
+    check(out["unreadableSome"]["unreadableRows"] == 2 and out["unreadableSome"]["state"] == "ok" and out["unreadableSome"]["complete"] is True, f"unreadable rows were not counted: {out['unreadableSome']}")
+    # The control search failing leaves everything else as it was.
+    for name in ("controlForbidden", "control500", "controlNetwork", "controlBadBody", "controlNoEcho", "controlNoPaging"):
+        record = out[name]
+        check(record["controlTotal"] is None and record["visibility"] == "unknown" and record["state"] == "ok" and record["found"] is False and record["status"] == 200 and record["complete"] is True
+              and record["candidate"]["salesNavId"] == ids["candidateSales"], f"{name}: a failed control search changed more than controlTotal: {record}")
+    # The seal covers the new fields: change any of them and the digest no longer matches.
+    for field, value in (("complete", False), ("controlTotal", "1"), ("visibility", "unknown"), ("unreadableRows", 1)):
+        tampered = {**full, field: value}
+        check(digest_of(tampered) != full["integrity"]["digest"], f"the digest does not cover {field}")
+    check(digest_of(full) == full["integrity"]["digest"], "the not-found digest is not the canonical one")
 
     # Fail closed: state error, found false, never a throw.
     for name, status in (("profileForbidden", 403), ("typeaheadForbidden", 429), ("searchForbidden", 403), ("search500", 500)):
@@ -405,6 +492,14 @@ def check_behaviour(out: dict) -> None:
             check(record["colleague"]["salesNavId"] is not None and record["candidate"]["salesNavId"] is not None and record["signedIn"] is True and record["status"] == 200
                   and record["colleague"]["memberId"] is not None and record["candidate"]["memberId"] is not None, f"state ok without both ids, a session or status 200: {record}")
         check(record["state"] in ("ok", "colleague-not-resolved", "candidate-not-resolved", "error"), "unknown state")
+        check(isinstance(record["complete"], bool) and isinstance(record["unreadableRows"], int) and record["unreadableRows"] >= 0 and record["visibility"] in ("visible", "unknown"),
+              f"a proof field is missing or has a value the script cannot give: {record}")
+        check(record["controlTotal"] is None or re.fullmatch(r"\d+", record["controlTotal"]) is not None, "controlTotal is not digits")
+        check((record["visibility"] == "visible") == (record["controlTotal"] is not None and int(record["controlTotal"]) > 0), "visibility visible does not match a control total above 0")
+        if record["found"] or record["state"] != "ok":
+            check(record["controlTotal"] is None, "a control total came from a record that was not an ok not-found")
+        if record["state"] == "error":
+            check(record["complete"] is False, "an error record claims a complete search")
         check(isinstance(record["pagesRead"], int) and 0 <= record["pagesRead"] <= 50, "pagesRead out of range")
         check(record["integrity"]["digest"] == digest_of(record), "the digest is not the canonical-JSON FNV-1a of the rest of the record")
         check(set(record["colleague"]) == {"input", "salesNavId", "memberId"} and set(record["candidate"]) == {"input", "salesNavId", "memberId"}, "a person carries more than input, salesNavId and memberId")

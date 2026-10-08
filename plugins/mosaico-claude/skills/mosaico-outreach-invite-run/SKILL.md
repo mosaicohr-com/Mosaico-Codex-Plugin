@@ -98,7 +98,8 @@ the copy to make it pass.
    recommended action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or
    unverified in `workflowStatus.unverifiedLeads`, each with its profile URL: for each one run
    **Capture connection evidence**, then reread `outreach_get_day`. Never guess a connection and never
-   skip to drafting for a listed Lead.
+   skip to drafting for a listed Lead. A colleague's Lead is never in that list for your run: only her own run
+   verifies it.
 3. Mosaico decides when sourcing ends, never your own judgement. While any line in
    `workflowStatus.sourcingPlan` has status `open`, keep sourcing: search, broaden suitable searches, check
    profiles and save qualified Leads with their profile details, following `nextOwnerUserId` and
@@ -116,9 +117,11 @@ the copy to make it pass.
    starts unknown. Never send `scheduledDate`: Mosaico ignores a day you send (warning
    `scheduled-date-ignored`) and files the Lead on the first business day with room; the answer's `placement`
    says the day it chose. For a candidate you save for a colleague, first run **Check a candidate against the
-   colleague** when it applies. Then run **Capture connection evidence** for the saved Lead, so Mosaico records connected,
-   invite-pending or not-connected before any draft is written. Write the missing outbound Invite draft
-   only for a Lead Mosaico lists as verified. Do not approve or send any invitation in this scope.
+   colleague** when it applies, then follow **Draft a colleague's invitation**: never run **Capture connection
+   evidence** for a colleague's Lead. For your own Lead run **Capture connection evidence** for the saved Lead, so
+   Mosaico records connected, invite-pending or not-connected before any draft is written. Write the missing
+   outbound Invite draft only for a Lead Mosaico lists as verified, or for a colleague's Lead saved with the note
+   `colleague-check-negative-proven`. Do not approve or send any invitation in this scope.
 6. Reread `outreach_get_day` after every saved Lead and draft. Mosaico preserves partial progress and
    owns the completion predicate; a valid partial save is not a completed run.
 7. After sourcing, verify and draft across every day in `workflowStatus.runDays`, not just one day:
@@ -142,8 +145,9 @@ drafts are later written under their own Agent and voice.
    the prepared count.
 2. Save each qualified Lead with its profile details and the planned `agentId` through `outreach_save_lead`, which takes no
    connection state (for a candidate you save for a colleague, first run **Check a candidate against the
-   colleague** when it applies), then run **Capture connection evidence** for it. Do not write any invitation draft
-   in this scope, and do not approve or send anything.
+   colleague** when it applies, and never run **Capture connection evidence** for her Lead), then, for your own
+   Lead, run **Capture connection evidence** for it. Do not write any invitation draft in this scope (a colleague's
+   proven Lead is drafted in **Source Leads and prepare drafts**), and do not approve or send anything.
 3. Reread `outreach_get_day` after every saved Lead and continue until Mosaico says the run is complete
    (reason `sourcing-quota-met` or `sourcing-days-full`) or returns a blocker, `human_decision_required`
    or `stop_run`.
@@ -208,7 +212,9 @@ never needs it. Mosaico supplies the colleague's identifier in that entry; you n
    `colleagueConnectionEvidence` on the `outreach_save_lead` call for this candidate and this colleague, with
    everything else you pass for a save. Do this whatever its `state` is (`ok`, `colleague-not-resolved`,
    `candidate-not-resolved` or `error`), and also when `signedIn` is false: Mosaico reads it and decides.
-   Never trim, retype or "fix" it, and never leave a field out.
+   Never trim, retype or "fix" it, and never leave a field out. Since plugin 0.9.11 the output also carries the
+   proof fields `complete`, `controlTotal`, `visibility` and `unreadableRows` inside the sealed object: pass them
+   exactly as returned too, and send a `null` as `null` rather than leaving the field out.
 4. Mosaico's answer is final:
    - `skipped` with code `already-connected-to-colleague` (recommended action `continue_sourcing`): the
      candidate is already connected to the colleague. Nothing was saved. This is not a failure and does not
@@ -224,18 +230,49 @@ never needs it. Mosaico supplies the colleague's identifier in that entry; you n
      the candidate as skipped with Mosaico's code and reason and continue. For `candidate-is-colleague`
      running again cannot help: the candidate is the colleague herself, so do not save it, list it as skipped
      and continue.
-   - Saved, with a note: `colleague-check-negative-unproven` means the candidate was not found in the
-     colleague's connections, or could not be looked up. That is **not** proof that they are not connected
-     (she may hide her connections): the Lead is saved with its connection unknown, so never write "not
-     connected" about it. `colleague-check-unavailable` means the check cannot work for this colleague (the page was signed out,
+   - Saved, with the note `colleague-check-negative-proven`: the candidate was not found in the colleague's
+     connections and the check showed that the search could have found them (every result page read, her
+     connections visible to the account that searched, no result row unread). Mosaico saved the Lead as verified
+     not connected by the colleague check, and the answer says `awaitingOwnerCheck` true. Draft her invitation at
+     once: see **Draft a colleague's invitation**. Nothing is sent until her own run records her own connection
+     evidence.
+   - Saved, with the note `colleague-check-negative-unproven`: the candidate was not found in the colleague's
+     connections, or could not be looked up, and the check could not show that the search would have found them
+     (the note says why, for example a script older than 0.9.11 or an unread page). That is **not** proof that they are
+     not connected (she may hide her connections): the Lead is saved with its connection unknown, so never write "not
+     connected" about it. Do not draft it (Mosaico refuses with `lead-awaiting-owner-check`) and do not verify it:
+     it stays undrafted and her own Sync run checks it first. Continue sourcing.
+   - Saved, with a note: `colleague-check-unavailable` means the check cannot work for this colleague (the page was signed out,
      LinkedIn refused it, or she could not be found in Sales Navigator): the candidate was saved without it, and
      Mosaico asks for no more checks for that colleague in this run, so save her next candidates without
      evidence. `colleague-check-cap-reached` means this run has used all its checks (30 candidates, or three times the Leads per run of the colleagues' Agents when that is more): save the rest without evidence.
-5. A saved Lead then goes through **Capture connection evidence** as before. The colleague check is never
-   passed to `outreach_record_connection_evidence`.
+5. A colleague's Lead never goes through **Capture connection evidence**, and the colleague check is never
+   passed to `outreach_record_connection_evidence`: only her own run verifies her Lead, from her own LinkedIn
+   account. Mosaico answers `evidence-owner-mismatch` to any evidence recorded for it and writes nothing. The
+   save answer never recommends `verify_connection` for her Lead; do not add that step yourself.
 
 When the script file is missing or the gate refuses it, do not work around it: do not save the candidate for
 the colleague, list it as skipped with the reason, and continue.
+
+## Draft a colleague's invitation
+
+This applies to a Lead you saved for a colleague with the note `colleague-check-negative-proven`, in **Source
+Leads and prepare drafts** (and in the **Source leads routine**'s drafting step). Her own Agent's instructions,
+from `outreach_get_agents`, govern the invitation text.
+
+1. Write the invitation draft in the same run: `outreach_record_message` as an outbound `invite` draft with
+   `sentAt` null, the Lead's `leadId`, the `runId`, the review of the body against her Agent's rules, and
+   no `ownerUserId` on the call: Mosaico finds her from the Leads this run accepted. Never approve or send it.
+2. To see which of her Leads still need a draft, read her day: `outreach_get_day` with `intent: source_invitation_leads`,
+   the `runId`, no `day`, and her member id (from her line in `workflowStatus.sourcingPlan`)
+   as `ownerUserId`. This is a read only. Never pass `ownerUserId` on a write.
+   Its `workflowStatus.days` lists her Leads without a draft, and `awaitingOwnerCheck` lists her Leads that wait
+   for her own check.
+3. A Lead saved with `colleague-check-negative-unproven` stays undrafted: Mosaico refuses its draft with
+   `lead-awaiting-owner-check`. A sourcing run writes only the invitation draft for her Lead; any other draft
+   for her is refused with `colleague-draft-invite-only`. Take Mosaico's answer as final, record it and continue.
+4. Her invitation is sent only by her own Sync run, after it records her own connection evidence for the Lead.
+   Mosaico does not offer it for sending before that (`own-evidence-required`).
 
 ## Report a sourcing run
 
@@ -250,8 +287,12 @@ Report in plain words, using Mosaico's counts, not memory. The first line is "Mo
 - the candidates skipped as already connected to that owner ("skipped as already connected to <owner>: N", from
   `workflowStatus.colleagueSkips` or the `colleagueSkips` Mosaico returns with `outreach_get_run`; its entries
   name the owner). Those skips are never failures;
-- from Mosaico's notes, any colleague whose check was unavailable and why, and that a candidate saved after
-  "not found" has its connection unknown, not "not connected".
+- from Mosaico's notes, any colleague whose check was unavailable and why;
+- the Leads saved for each colleague, split into "verified not connected by colleague check (proven)" (note
+  `colleague-check-negative-proven`) and "unproven, awaiting her Sync" (note `colleague-check-negative-unproven`,
+  and any Lead awaiting her own check on her day read): a Lead saved after "not found" without the proof has its
+  connection unknown, not "not connected";
+- the invitation drafts written for each colleague.
 
 A run Mosaico records as abandoned (`runOutcome` abandoned) is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than `sourcing-days-full` is a failed run: report it as
 failed with Mosaico's code and message (for example `sourcing_plan_empty` or the blocker that stopped it),
@@ -276,7 +317,12 @@ or every Agent without a free day) is not a failure: report "Every Agent is full
    Mosaico removes the invitation from the send list itself: do nothing more and continue with the next
    one. If the capture gave Mosaico nothing it could use, do not send: leave the Lead unverified, list
    it as skipped and continue. Never call `outreach_record_delivery_block` with `already-connected` or
-   `invite-pending`.
+   `invite-pending`. An invitation for a Lead whose only not-connected evidence is a colleague check (another
+   member's sourcing run saved it as not connected) is held back: Mosaico lists it in `workflowStatus.heldInvitations` with
+   `own-evidence-required`, not for sending, and lists the Lead first in `workflowStatus.unverifiedLeads` with the
+   reason `colleague-verified-needs-own-check`. Verify it from your own pane like any unverified Lead, then reread.
+   If `outreach_mark_message_sent` answers `own-evidence-required`, run **Capture connection evidence** for that
+   Lead, reread the day, and continue as Mosaico then says.
 4. Send through the authenticated LinkedIn browser: click Connect and type the approved note. Do not
    judge from the screen whether it worked; LinkedIn's data says so, in the next step.
 5. **Confirm the send from data.** LinkedIn's profile data cannot show a pending invitation; only its
@@ -446,12 +492,12 @@ Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com 
 
 Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Send no quota and no colleague: Mosaico derives the quota from the sourcing plan on the Agents (the sum of the Leads per run of each owner's Agents). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start the sourcing run once (Step 2 and Step 3 use the same run) and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. Read environmentName in the start answer. If it is not production, stop and report it; do not work in that environment. The report's first line is "Mosaico environment: production" (the name the answer gave). If the answer carries the note previous-run-abandoned, your last Source leads run was left with a line open: say so right after that line, as "Previous run failed: stopped with N open" (N from previousRun.openLines), then go on. If it answers sourcing_plan_empty (recommended action set_agent_sourcing_numbers_in_outreach), stop: quote Mosaico's code and message verbatim, then end the report with this sentence: "Set Leads per day and Leads per run on an Agent in Outreach (Agent tab), then rerun." Do not ask the person for numbers. If it answers sourcing-days-full (recommended action wait_for_free_days), no run was issued because every planned Agent is full for the next 10 business days: this is not a failure; stop and report "Every Agent is full for the next 10 business days; nothing to source." Otherwise the run carries run.quota and run.sourcingPlan.
 
-Step 2. Run this skill with the selected action "source Leads only". Before you source, call outreach_get_agents with the runId. Never pass ownerUserId with it. It returns every Agent in this run's plan, yours and your colleagues', each with its own search and message instructions, checklist and attachments: work from every returned Agent's own instructions, including colleagues' Agents, for the Leads you save under it. Mosaico files every Lead on a day; you never choose one. Call outreach_get_day without day. Never send targetCount for sourcing. Never send scheduledDate. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. Keep sourcing while any line of workflowStatus.sourcingPlan is open, following workflowStatus.nextOwnerUserId and nextAgentId; the stop is Mosaico's completion (Step 4), never your own judgement. Read workflowStatus.sourcingPlan, workflowStatus.agentId and workflowStatus.nextAgentId from outreach_get_day and pass the agentId for the owner you save for on every outreach_save_lead, as this skill's "Which Agent a Lead goes to" says; if Mosaico blocks a save with agent-required, agent-not-in-sourcing-plan or planned-agent-quota-met, save again once with the agentId it gives; sourcing-quota-met and sourcing-days-full save nothing and are not failures: reread outreach_get_day for the next step. Before saving a candidate for a colleague, when outreach_get_day lists that colleague in workflowStatus.colleagueChecks with allowed true, run the colleague-connection check as this skill describes: send the directive from that entry, `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=<the colleague's identifier from workflowStatus.colleagueChecks>`, from a Sales Navigator page (open https://www.linkedin.com/sales/home first), and pass its whole output unchanged as colleagueConnectionEvidence on outreach_save_lead. Mosaico's answer is final: a skipped candidate (already connected to the colleague) is not a failure, and a candidate saved after "not found" is not proven unconnected.
+Step 2. Run this skill with the selected action "source Leads only". Before you source, call outreach_get_agents with the runId. Never pass ownerUserId with it. It returns every Agent in this run's plan, yours and your colleagues', each with its own search and message instructions, checklist and attachments: work from every returned Agent's own instructions, including colleagues' Agents, for the Leads you save under it. Mosaico files every Lead on a day; you never choose one. Call outreach_get_day without day. Never send targetCount for sourcing. Never send scheduledDate. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. Keep sourcing while any line of workflowStatus.sourcingPlan is open, following workflowStatus.nextOwnerUserId and nextAgentId; the stop is Mosaico's completion (Step 4), never your own judgement. Read workflowStatus.sourcingPlan, workflowStatus.agentId and workflowStatus.nextAgentId from outreach_get_day and pass the agentId for the owner you save for on every outreach_save_lead, as this skill's "Which Agent a Lead goes to" says; if Mosaico blocks a save with agent-required, agent-not-in-sourcing-plan or planned-agent-quota-met, save again once with the agentId it gives; sourcing-quota-met and sourcing-days-full save nothing and are not failures: reread outreach_get_day for the next step. Before saving a candidate for a colleague, when outreach_get_day lists that colleague in workflowStatus.colleagueChecks with allowed true, run the colleague-connection check as this skill describes: send the directive from that entry, `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=<the colleague's identifier from workflowStatus.colleagueChecks>`, from a Sales Navigator page (open https://www.linkedin.com/sales/home first), and pass its whole output unchanged as colleagueConnectionEvidence on outreach_save_lead. Pass the output exactly as returned, every field including complete, controlTotal, visibility and unreadableRows (a null stays a null, never left out) and integrity. Mosaico's answer is final: a skipped candidate (already connected to the colleague) is not a failure; a candidate saved with the note colleague-check-negative-proven is verified not connected by the colleague check, and you draft her invitation in Step 3; a candidate saved with colleague-check-negative-unproven is not proven unconnected and stays undrafted, so continue sourcing. Never run the connection-evidence script for a colleague's Lead and never call outreach_record_connection_evidence for it: Mosaico answers evidence-owner-mismatch, and only her own Sync run verifies it.
 
-Step 3. Run this skill again with the same run and the selected action "source Leads and prepare invitation drafts", across every day in workflowStatus.runDays, not just one. For each Lead Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. Never approve or send an invitation.
+Step 3. Run this skill again with the same run and the selected action "source Leads and prepare invitation drafts", across every day in workflowStatus.runDays, not just one. For each of your own Leads Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. For each colleague with Leads saved in this run, read her day (outreach_get_day with intent source_invitation_leads, the runId and her member id from workflowStatus.sourcingPlan as ownerUserId; a read only) and, as this skill's "Draft a colleague's invitation" says, write the missing invitation draft with outreach_record_message (her leadId, no ownerUserId on the call) for each Lead saved with colleague-check-negative-proven; leave the unproven ones undrafted. Never approve or send an invitation.
 
 Step 4. Stop only when Mosaico says the run is complete (workflowStatus.completion is complete with reason sourcing-quota-met or sourcing-days-full) and nothing is left to verify or draft, when Mosaico recommends end_run_days_full, or when Mosaico reports stop_run after the tenth failure (then write the sourcing report Mosaico asks for). Never stop while any line of workflowStatus.sourcingPlan is open, and never because you think enough was found. A skipped candidate, a refused write for one Lead, or sourcing-quota-met or sourcing-days-full on a save is not a reason to stop. There is no search limit: do as many searches as it takes, and "I could not find candidates", "few results", "weak results", "slow" and "enough found" are never a reason to stop. When results are few, widen inside the Agent's brief (more keywords, more results pages, other filters, other regions the brief allows, Premium Daily Prospects) and keep searching; never widen past the brief's qualification rules. If an Agent's brief says to report a lead supply constraint, note it for the final report and keep searching inside the brief; it never means stop. A run that ends with any line still open and no stop_run is a failed run: report it as "run failed: stopped with N open". Then end the run with outreach_end_run and the honest reason, and let Mosaico decide the outcome: reason complete when Mosaico says the run is complete or the failure stop fired; reason blocked, with the blockerCode Mosaico gave in this run or the linkedInIssue (warning, captcha or restricted) and a note, when a genuine blocker stops it. Never write a sourcing report while a line is open unless Mosaico says the failure stop fired; before then Mosaico refuses it with sourcing-not-complete and you keep searching. Mosaico records a complete or blocked claim it cannot back as abandoned.
 
-Step 5. Start the report with the line "Mosaico environment: <environmentName>" and, when the start answer carried previous-run-abandoned, the line "Previous run failed: stopped with N open". Report separately, using Mosaico's counts, not memory: the runOutcome Mosaico gave when you ended the run; for each owner and each of their Agents in workflowStatus.sourcingPlan, the target (Leads per run), the Leads accepted, the Leads remaining and the status (name the owner and the Agent); for each day in workflowStatus.runDays, how many Leads were filed on it; the shortfalls in workflowStatus.shortfalls; candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), drafts written, candidates skipped with reasons, Leads left unverified, blockers. A run Mosaico records as abandoned is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than days-full is a failed run: report it as failed with Mosaico's code (for example sourcing_plan_empty) and message, also when Mosaico refused the start, and never as successful. A run that ends sourcing-days-full with nothing saved is not a failure: report "Every Agent is full for the next 10 business days; nothing to source." Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+Step 5. Start the report with the line "Mosaico environment: <environmentName>" and, when the start answer carried previous-run-abandoned, the line "Previous run failed: stopped with N open". Report separately, using Mosaico's counts, not memory: the runOutcome Mosaico gave when you ended the run; for each owner and each of their Agents in workflowStatus.sourcingPlan, the target (Leads per run), the Leads accepted, the Leads remaining and the status (name the owner and the Agent); for each day in workflowStatus.runDays, how many Leads were filed on it; the shortfalls in workflowStatus.shortfalls; candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), the Leads saved for each colleague as "verified not connected by colleague check (proven)" (note colleague-check-negative-proven) and as "unproven, awaiting her Sync" (note colleague-check-negative-unproven), drafts written (and the drafts written for each colleague), candidates skipped with reasons, Leads left unverified, blockers. A run Mosaico records as abandoned is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than days-full is a failed run: report it as failed with Mosaico's code (for example sourcing_plan_empty) and message, also when Mosaico refused the start, and never as successful. A run that ends sourcing-days-full with nothing saved is not a failure: report "Every Agent is full for the next 10 business days; nothing to source." Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
 
 Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.

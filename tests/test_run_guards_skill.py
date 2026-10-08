@@ -55,7 +55,8 @@ def main() -> None:
         check("Read outreach_get_agents, then" not in routine and "Read `outreach_get_agents`, then call" not in raw, f"{package} invite-run skill still reads Agents without the runId")
         for number, line in enumerate(raw.splitlines(), 1):
             if "ownerUserId" in line:
-                check(bool(re.search(r"(Never|Do not) pass", line)), f"{package} invite-run line {number} tells the model about ownerUserId")
+                # Only a prohibition, or (0.9.11) the read of a colleague's day and the draft call that carries no ownerUserId.
+                check(bool(re.search(r"(Never|Do not) pass|no `ownerUserId`|as `ownerUserId`|as ownerUserId", line)), f"{package} invite-run line {number} tells the model about ownerUserId")
 
         # 2. The five stop sentences, in the section (backticks aside) and word for word in the routine step 4.
         step4 = routine[routine.index("Step 4."):routine.index("Step 5.")]
@@ -111,14 +112,14 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.10", f"{manifest.name} is not at 0.9.10")
+        check(json.loads(read(manifest))["version"] == "0.9.11", f"{manifest.name} is not at 0.9.11")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])
     for needle in ("outreach_get_agents with the runId (never with ownerUserId)", "no search limit", "outreach_end_run", "reason complete or blocked", "sourcing-not-complete", "environmentName", "Mosaico environment: production", "previous-run-abandoned", "run failed: stopped with N open", "still say \"0.9.9 or later\"", "pull request 1820"):
         check(needle in entry, f"README 0.9.10 entry lacks: {needle}")
     check("**How a run ends.**" in readme, "README lacks the How a run ends paragraph")
-    print("PASS: the skills read every planned Agent by run id, state the five stop sentences, end every routine through outreach_end_run, report the environment and a previous abandoned run, and the version is 0.9.10.")
+    print("PASS: the skills read every planned Agent by run id, state the five stop sentences, end every routine through outreach_end_run, report the environment and a previous abandoned run, and the version is 0.9.11.")
 
 
 def sourcing_start(raw: str) -> str:
