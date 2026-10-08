@@ -92,7 +92,11 @@ def check_0911(claude_text: str, codex_text: str) -> None:
     # Thin schedule texts keep their minimum version: no new routine section, the procedure lives in the installed plugin.
     for package in (CLAUDE, CODEX):
         installer = flat((package / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md").read_text(encoding="utf-8"))
-        check("0.9.9 or later" in installer and "0.9.11 or later" not in installer and "0.9.10 or later" not in installer, f"{package.name} schedule-install changed a thin text's version")
+        # 0.9.12: the Claude Source leads lanes move to 0.9.12 (they read the scope line); Codex keeps its single text at 0.9.9.
+        if package is CLAUDE:
+            check("0.9.12 or later" in installer and "0.9.9 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install lacks the 0.9.12 stamp")
+        else:
+            check("0.9.9 or later" in installer and "0.9.12 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install changed a thin text's version")
     # README: the changelog entry, the script description and the colleague-check paragraph.
     readme_raw = (ROOT / "README.md").read_text(encoding="utf-8")
     check(readme_raw.index("### 0.9.11") < readme_raw.index("### 0.9.10"), "README changelog lacks 0.9.11 above 0.9.10")
@@ -154,7 +158,7 @@ def main() -> None:
     check_0911(claude_text, codex_text)
     # Manifests and the README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.11", f"{manifest.name} is not at 0.9.11")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
     readme = flat((ROOT / "README.md").read_text(encoding="utf-8"))
     check("### 0.9.5" in readme and "### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
     print("PASS: the invite-run skills run the colleague check before a colleague save, pass its output unchanged, handle every Mosaico answer, and never treat 'not found' as 'not connected'; Codex says it cannot run it.")

@@ -32,11 +32,11 @@ def flat(text: str) -> str:
 
 # The five stop sentences. The wording is the owner's: there is no search budget.
 STOP_SENTENCES = (
-    "Stop only when Mosaico says the run is complete (workflowStatus.completion is complete with reason sourcing-quota-met or sourcing-days-full) and nothing is left to verify or draft, when Mosaico recommends end_run_days_full, or when Mosaico reports stop_run after the tenth failure (then write the sourcing report Mosaico asks for).",
+    "Stop only when Mosaico says the run is complete (workflowStatus.completion is complete with reason sourcing-quota-met, sourcing-days-full or sourcing-agent-unavailable) and nothing is left to verify or draft, or when Mosaico recommends end_run_days_full.",
     'There is no search limit: do as many searches as it takes, and "I could not find candidates", "few results", "weak results", "slow" and "enough found" are never a reason to stop.',
     "When results are few, widen inside the Agent's brief (more keywords, more results pages, other filters, other regions the brief allows, Premium Daily Prospects) and keep searching; never widen past the brief's qualification rules.",
     "If an Agent's brief says to report a lead supply constraint, note it for the final report and keep searching inside the brief; it never means stop.",
-    'A run that ends with any line still open and no stop_run is a failed run: report it as "run failed: stopped with N open".',
+    'A run that ends with any line still open is a failed run: report it as "run failed: stopped with N open".',
 )
 
 
@@ -70,10 +70,12 @@ def main() -> None:
         # 3. Runs end through outreach_end_run, with an honest reason; the application decides.
         check("## End the run" in raw and "`outreach_end_run`" in raw, f"{package} invite-run skill lacks the End the run section")
         end_section = flat(raw[raw.index("## End the run"):raw.index("## Source leads routine")])
-        for needle in ("End every run with outreach_end_run and the honest reason", "Mosaico decides how the run ended, not you", "complete: Mosaico says the run is complete", "blocked: a genuine blocker stops the run", "blockerCode", "linkedInIssue (warning, captcha or restricted)", "records a wrong one as abandoned", "outreach_record_sourcing_report only when Mosaico reports stop_run after the tenth failure", "sourcing-not-complete", "runOutcome"):
+        # 0.9.12: two reasons only, a refused end keeps the run open, no sourcing report, no failure stop.
+        for needle in ("End every run with outreach_end_run and the honest reason", "Mosaico decides how the run ended, not you", "complete: Mosaico says the plan is done", "blocked: a genuine blocker stops the run", "blockerCode", "linkedInIssue (warning, captcha or restricted)", "Never ask for abandoned", "sourcing-run-open", "Do not retry the end and do not argue", "runOutcome"):
             check(needle in end_section, f"{package} End the run section lacks: {needle}")
         check("Then end the run with outreach_end_run and the honest reason, and let Mosaico decide the outcome" in step4 and "reason complete" in step4 and "reason blocked" in step4, f"{package} Step 4 does not end the run through outreach_end_run")
-        check("Never write a sourcing report while a line is open unless Mosaico says the failure stop fired" in step4 and "sourcing-not-complete" in step4, f"{package} Step 4 allows a sourcing report while a line is open")
+        check("outreach_record_sourcing_report" not in text and "sourcing report Mosaico asks for" not in text, f"{package} invite-run skill still asks for a sourcing report")
+        check("sourcing-run-open" in step4 and "do not retry the end and do not argue" in step4, f"{package} Step 4 does not stop at a refused end")
         check("End the run (see **End the run**), then finish with **Report a sourcing run**" in sourcing, f"{package} Source Leads section does not end the run before the report")
 
         # 4. The environment and a previous abandoned run.
@@ -92,7 +94,11 @@ def main() -> None:
         check("with the runId, which returns every Agent in the run's plan" in overview, f"{package} overview skill does not read the planned Agents by run id")
         installer = flat(read(root / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md"))
         check("environmentName" in installer and "a run on anything but production stops" in installer, f"{package} schedule-install skill lacks the environment rule")
-        check("0.9.9 or later" in installer and "0.9.10 or later" not in installer, f"{package} schedule-install changed a thin text's version although no new routine section is required")
+        # 0.9.12: the Claude Source leads lanes read the scope line, so their stamp rises to 0.9.12; Codex keeps its single text at 0.9.9.
+        if package == "Claude":
+            check("0.9.12 or later" in installer and "0.9.9 or later" not in installer and "0.9.10 or later" not in installer, f"{package} schedule-install lacks the 0.9.12 stamp")
+        else:
+            check("0.9.9 or later" in installer and "0.9.12 or later" not in installer, f"{package} schedule-install changed a thin text's version")
 
     # The follow-up (Sync data) and repair routines end their runs through outreach_end_run and report the environment.
     for name, marker, stop_text in (
@@ -112,14 +118,14 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.11", f"{manifest.name} is not at 0.9.11")
+        check(json.loads(read(manifest))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])
     for needle in ("outreach_get_agents with the runId (never with ownerUserId)", "no search limit", "outreach_end_run", "reason complete or blocked", "sourcing-not-complete", "environmentName", "Mosaico environment: production", "previous-run-abandoned", "run failed: stopped with N open", "still say \"0.9.9 or later\"", "pull request 1820"):
         check(needle in entry, f"README 0.9.10 entry lacks: {needle}")
     check("**How a run ends.**" in readme, "README lacks the How a run ends paragraph")
-    print("PASS: the skills read every planned Agent by run id, state the five stop sentences, end every routine through outreach_end_run, report the environment and a previous abandoned run, and the version is 0.9.11.")
+    print("PASS: the skills read every planned Agent by run id, state the five stop sentences, end every routine through outreach_end_run, report the environment and a previous abandoned run, and the version is 0.9.12.")
 
 
 def sourcing_start(raw: str) -> str:
