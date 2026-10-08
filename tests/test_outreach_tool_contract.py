@@ -64,7 +64,8 @@ def main() -> None:
         raise SystemExit(f"Skills never start a run: missing {sorted(unused)}")
     for skill in plugin_root.glob("*/skills/*/SKILL.md"):
         for number, line in enumerate(skill.read_text(encoding="utf-8").splitlines(), 1):
-            if "ownerUserId" in line and not re.search(r"(Never|Do not) pass", line):
+            # Only a prohibition, or (0.9.11) the read of a colleague's day and the draft call that carries no ownerUserId.
+            if "ownerUserId" in line and not re.search(r"(Never|Do not) pass|no `ownerUserId`|as `ownerUserId`|as ownerUserId", line):
                 raise SystemExit(f"{skill}:{number} tells the model about ownerUserId")
     missing = codex - registered
     if missing:

@@ -139,7 +139,7 @@ def main() -> None:
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.10", f"{manifest.name} is not at 0.9.10")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.11", f"{manifest.name} is not at 0.9.11")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 0.7.0" in readme and readme.index("### 0.9.0") < readme.index("### 0.8.7") < readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
@@ -155,7 +155,7 @@ def main() -> None:
     skill = flat(claude)
     check("messaging search by the Lead's name" in skill and "primary-inbox conversation list" in skill and "Other tab are not paged" in skill and "`lookup`" in skill,
           "the Claude follow-up skill does not describe the name search and the paged primary-inbox fallback")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.9.10.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.9.11.")
 
 
 if __name__ == "__main__":

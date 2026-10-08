@@ -92,7 +92,9 @@ n items, run the Repair routine", where n is `repairNeeded.total`.
    action is `capture_connections`, run **Capture recent connections** once, then reread. When the
    recommended action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or unverified in
    `unverifiedLeads`, each with its profile URL: for each one run **Capture connection evidence**, then
-   reread `outreach_get_follow_ups`. Never guess a connection and never skip to drafting for a listed
+   reread `outreach_get_follow_ups`. The list may name Leads with the reason `colleague-verified-needs-own-check`
+   first (a colleague's sourcing run saved them as not connected): verify them from your own pane like any other
+   unverified Lead. Never guess a connection and never skip to drafting for a listed
    Lead.
 2. For each returned Lead, open its pages directly: `navigation.messageUrl` (the stored
    conversation) when present, otherwise `navigation.profileUrl`. Do not search LinkedIn lists for
