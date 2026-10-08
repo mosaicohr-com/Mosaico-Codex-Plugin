@@ -38,15 +38,31 @@ Sourcing takes no day from the person: Mosaico files each Lead on the first busi
    numbers and that the person sources (their own, and a colleague's that names them in Sourced by) and
    returns as `run.quota` the sum of their Leads per run, with the plan in `run.sourcingPlan`. Every run
    delivers its own Leads per run; nothing is taken off for earlier runs. Mosaico, not you, files each Lead on
-   a day. Never send `quota` or `colleagueOwnerUserId`, and never ask the person for numbers. Read the outcome:
-   - A normal run, with `run.quota` and `run.sourcingPlan`: go on.
+   a day. Never send `quota` or `colleagueOwnerUserId`, and never ask the person for numbers.
+   Lane: if the schedule's standing answers hold the line `sourcing scope: own` or `sourcing scope: colleagues`, pass
+   exactly that word as `sourcingScope` on `outreach_start_run`. If there is no such line, send nothing. Never choose,
+   change or invent a scope, and never send one with `quota` or `colleagueOwnerUserId`. Start a sourcing run once per
+   session: never start a second one, whatever Mosaico answers. Read the outcome:
+   - A normal run, with `run.quota` and `run.sourcingPlan`: go on. Check the echo: the answer's top-level
+     `sourcingScope` must be the word you sent, or `all` when you sent none (`run.sourcingScope` is absent then). If it
+     differs, say so in the report.
    - Every start answer names the Mosaico environment in `environmentName`. If it is not `production`, stop and report it; do not work in that environment. The report's first line is "Mosaico environment: production" (the name the answer gave).
-   - If the answer carries the note `previous-run-abandoned` (with `previousRun`), your last Source leads run was left with a line open. Say so right after the environment line, as "Previous run failed: stopped with N open" (N from `previousRun.openLines`), then go on.
+   - The answer carries the lane in `sourcingScope`; the report's second line is "Mosaico lane: own", "Mosaico lane: colleagues" or "Mosaico lane: whole plan" (for `all`).
+   - If the answer carries the note `previous-run-abandoned` (with `previousRun`), your last Source leads run of this lane was left with a line open (stopped, or closed by Mosaico after 30 quiet minutes). Say so right after the lane line, as "Previous run failed: stopped with N open" (N from `previousRun.openLines`), then go on. If the note is `previous-run-finished-not-ended`, that run had finished its work but was never ended: say so in one line, then go on. Mosaico gives either note once.
    - Blocked with `sourcing_plan_empty` (recommended action `set_agent_sourcing_numbers_in_outreach`): no Agent
-     has both Leads per day and Leads per run for this person. Stop. A scheduled run quotes Mosaico's code and
+     has both Leads per day and Leads per run for this person. This is loud: a failed run. Stop. A scheduled run quotes Mosaico's code and
      message verbatim and ends its report with this sentence: "Set Leads per day and Leads per run on an Agent in Outreach (Agent tab), then rerun."
-   - Blocked with `sourcing-days-full` (recommended action `wait_for_free_days`): every planned Agent is full
+   - Blocked with `sourcing-days-full` (recommended action `wait_for_free_days`): every planned Agent of this lane is full
      for the next 10 business days and no run was issued. This is not a failure. Stop and report: "Every Agent is full for the next 10 business days; nothing to source."
+   - Blocked with `sourcing-run-busy` (recommended action `wait_for_current_run`): another Source leads run of this account
+     is working, so no run was issued and there is no `runId`. This is not a failure. `busy` names the lane and when that
+     run counts as idle (`busy.releasesAt`). Stop: do not start again and do not wait in this session. Report one line:
+     "Another Source leads run is working on this account; nothing started."
+   - Blocked with `sourcing-scope-empty` (recommended action `nothing_to_source`): no planned Agent is in this lane. This
+     is not a failure. Stop and report: "Nothing to source for the <own|colleagues> Agents."
+   - Blocked with `sourcing_scope_invalid` (recommended action `correct_sourcing_scope`): a scope was sent with a quota or a
+     colleague, or for another intent. This is loud: report a failed run with Mosaico's code and message verbatim, and do
+     not retry with another scope.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
    `outreach_deposit_conversation`, `outreach_mark_message_sent`, `outreach_record_delivery_block`
@@ -70,8 +86,10 @@ Sourcing takes no day from the person: Mosaico files each Lead on the first busi
 When a profile already exists under another owner, read the state Mosaico returns and follow its
 recommended action. If `outreach_save_lead` returns `skipped` with `continue_sourcing`, nothing was
 saved and this is not a blocker: note the candidate for your final report, source a replacement and
-keep going. Mosaico records the skip on the run and does not count it toward the target. Stop only
-when Mosaico returns a blocker, `human_decision_required` or `stop_run`; then show the person the
+keep going. Mosaico records the skip on the run and does not count it toward the target. The skip is
+`profile-exists-under-other-owner` with `heldByOtherOwner` (how many this run skipped); it also covers a person the
+other owner dropped. It is never a failure: do not count it and do not stop for it. Stop only
+when Mosaico returns a blocker or `human_decision_required`; then show the person the
 owner, Lead and status it returned. `outreach_deposit_conversation` returns such a blocker for a new
 Lead. Re-send with `acknowledgeProfileOnOtherOwner: true` only after the person decides to; never
 set it yourself.
@@ -92,7 +110,8 @@ the copy to make it pass.
    yours and your colleagues', each with its own search and message instructions, checklist and attachments: work from every
    returned Agent's own instructions, including colleagues' Agents, for the Leads you save under it. Then call
    `outreach_get_day` with `intent: source_invitation_leads` and the `runId`. Leave `day` out: for a sourcing run Mosaico reads every day the run filed Leads on. Never send
-   `targetCount` for sourcing: Mosaico takes the target from the run's sourcing plan.
+   `targetCount` for sourcing: Mosaico takes the target from the run's sourcing plan. The answer's `workflowStatus.workNow`
+   (also at the top of the answer) names the work to do now: see step 3.
 2. Follow `workflowStatus.recommendedAction`. Use its prepared count, remaining count, blockers and
    completion result; do not reconstruct them from separate records or conversation memory. When the
    recommended action is `verify_connection`, Mosaico lists the Leads whose connection is unknown or
@@ -100,19 +119,30 @@ the copy to make it pass.
    **Capture connection evidence**, then reread `outreach_get_day`. Never guess a connection and never
    skip to drafting for a listed Lead. A colleague's Lead is never in that list for your run: only her own run
    verifies it.
-3. Mosaico decides when sourcing ends, never your own judgement. While any line in
-   `workflowStatus.sourcingPlan` has status `open`, keep sourcing: search, broaden suitable searches, check
-   profiles and save qualified Leads with their profile details, following `nextOwnerUserId` and
-   `nextAgentId`. Sourcing is over only when `workflowStatus.completion` says the run is complete with reason
-   `sourcing-quota-met` (every Agent delivered its Leads per run) or `sourcing-days-full` (an Agent ran out
-   of free days first: do not search for more to fill its shortfall).
+3. Mosaico decides when sourcing ends, never your own judgement. Work `workflowStatus.workNow` and read it again at
+   every decision point: after every saved Lead, every skipped candidate and every verification. While it says
+   `state: work`, search for the Agent it names: `workNow.brief` is that Agent's own search instructions, word for word,
+   `workNow.remainingThisRun` is what that Agent still owes in this run, and `workNow.agentName` names it. A supply note in a
+   brief is for the final report, never a reason to stop. If `workNow.briefMissing` is true the Agent was deleted: read
+   `workNow` again, because Mosaico closes its line. In a `colleagues` run your own day has no Agent of its own and Mosaico says
+   so without a blocker: source for the owner `workNow` names, check, save and draft for her as this skill says, and do not
+   draft for yourself. While any line in `workflowStatus.sourcingPlan` has status `open`, keep sourcing. Sourcing is over only
+   when `workNow` says `state: none` and `workflowStatus.completion` says the run is complete with reason
+   `sourcing-quota-met` (every Agent delivered its Leads per run), `sourcing-days-full` (an Agent ran out of free days
+   first: do not search for more to fill its shortfall) or `sourcing-agent-unavailable` (Mosaico closed an Agent that was
+   switched off or deleted, or whose owner left: never source for it; report it from `unavailableAgents`). `workNow` with
+   `state: none` and reason `run-ended` means Mosaico closed the run: stop and report it. While searching, call
+   `outreach_get_run` at least every 10 minutes, or after every 10 candidates, even when nothing was saved: Mosaico closes a
+   run that makes no Mosaico call for 30 minutes.
 4. The stop rules, in Mosaico's words. Loading a few Leads is not completion; if a line is still `open`, continue.
-   - Stop only when Mosaico says the run is complete (`workflowStatus.completion` is complete with reason sourcing-quota-met or sourcing-days-full) and nothing is left to verify or draft, when Mosaico recommends end_run_days_full, or when Mosaico reports stop_run after the tenth failure (then write the sourcing report Mosaico asks for).
+   - Stop only when Mosaico says the run is complete (`workflowStatus.completion` is complete with reason sourcing-quota-met, sourcing-days-full or sourcing-agent-unavailable) and nothing is left to verify or draft, or when Mosaico recommends end_run_days_full.
    - There is no search limit: do as many searches as it takes, and "I could not find candidates", "few results", "weak results", "slow" and "enough found" are never a reason to stop.
    - When results are few, widen inside the Agent's brief (more keywords, more results pages, other filters, other regions the brief allows, Premium Daily Prospects) and keep searching; never widen past the brief's qualification rules.
    - If an Agent's brief says to report a lead supply constraint, note it for the final report and keep searching inside the brief; it never means stop.
-   - A run that ends with any line still open and no stop_run is a failed run: report it as "run failed: stopped with N open".
-5. Save each qualified Lead through `outreach_save_lead` with the `agentId` the day read gave for that owner (see
+   - A run that ends with any line still open is a failed run: report it as "run failed: stopped with N open".
+   - A run keeps searching until Mosaico says the numbers are met. A candidate you reject, a person another owner already holds and a person already connected to the colleague are never failures, and Mosaico counts none in a new run.
+   - Asking to end the run does not end it while a line is open: see **End the run**.
+5. Save each qualified Lead through `outreach_save_lead` with `workNow.agentId` and no `ownerUserId` (see
    **Which Agent a Lead goes to**), which takes no connection state: the new Lead
    starts unknown. Never send `scheduledDate`: Mosaico ignores a day you send (warning
    `scheduled-date-ignored`) and files the Lead on the first business day with room; the answer's `placement`
@@ -129,7 +159,7 @@ the copy to make it pass.
    When the recommended action is `end_run_days_full`, nothing is left to verify, sort or draft: end the
    run and report.
 8. Report a shortfall only from Mosaico: `workflowStatus.shortfalls` (an Agent that ran out of free days),
-   or a genuine Mosaico, authentication, LinkedIn or human-decision blocker. State the exact counts and
+   `workflowStatus.unavailableAgents` (an Agent Mosaico closed as unavailable), or a genuine Mosaico, authentication, LinkedIn or human-decision blocker. State the exact counts and
    the reason; never report the run as complete while a line is `open`.
 9. End the run (see **End the run**), then finish with **Report a sourcing run**.
 
@@ -143,37 +173,43 @@ drafts are later written under their own Agent and voice.
    per run, not the 20 of a prepared day. Mosaico keeps the plan and reports what remains for each Agent
    (`remainingThisRun`); use its counts, and `workflowStatus.counts.readyLeads` for the ready Leads, not
    the prepared count.
-2. Save each qualified Lead with its profile details and the planned `agentId` through `outreach_save_lead`, which takes no
+2. Save each qualified Lead with its profile details and `workNow.agentId` (no `ownerUserId`) through `outreach_save_lead`, which takes no
    connection state (for a candidate you save for a colleague, first run **Check a candidate against the
    colleague** when it applies, and never run **Capture connection evidence** for her Lead), then, for your own
    Lead, run **Capture connection evidence** for it. Do not write any invitation draft in this scope (a colleague's
    proven Lead is drafted in **Source Leads and prepare drafts**), and do not approve or send anything.
-3. Reread `outreach_get_day` after every saved Lead and continue until Mosaico says the run is complete
-   (reason `sourcing-quota-met` or `sourcing-days-full`) or returns a blocker, `human_decision_required`
-   or `stop_run`.
+3. Reread `outreach_get_day` after every saved Lead, read `workNow` again, and continue until Mosaico says the run is
+   complete (reason `sourcing-quota-met`, `sourcing-days-full` or `sourcing-agent-unavailable`) or returns a blocker or
+   `human_decision_required`.
 4. End the run (see **End the run**), then finish with **Report a sourcing run**. A run with a line still `open` is not complete.
 
 ## Which Agent a Lead goes to
 
 In a sourcing run Mosaico plans the Agents. `outreach_get_day` lists them in `workflowStatus.sourcingPlan`,
 each line giving the owner, `agentId`, `agentName`, `leadsPerDay`, `leadsPerRun`, `acceptedThisRun`,
-`remainingThisRun`, a status (`open`, `met` or `days-full`) and the days its Leads were filed on.
-`workflowStatus.agentId` is the Agent to pass as `agentId` on `outreach_save_lead` for the owner of that
-read, and `workflowStatus.nextAgentId` is the one for the next owner (`nextOwnerUserId`) who still has an
-`open` Agent. Pass the `agentId` the read gave for that owner on every save. Never choose an Agent yourself,
-and never send `targetCount` or `scheduledDate` for sourcing. If Mosaico blocks a save:
+`remainingThisRun`, a status (`open`, `met`, `days-full` or `agent-unavailable`) and the days its Leads were filed on.
+`workNow` (in `workflowStatus.workNow` and at the top of the `outreach_get_day` and `outreach_get_run` answers, and in a
+refusal to end the run) names the Agent to source for now. Pass `workNow.agentId` as `agentId` on every
+`outreach_save_lead` and pass no `ownerUserId`: Mosaico saves the Lead for the owner of that Agent, so a colleague's
+Agent saves her Lead. `workflowStatus.agentId` and `nextAgentId` are a fallback only when `workNow` is not there. Never
+choose an Agent yourself, and never send `targetCount` or `scheduledDate` for sourcing. If Mosaico blocks a save:
 
-- `agent-required`: save again once with the `agentId` the day read gave for that owner.
+- `agent-required`: save again once with `workNow.agentId`.
 - `agent-not-in-sourcing-plan`: that Agent is not planned for this owner. Save again once with the
   `agentId` in Mosaico's hint.
 - `planned-agent-quota-met`: that Agent has delivered its Leads per run, or has no free day, while another
   Agent of the owner is still `open`. Save again once with the `agentId` Mosaico gives.
+- `planned-agent-unavailable`: that Agent was switched off or deleted, or its owner left, and Mosaico closed its
+  line. Nothing was saved. The answer carries `workNow`: source for the Agent it names, and never try the unavailable
+  Agent again. If `workNow` is `none`, end the run with `complete`; Mosaico accepts it.
 - `sourcing-quota-met`: this owner's target is met. Source for the next owner Mosaico names, if any.
 - `sourcing-days-full`: that Agent has no free day in the next 10 business days. Do not search for more
   for it.
+- `skipped` with `profile-exists-under-other-owner`: another owner already holds that person (even one they dropped).
+  Nothing was saved. Continue with the next candidate; it is never a failure.
 
-Nothing was saved by a blocked save, and none of these counts as a failure. Then reread `outreach_get_day`
-for the next step.
+Nothing was saved by a blocked or skipped save, and none of these counts as a failure. Then read `workNow` again
+(reread `outreach_get_day`) for the next step.
 
 ## Check a candidate against the colleague
 
@@ -276,7 +312,7 @@ from `outreach_get_agents`, govern the invitation text.
 
 ## Report a sourcing run
 
-Report in plain words, using Mosaico's counts, not memory. The first line is "Mosaico environment: <environmentName>" from the start answer; if that answer carried `previous-run-abandoned`, the next line is "Previous run failed: stopped with N open". Then:
+Report in plain words, using Mosaico's counts, not memory. The first line is "Mosaico environment: <environmentName>" from the start answer. The second is "Mosaico lane: own", "Mosaico lane: colleagues" or "Mosaico lane: whole plan", from the answer's `sourcingScope` (`all` is the whole plan). If that answer carried `previous-run-abandoned`, the next line is "Previous run failed: stopped with N open" (or one line saying the previous run finished but was not ended, for `previous-run-finished-not-ended`). Then:
 
 - the `runOutcome` Mosaico gave when you ended the run;
 - per Agent, from `workflowStatus.sourcingPlan` (or `sourcingProgress.lines` from `outreach_get_run`): name the
@@ -284,6 +320,11 @@ Report in plain words, using Mosaico's counts, not memory. The first line is "Mo
   status (`open`, `met` or `days-full`);
 - per day, from `workflowStatus.runDays`: how many Leads were filed on each day;
 - the shortfalls in `workflowStatus.shortfalls`: each Agent that ran out of free days and what it was still owed;
+- the Agents Mosaico closed as unavailable (`workflowStatus.unavailableAgents`, or `sourcingProgress.unavailableAgents` from
+  `outreach_get_run`, or `unavailableAgents` in the end answer): each with its reason (`agent-off`, `agent-deleted` or
+  `owner-inactive`) and what it was still owed;
+- "Candidates skipped as held by another owner: N", N from the `count` of `workflowStatus.collisions` (or of the `collisions`
+  `outreach_get_run` returns). Those skips are never failures;
 - the candidates skipped as already connected to that owner ("skipped as already connected to <owner>: N", from
   `workflowStatus.colleagueSkips` or the `colleagueSkips` Mosaico returns with `outreach_get_run`; its entries
   name the owner). Those skips are never failures;
@@ -294,7 +335,7 @@ Report in plain words, using Mosaico's counts, not memory. The first line is "Mo
   connection unknown, not "not connected";
 - the invitation drafts written for each colleague.
 
-A run Mosaico records as abandoned (`runOutcome` abandoned) is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than `sourcing-days-full` is a failed run: report it as
+A run whose `runOutcome` is not complete or blocked, or that Mosaico closed with a line open, is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than `sourcing-days-full` is a failed run: report it as
 failed with Mosaico's code and message (for example `sourcing_plan_empty` or the blocker that stopped it),
 including a run Mosaico refused at the start. Never report such a run as successful, and never describe a
 partly filled plan as complete. A run that ends `sourcing-days-full` with nothing saved (refused at the start,
@@ -471,12 +512,12 @@ Only Owners and Admins can use Outreach.
 
 End every run with `outreach_end_run` and the honest reason. Mosaico decides how the run ended, not you:
 
-- `complete`: Mosaico says the run is complete (for sourcing, `sourcing-quota-met` or `sourcing-days-full`, or the failure stop after the tenth failure once the sourcing report is written).
-- `blocked`: a genuine blocker stops the run. Give `blockerCode`, a code Mosaico returned in this run, or `linkedInIssue` (`warning`, `captcha` or `restricted`) with a `note`.
+- `complete`: Mosaico says the plan is done: every planned Agent delivered its Leads per run, ran out of free days, or became unavailable (for sourcing, `sourcing-quota-met`, `sourcing-days-full` or `sourcing-agent-unavailable`). Always call it on a finished run, even when nothing is left to do: a run you leave unended keeps the account busy for 30 minutes.
+- `blocked`: a genuine blocker stops the run. Give `blockerCode` (`linkedin_account_changed` or `linkedin_identity_invalid`, given by Mosaico in this run, or `INTERNAL_SERVER_ERROR` when Mosaico's last three calls all failed) or `linkedInIssue` (`warning`, `captcha` or `restricted`) with a `note`.
 
-Never ask for `complete` or `blocked` to end a run you stopped yourself: Mosaico checks the claim and records a wrong one as abandoned, with the open lines, and a sourcing run left with a line open is a failed run.
-Write a sourcing report with `outreach_record_sourcing_report` only when Mosaico reports `stop_run` after the tenth failure. While a line is open and Mosaico has not said so, it refuses with `sourcing-not-complete`: go back to searching.
-Read the answer's `runOutcome` and report it.
+These are the only two reasons. Never ask for `abandoned`; it no longer exists. If you ask to end a sourcing run while a line is open and nothing proves a blocker, Mosaico refuses: the answer is blocked with `sourcing-run-open`, the run stays open and writable, and it carries `workNow` and the one allowed action `continue_sourcing`. Do not retry the end and do not argue; read `workNow` and keep sourcing.
+If a write answers `run_ended` (recommended action `report_run_closed`), Mosaico closed the run after 30 minutes without a call: stop, report "Mosaico closed this run after 30 minutes without a call", and do not start another run. A second `outreach_end_run` on a closed run answers `report_run_closed`.
+Read the answer's `runOutcome` and report it. When it names `unavailableAgents`, say so.
 
 ## Source leads routine
 
@@ -484,20 +525,20 @@ This is the Source leads flow of Mosaico Outreach. It only finds Leads and write
 
 **Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
 
-The schedule's text carries only the person's standing answers: the timezone and the LinkedIn public identifier; the actions are "source Leads only", then "source Leads and prepare invitation drafts". Neither the days nor the numbers are in the schedule: Mosaico files each Lead on a day, and Leads per day, Leads per run and who sources them are set on each Agent in Outreach (Agent tab), where Mosaico holds them. Take them from there; the schedule supplies the answers to this skill's opening questions, so do not ask them, do not show a menu, and do not ask which days or which scope. If a standing answer is missing, stop and report which one.
+The schedule's text carries only the person's standing answers: the timezone, the LinkedIn public identifier and, for a lane, the line `sourcing scope: own` or `sourcing scope: colleagues`; the actions are "source Leads only", then "source Leads and prepare invitation drafts". Neither the days nor the numbers are in the schedule: Mosaico files each Lead on a day, and Leads per day, Leads per run and who sources them are set on each Agent in Outreach (Agent tab), where Mosaico holds them. Take them from there; the schedule supplies the answers to this skill's opening questions, so do not ask them, do not show a menu, and do not ask which days or which scope. If a standing answer is missing, stop and report which one.
 
 Resolve the current business date and time in the timezone from the schedule's standing answers. The person has supplied standing answers for this recurring automation: proceed without asking which days or which scope.
 
 Do every LinkedIn step in Claude's built-in browser pane, from any linkedin.com page, signed in to the person's LinkedIn (the public identifier from the schedule's standing answers). Obtain connection evidence and identity only through the plugin's approved capture scripts, run by sending the browser javascript tool the one-line directive `// mosaico run <script>.js <PLACEHOLDER>=<value>` (the plugin's gate inserts the approved script; never retype a script), exactly as the skills describe; if the gate refuses the directive, run the approved script word for word with only the first line's value changed (the thread script's second line holds the Lead's name). The first-line value for every per-Lead script is the Lead's scriptIdentifier from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its linkedInProfileUrl after /in/. The thread script also takes the Lead's name from the Mosaico read, so its directive is `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<the Lead's name>`. The approved scripts are browser/linkedin-whoami.js, browser/linkedin-connection-evidence.js and browser/linkedin-salesnav-colleague-connection.js; read each from the installed plugin. Read each script file with the file-reading tool, one file at a time, by its path under the installed plugin's browser folder; do not print them with a shell command. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
 
-Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Send no quota and no colleague: Mosaico derives the quota from the sourcing plan on the Agents (the sum of the Leads per run of each owner's Agents). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start the sourcing run once (Step 2 and Step 3 use the same run) and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. Read environmentName in the start answer. If it is not production, stop and report it; do not work in that environment. The report's first line is "Mosaico environment: production" (the name the answer gave). If the answer carries the note previous-run-abandoned, your last Source leads run was left with a line open: say so right after that line, as "Previous run failed: stopped with N open" (N from previousRun.openLines), then go on. If it answers sourcing_plan_empty (recommended action set_agent_sourcing_numbers_in_outreach), stop: quote Mosaico's code and message verbatim, then end the report with this sentence: "Set Leads per day and Leads per run on an Agent in Outreach (Agent tab), then rerun." Do not ask the person for numbers. If it answers sourcing-days-full (recommended action wait_for_free_days), no run was issued because every planned Agent is full for the next 10 business days: this is not a failure; stop and report "Every Agent is full for the next 10 business days; nothing to source." Otherwise the run carries run.quota and run.sourcingPlan.
+Step 1. Open any linkedin.com page once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Send no quota and no colleague: Mosaico derives the quota from the sourcing plan on the Agents (the sum of the Leads per run of each owner's Agents). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. If the standing answers hold the line `sourcing scope: own` or `sourcing scope: colleagues`, pass exactly that word as sourcingScope on outreach_start_run; if there is no such line, send nothing; never choose, change or invent a scope. Start the sourcing run once (Step 2 and Step 3 use the same run), never start a second sourcing run in this session, and pass its runId on every read and write; before each evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. Read environmentName in the start answer. If it is not production, stop and report it; do not work in that environment. The report's first line is "Mosaico environment: production" (the name the answer gave); the second is "Mosaico lane: own", "Mosaico lane: colleagues" or "Mosaico lane: whole plan", from the answer's top-level sourcingScope, which must be the word you sent (all when you sent none): if it differs, say so in the report. If the answer carries the note previous-run-abandoned, your last Source leads run of this lane was left with a line open: say so right after the lane line, as "Previous run failed: stopped with N open" (N from previousRun.openLines), then go on; the note previous-run-finished-not-ended means that run had finished but was never ended: say so in one line, then go on. If it answers sourcing_plan_empty (recommended action set_agent_sourcing_numbers_in_outreach), stop: quote Mosaico's code and message verbatim, then end the report with this sentence: "Set Leads per day and Leads per run on an Agent in Outreach (Agent tab), then rerun." Do not ask the person for numbers. A sourcing_plan_empty stop is loud: a failed run. If it answers sourcing-days-full (recommended action wait_for_free_days), no run was issued because every planned Agent of this lane is full for the next 10 business days: this is not a failure; stop and report "Every Agent is full for the next 10 business days; nothing to source." If it answers sourcing-run-busy (recommended action wait_for_current_run), another Source leads run of this account is working, no run was issued and there is no runId: this is not a failure; stop, do not start again, and report "Another Source leads run is working on this account; nothing started." If it answers sourcing-scope-empty (recommended action nothing_to_source), no planned Agent is in this lane: this is not a failure; stop and report "Nothing to source for the <own|colleagues> Agents." If it answers sourcing_scope_invalid (recommended action correct_sourcing_scope), stop: quote Mosaico's code and message verbatim and report a failed run; do not retry with another scope. Otherwise the run carries run.quota and run.sourcingPlan.
 
-Step 2. Run this skill with the selected action "source Leads only". Before you source, call outreach_get_agents with the runId. Never pass ownerUserId with it. It returns every Agent in this run's plan, yours and your colleagues', each with its own search and message instructions, checklist and attachments: work from every returned Agent's own instructions, including colleagues' Agents, for the Leads you save under it. Mosaico files every Lead on a day; you never choose one. Call outreach_get_day without day. Never send targetCount for sourcing. Never send scheduledDate. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. Keep sourcing while any line of workflowStatus.sourcingPlan is open, following workflowStatus.nextOwnerUserId and nextAgentId; the stop is Mosaico's completion (Step 4), never your own judgement. Read workflowStatus.sourcingPlan, workflowStatus.agentId and workflowStatus.nextAgentId from outreach_get_day and pass the agentId for the owner you save for on every outreach_save_lead, as this skill's "Which Agent a Lead goes to" says; if Mosaico blocks a save with agent-required, agent-not-in-sourcing-plan or planned-agent-quota-met, save again once with the agentId it gives; sourcing-quota-met and sourcing-days-full save nothing and are not failures: reread outreach_get_day for the next step. Before saving a candidate for a colleague, when outreach_get_day lists that colleague in workflowStatus.colleagueChecks with allowed true, run the colleague-connection check as this skill describes: send the directive from that entry, `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=<the colleague's identifier from workflowStatus.colleagueChecks>`, from a Sales Navigator page (open https://www.linkedin.com/sales/home first), and pass its whole output unchanged as colleagueConnectionEvidence on outreach_save_lead. Pass the output exactly as returned, every field including complete, controlTotal, visibility and unreadableRows (a null stays a null, never left out) and integrity. Mosaico's answer is final: a skipped candidate (already connected to the colleague) is not a failure; a candidate saved with the note colleague-check-negative-proven is verified not connected by the colleague check, and you draft her invitation in Step 3; a candidate saved with colleague-check-negative-unproven is not proven unconnected and stays undrafted, so continue sourcing. Never run the connection-evidence script for a colleague's Lead and never call outreach_record_connection_evidence for it: Mosaico answers evidence-owner-mismatch, and only her own Sync run verifies it.
+Step 2. Run this skill with the selected action "source Leads only". Before you source, call outreach_get_agents with the runId. Never pass ownerUserId with it. It returns every Agent in this run's plan, yours and your colleagues', each with its own search and message instructions, checklist and attachments: work from every returned Agent's own instructions, including colleagues' Agents, for the Leads you save under it. Mosaico files every Lead on a day; you never choose one. Call outreach_get_day without day. Never send targetCount for sourcing. Never send scheduledDate. Each Lead is saved directly under the target owner by the run; there is no transfer step. Follow workflowStatus.recommendedAction and reread after every saved Lead. Work workflowStatus.workNow (also at the top of the answer) and read it again at every decision point: while it says state work, search for the Agent it names, inside workNow.brief, that Agent's own search instructions word for word; a supply note in the brief is for the final report, never a reason to stop. In a colleagues run your own day has no Agent of its own and Mosaico says so without a blocker: source for the owner workNow names, check, save and draft for her as this skill says, and do not draft for yourself. Keep sourcing while any line of workflowStatus.sourcingPlan is open; the stop is Mosaico's completion (Step 4), never your own judgement. While searching, call outreach_get_run at least every 10 minutes, or after every 10 candidates, even when nothing was saved: Mosaico closes a run that makes no Mosaico call for 30 minutes. Pass workNow.agentId on every outreach_save_lead and no ownerUserId, as this skill's "Which Agent a Lead goes to" says; if Mosaico blocks a save with agent-required, agent-not-in-sourcing-plan or planned-agent-quota-met, save again once with the agentId it gives; planned-agent-unavailable saves nothing and carries workNow: source for the Agent it names, and never try the unavailable one again; sourcing-quota-met and sourcing-days-full save nothing and are not failures; a candidate another owner already holds is skipped (profile-exists-under-other-owner, heldByOtherOwner), never a failure: continue with the next candidate; then read workNow again. Before saving a candidate for a colleague, when outreach_get_day lists that colleague in workflowStatus.colleagueChecks with allowed true, run the colleague-connection check as this skill describes: send the directive from that entry, `// mosaico run linkedin-salesnav-colleague-connection.js PUBLIC_IDENTIFIER=<the candidate's identifier> COLLEAGUE_IDENTIFIER=<the colleague's identifier from workflowStatus.colleagueChecks>`, from a Sales Navigator page (open https://www.linkedin.com/sales/home first), and pass its whole output unchanged as colleagueConnectionEvidence on outreach_save_lead. Pass the output exactly as returned, every field including complete, controlTotal, visibility and unreadableRows (a null stays a null, never left out) and integrity. Mosaico's answer is final: a skipped candidate (already connected to the colleague) is not a failure; a candidate saved with the note colleague-check-negative-proven is verified not connected by the colleague check, and you draft her invitation in Step 3; a candidate saved with colleague-check-negative-unproven is not proven unconnected and stays undrafted, so continue sourcing. Never run the connection-evidence script for a colleague's Lead and never call outreach_record_connection_evidence for it: Mosaico answers evidence-owner-mismatch, and only her own Sync run verifies it.
 
 Step 3. Run this skill again with the same run and the selected action "source Leads and prepare invitation drafts", across every day in workflowStatus.runDays, not just one. For each of your own Leads Mosaico lists as connection unverified, open its profile, run the approved connection-evidence script and pass the result unchanged to outreach_record_connection_evidence. Write a missing invitation draft only for a Lead Mosaico lists as verified. For each colleague with Leads saved in this run, read her day (outreach_get_day with intent source_invitation_leads, the runId and her member id from workflowStatus.sourcingPlan as ownerUserId; a read only) and, as this skill's "Draft a colleague's invitation" says, write the missing invitation draft with outreach_record_message (her leadId, no ownerUserId on the call) for each Lead saved with colleague-check-negative-proven; leave the unproven ones undrafted. Never approve or send an invitation.
 
-Step 4. Stop only when Mosaico says the run is complete (workflowStatus.completion is complete with reason sourcing-quota-met or sourcing-days-full) and nothing is left to verify or draft, when Mosaico recommends end_run_days_full, or when Mosaico reports stop_run after the tenth failure (then write the sourcing report Mosaico asks for). Never stop while any line of workflowStatus.sourcingPlan is open, and never because you think enough was found. A skipped candidate, a refused write for one Lead, or sourcing-quota-met or sourcing-days-full on a save is not a reason to stop. There is no search limit: do as many searches as it takes, and "I could not find candidates", "few results", "weak results", "slow" and "enough found" are never a reason to stop. When results are few, widen inside the Agent's brief (more keywords, more results pages, other filters, other regions the brief allows, Premium Daily Prospects) and keep searching; never widen past the brief's qualification rules. If an Agent's brief says to report a lead supply constraint, note it for the final report and keep searching inside the brief; it never means stop. A run that ends with any line still open and no stop_run is a failed run: report it as "run failed: stopped with N open". Then end the run with outreach_end_run and the honest reason, and let Mosaico decide the outcome: reason complete when Mosaico says the run is complete or the failure stop fired; reason blocked, with the blockerCode Mosaico gave in this run or the linkedInIssue (warning, captcha or restricted) and a note, when a genuine blocker stops it. Never write a sourcing report while a line is open unless Mosaico says the failure stop fired; before then Mosaico refuses it with sourcing-not-complete and you keep searching. Mosaico records a complete or blocked claim it cannot back as abandoned.
+Step 4. Stop only when Mosaico says the run is complete (workflowStatus.completion is complete with reason sourcing-quota-met, sourcing-days-full or sourcing-agent-unavailable) and nothing is left to verify or draft, or when Mosaico recommends end_run_days_full. Never stop while any line of workflowStatus.sourcingPlan is open, and never because you think enough was found. A skipped candidate, a refused write for one Lead, or sourcing-quota-met or sourcing-days-full on a save is not a reason to stop. There is no search limit: do as many searches as it takes, and "I could not find candidates", "few results", "weak results", "slow" and "enough found" are never a reason to stop. When results are few, widen inside the Agent's brief (more keywords, more results pages, other filters, other regions the brief allows, Premium Daily Prospects) and keep searching; never widen past the brief's qualification rules. If an Agent's brief says to report a lead supply constraint, note it for the final report and keep searching inside the brief; it never means stop. A run keeps searching until Mosaico says the numbers are met: a candidate you reject, a person another owner already holds and a person already connected to the colleague are never failures, and Mosaico counts none in a new run. A run that ends with any line still open is a failed run: report it as "run failed: stopped with N open". Then end the run with outreach_end_run and the honest reason, and let Mosaico decide the outcome: always call it on a finished run, with reason complete when Mosaico says the plan is done (every Agent delivered, ran out of free days, or became unavailable); reason blocked, with the blockerCode Mosaico gave in this run (linkedin_account_changed, linkedin_identity_invalid, or INTERNAL_SERVER_ERROR after Mosaico's last three calls failed) or the linkedInIssue (warning, captcha or restricted) and a note, when a genuine blocker stops it. These are the only two reasons; never ask for abandoned, it no longer exists. If Mosaico answers sourcing-run-open, the end was refused and the run stays open: do not retry the end and do not argue; read workNow and keep sourcing. If a write answers run_ended (recommended action report_run_closed), Mosaico closed the run after 30 minutes without a call: stop, report "Mosaico closed this run after 30 minutes without a call", and do not start another run.
 
-Step 5. Start the report with the line "Mosaico environment: <environmentName>" and, when the start answer carried previous-run-abandoned, the line "Previous run failed: stopped with N open". Report separately, using Mosaico's counts, not memory: the runOutcome Mosaico gave when you ended the run; for each owner and each of their Agents in workflowStatus.sourcingPlan, the target (Leads per run), the Leads accepted, the Leads remaining and the status (name the owner and the Agent); for each day in workflowStatus.runDays, how many Leads were filed on it; the shortfalls in workflowStatus.shortfalls; candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), the Leads saved for each colleague as "verified not connected by colleague check (proven)" (note colleague-check-negative-proven) and as "unproven, awaiting her Sync" (note colleague-check-negative-unproven), drafts written (and the drafts written for each colleague), candidates skipped with reasons, Leads left unverified, blockers. A run Mosaico records as abandoned is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than days-full is a failed run: report it as failed with Mosaico's code (for example sourcing_plan_empty) and message, also when Mosaico refused the start, and never as successful. A run that ends sourcing-days-full with nothing saved is not a failure: report "Every Agent is full for the next 10 business days; nothing to source." Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
+Step 5. Start the report with the line "Mosaico environment: <environmentName>", then the line "Mosaico lane: own", "Mosaico lane: colleagues" or "Mosaico lane: whole plan", and, when the start answer carried previous-run-abandoned, the line "Previous run failed: stopped with N open". Report separately, using Mosaico's counts, not memory: the runOutcome Mosaico gave when you ended the run; for each owner and each of their Agents in workflowStatus.sourcingPlan, the target (Leads per run), the Leads accepted, the Leads remaining and the status (name the owner and the Agent); for each day in workflowStatus.runDays, how many Leads were filed on it; the shortfalls in workflowStatus.shortfalls; the Agents Mosaico closed as unavailable (unavailableAgents, with each reason: agent-off, agent-deleted or owner-inactive); "Candidates skipped as held by another owner: N" (N from the count of workflowStatus.collisions); candidates skipped as already connected to each owner (from workflowStatus.colleagueSkips), the Leads saved for each colleague as "verified not connected by colleague check (proven)" (note colleague-check-negative-proven) and as "unproven, awaiting her Sync" (note colleague-check-negative-unproven), drafts written (and the drafts written for each colleague), candidates skipped with reasons, Leads left unverified, blockers. A run whose runOutcome is not complete or blocked, or that Mosaico closed with a line open, is a failed run: report it as "run failed: stopped with N open". A run that saved nothing because of a blocker other than days-full is a failed run: report it as failed with Mosaico's code (for example sourcing_plan_empty) and message, also when Mosaico refused the start, and never as successful. A run that ends sourcing-days-full with nothing saved is not a failure: report "Every Agent is full for the next 10 business days; nothing to source." Nothing merely drafted may be described as approved or sent. Preserve Mosaico as workflow authority and never modify another owner's records.
 
 Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.

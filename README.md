@@ -55,9 +55,10 @@ Nothing in the plugin needs updating for this.
 
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
-action. The schedule option installs three per-user local-time schedules: Sync data (connections and
-messaging, once a day, the only one that sends), Source leads (every two hours in business hours,
-at least 60 minutes from Sync, never sends; how many Leads it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
+action. The schedule option installs per-user local-time schedules: Sync data (connections and
+messaging, once a day, the only one that sends), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
+colleagues lane on the odd hours, each at least 60 minutes from the other lane and from Sync, never sends; how many Leads
+it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
 demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
 is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
 `~/.claude/settings.json` allows the three browser tools scheduled sessions need
@@ -79,10 +80,11 @@ run reports "Every Agent is full for the next 10 business days; nothing to sourc
 
 **How a run ends.** A run ends through Mosaico, not on the model's say-so. A Source leads run reads every Agent in its
 plan (`outreach_get_agents` with the `runId`), keeps searching with no search limit, and stops only when Mosaico says
-the run is complete, at the tenth failed candidate, or on a genuine blocker (a code Mosaico gave in the run, or a
-LinkedIn warning, captcha or restriction). Every run ends with `outreach_end_run` and the honest reason, and Mosaico
-decides the outcome; a run left with a line open is recorded as abandoned and reported as "run failed: stopped with N
-open". The start answer names the Mosaico environment (`environmentName`), every report begins with it, and a run on
+the run is complete (every Agent delivered, ran out of free days, or became unavailable), or on a genuine blocker (a
+code Mosaico gave in the run, or a LinkedIn warning, captcha or restriction). Every run ends with `outreach_end_run`
+and the honest reason (`complete` or `blocked`); Mosaico refuses an end it cannot back while a line is open
+(`sourcing-run-open`) and the run keeps going. A run with no Mosaico call for 30 minutes is closed by the next Source
+leads run and reported as "run failed: stopped with N open". The start answer names the Mosaico environment (`environmentName`), every report begins with it, and a run on
 anything but production stops.
 
 Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
@@ -168,6 +170,35 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.12
+
+Requires Mosaico server release 20261008e (PR #1831) or later; install only after that release is live on main-v2.
+Before that release the server does not know `sourcingScope`, `workNow` or the two-reason `outreach_end_run`.
+
+- Source leads runs in two lanes. The saved text carries one standing line, `sourcing scope: own` or
+  `sourcing scope: colleagues`, and the run passes exactly that word as `sourcingScope` on `outreach_start_run`; with no
+  such line it sends nothing and works the whole plan. It never chooses or invents a scope, checks the echo in the
+  start answer, and starts once per session. The report gains "Mosaico lane" and "Candidates skipped as held by
+  another owner: N".
+- The run works `workNow`, the Agent Mosaico names, re-read at every decision point: `workNow.brief` is that Agent's
+  own search instructions, and `workNow.agentId` goes on every `outreach_save_lead` with no `ownerUserId` (Mosaico
+  saves the Lead for the Agent's owner). In a colleagues run the run's own day is empty and it sources for the owner
+  `workNow` names. While searching it calls `outreach_get_run` at least every 10 minutes.
+- Start refusals are handled: `sourcing-run-busy` and `sourcing-scope-empty` are not failures (one line, then stop);
+  `sourcing_scope_invalid` and `sourcing_plan_empty` are loud. A candidate held by another owner is a skip, never a
+  failure, and there is no stop after a number of failures and no search budget: a run keeps searching until Mosaico
+  says the numbers are met.
+- `outreach_end_run` takes `complete` or `blocked` only; `abandoned` is gone. A refused end (`sourcing-run-open`) is not
+  retried or argued: the run reads `workNow` and keeps sourcing. A finished run is always ended with `complete`. A
+  write answered `run_ended` after an idle close stops the run, which reports and starts nothing. An Agent Mosaico
+  closed as unavailable (`unavailableAgents`) is reported and never sourced for.
+- The installer creates two Source leads tasks, "Mosaico Outreach — Source leads (own)" at
+  `0 0,2,4,6,8,12,14,16,18,20,22 * * *` and "Mosaico Outreach — Source leads (colleagues)" at
+  `0 1,3,5,7,9,11,15,17,19,21,23 * * *`, 60 minutes apart from each other, from Sync (13:00) and from Repair (Sunday
+  10:00). A scope-less Source leads task is updated in place into the own lane. A person who does not source gets none.
+  Both texts say "0.9.12 or later", so run the installer again to move a saved Source leads text; Sync data and Repair
+  texts are unchanged.
 
 ### 0.9.11
 

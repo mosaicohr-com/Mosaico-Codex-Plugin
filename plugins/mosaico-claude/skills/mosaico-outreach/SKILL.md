@@ -26,10 +26,10 @@ all-dates follow-up actions:
 - **Repair the Outreach backlog** — Work the repair queue Mosaico keeps behind the daily Sync data
   run: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
   declines nobody applied. Up to the cap Mosaico sets for one run. Never approve or send.
-- **Install the Outreach schedules** — Idempotently create three local-time schedules: Sync data
-  (connections and messaging, once a day), Source leads (every two hours in business hours, at
-  least 60 minutes from Sync) and Repair (once a week, Sunday 10:00 AM by default, also on demand).
-  Only Sync data sends.
+- **Install the Outreach schedules** — Idempotently create the local-time schedules: Sync data
+  (connections and messaging, once a day), Source leads in two lanes (own, on the even hours, and
+  colleagues, on the odd hours, each at least 60 minutes from the other lane, from Sync and from
+  Repair) and Repair (once a week, Sunday 10:00 AM by default, also on demand). Only Sync data sends.
 
 Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
 `/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and

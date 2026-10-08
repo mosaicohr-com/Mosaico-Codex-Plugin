@@ -20,6 +20,10 @@ TITLES = (
     "Mosaico Outreach — Source leads",
     "Mosaico Outreach — Repair",
 )
+LANE_TITLES = (
+    "Mosaico Outreach — Source leads (own)",
+    "Mosaico Outreach — Source leads (colleagues)",
+)
 OUTREACH_SKILLS = (
     "mosaico-outreach-invite-run",
     "mosaico-outreach-follow-up-run",
@@ -45,7 +49,8 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 
 MIN_VERSION = "0.9.6"
-SOURCE_MIN_VERSION = "0.9.9"
+SOURCE_MIN_VERSION = "0.9.9"  # Codex's single Source leads text
+LANE_MIN_VERSION = "0.9.12"  # Claude's two Source leads lane texts read the `sourcing scope` line
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -122,18 +127,21 @@ def main() -> None:
     THIN_CAP = 200
     claude_texts = re.findall(r"```text\n(.*?)\n```", claude, re.S)
     codex_texts = re.findall(r"```text\n(.*?)\n```", SKILLS["Codex"], re.S)
-    check(len(claude_texts) == 3, f"Claude skill must hold exactly three schedule texts, found {len(claude_texts)}")
+    check(len(claude_texts) == 4, f"Claude skill must hold exactly four schedule texts (Sync data, Source leads own, Source leads colleagues, Repair), found {len(claude_texts)}")
+    for title in LANE_TITLES:
+        check(title in claude, f"Claude skill is missing the Source leads lane title: {title}")
     check(len(codex_texts) == 1, f"Codex skill must hold exactly one schedule text, found {len(codex_texts)}")
-    sync_text, source_text, repair_text = claude_texts
+    sync_text, source_text, colleagues_text, repair_text = claude_texts
     codex_text = codex_texts[0]
     THIN = (
         ("Claude Sync data", sync_text, "mosaico:mosaico-outreach-follow-up-run", "Sync data routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
-        ("Claude Source leads", source_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
+        ("Claude Source leads (own)", source_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
+        ("Claude Source leads (colleagues)", colleagues_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Claude Repair", repair_text, "mosaico:mosaico-outreach-repair-run", "Repair routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>",), "authenticated LinkedIn browser"),
     )
     for label, text, skill_name, section_name, placeholders, browser in THIN:
-        min_version = SOURCE_MIN_VERSION if "Source leads" in label else MIN_VERSION
+        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else MIN_VERSION
         words = len(text.split())
         check(words <= THIN_CAP, f"{label} schedule text is {words} words, over the {THIN_CAP}-word cap: it must be thin")
         check(f"Use the installed {skill_name} skill from the mosaico plugin ({min_version} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
@@ -147,20 +155,23 @@ def main() -> None:
         check("A LinkedIn warning or captcha stops the run, which then reports." in text, f"{label} text lacks the LinkedIn warning guard")
         for procedure in ("Step 1", "Step 2", "Step 3", "outreach_start_run", "outreach_get_", "outreach_record", "identityEvidence", "// mosaico run", "browser/linkedin-", "file-reading tool"):
             check(procedure not in text, f"{label} text holds procedure ({procedure}); it belongs in the skill's routine section")
-    for label, text in (("Claude Source leads", source_text), ("Codex Source leads", codex_text)):
+    for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("<quota map>" not in text and "quota" not in text.lower() and "who receives" not in text.lower(), f"{label} thin text still carries a quota standing answer")
     check("Proceed without asking which days or which scope" in sync_text and "Proceed without asking which days or which scope" in source_text and "Proceed without asking which scope" in repair_text, "A thin text does not say to proceed without asking")
     check('"one pass per thread"' in sync_text and '"send approved invitations"' in sync_text, "Sync data text lacks its scope answers")
-    check('"source Leads only"' in source_text, "Source leads text lacks its scope answers")
-    for label, text in (("Claude Source leads", source_text), ("Codex Source leads", codex_text)):
+    check('"source Leads only"' in source_text and '"source Leads only"' in colleagues_text, "Source leads text lacks its scope answers")
+    for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("next business day" not in text and "day:" not in text and "scheduledDate" not in text, f"{label} thin text still names a day: the application files the days")
     check("whole repair queue" in repair_text, "Repair text lacks its scope answer")
-    check("the Source leads schedule" not in sync_text and "Sync data schedule" not in source_text, "A thin text describes another schedule's procedure")
+    check("the Source leads schedule" not in sync_text and "Sync data schedule" not in source_text and "Sync data schedule" not in colleagues_text, "A thin text describes another schedule's procedure")
     # The installer states the version stamp once and the update-in-place rule for a long-form text.
     for package, text in SKILLS.items():
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
-        check("The Source leads text needs 0.9.9, the first release where Leads per run and the application's day placement drive it" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.9")
+        if package == "Claude":
+            check("The Source leads texts need 0.9.12, the first release that reads the `sourcing scope` line" in flat_installer, "Claude skill does not state the Source leads minimum version 0.9.12")
+        else:
+            check("The Source leads text needs 0.9.9, the first release where Leads per run and the application's day placement drive it" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.9")
         check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say both numbers are set on each Agent, and an Agent is sourced only with both")
         check("Never copy any step of the procedure into" in flat_installer, f"{package} skill does not forbid copying procedure into a schedule text")
         update = flat_installer[flat_installer.index("### Update the standing answers in place") :] if "### Update the standing answers in place" in flat_installer else ""
@@ -170,7 +181,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.9", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.9" and LANE_MIN_VERSION == "0.9.12", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -316,12 +327,12 @@ def main() -> None:
         check("Never send targetCount for sourcing" in flat_text and "Never send scheduledDate" in flat_text, f"{package} Source leads Step 2 does not forbid targetCount and scheduledDate")
         check("targetCount:" not in flat_text and "scheduledDate:" not in flat_text and "scheduledDate=" not in flat_text, f"{package} Source leads routine passes targetCount or scheduledDate")
         check("Call outreach_get_day without day" in flat_text and "the next business day" not in flat_text, f"{package} Source leads Step 2 does not omit day on outreach_get_day")
-        check("Keep sourcing while any line of workflowStatus.sourcingPlan is open" in flat_text and "nextOwnerUserId and nextAgentId" in flat_text and "never your own judgement" in flat_text, f"{package} Source leads Step 2 does not keep sourcing while a line is open")
+        check("Keep sourcing while any line of workflowStatus.sourcingPlan is open" in flat_text and "Work workflowStatus.workNow" in flat_text and "never your own judgement" in flat_text, f"{package} Source leads Step 2 does not keep sourcing while a line is open")
         step4 = flat_text[flat_text.index("Step 4."):flat_text.index("Step 5.")]
-        check("Stop only when Mosaico says the run is complete" in step4 and "sourcing-quota-met or sourcing-days-full" in step4 and "end_run_days_full" in step4 and "Never stop while any line of workflowStatus.sourcingPlan is open" in step4 and "never because you think enough was found" in step4, f"{package} Source leads Step 4 stops on something other than Mosaico's completion")
+        check("Stop only when Mosaico says the run is complete" in step4 and "sourcing-quota-met, sourcing-days-full or sourcing-agent-unavailable" in step4 and "end_run_days_full" in step4 and "Never stop while any line of workflowStatus.sourcingPlan is open" in step4 and "never because you think enough was found" in step4, f"{package} Source leads Step 4 stops on something other than Mosaico's completion")
         check("across every day in workflowStatus.runDays" in flat_text, f"{package} Source leads Step 3 does not verify and draft across every run day")
         check("sourcing-quota-met and sourcing-days-full save nothing and are not failures" in flat_text, f"{package} Source leads Step 2 does not handle the two save blocks that end sourcing")
-        for needle in ("workflowStatus.sourcingPlan", "workflowStatus.agentId", "workflowStatus.nextAgentId", "pass the agentId", "agent-not-in-sourcing-plan", "planned-agent-quota-met", "agent-required"):
+        for needle in ("workflowStatus.sourcingPlan", "workflowStatus.workNow", "workNow.agentId", "no ownerUserId", "agent-not-in-sourcing-plan", "planned-agent-quota-met", "agent-required", "planned-agent-unavailable"):
             check(needle in flat_text, f"{package} Source leads Step 2 lacks: {needle}")
         check("Do not ask the person for numbers" in flat_text, f"{package} Source leads routine may ask the person for numbers")
         check("for each owner and each of their Agents in workflowStatus.sourcingPlan, the target (Leads per run), the Leads accepted, the Leads remaining and the status" in flat_text and "for each day in workflowStatus.runDays, how many Leads were filed on it" in flat_text and "the shortfalls in workflowStatus.shortfalls" in flat_text, f"{package} Source leads Step 5 does not report per Agent and per day")
@@ -332,7 +343,7 @@ def main() -> None:
         check(script in source, f"Claude Source leads routine does not name the approved script {script}")
     check("browser/linkedin-salesnav-colleague-connection.js" in source and "the colleague-connection check" in source and "workflowStatus.colleagueChecks" in source, "Claude Source leads routine lacks the colleague check hand-off")
     check("cannot run the colleague-connection check" in codex_source and "colleague-check-required" in codex_source, "Codex Source leads routine lacks the colleague check refusal")
-    check("needs no\n   quota" in second_person(claude) or "needs no quota" in " ".join(second_person(claude).split()), "Second-person section does not say her Source leads schedule needs no quota")
+    check("need no quota" in " ".join(second_person(claude).split()), "Second-person section does not say her Source leads schedules need no quota")
     check("Leads per day and Leads per run on her Agent in Outreach (Agent tab)" in " ".join(second_person(claude).split()) and '"Sourced by"' in second_person(claude), "Second-person section does not point at both numbers and Sourced by on her Agent")
     for package, text in SKILLS.items():
         flat_installer = " ".join(text.split())
@@ -348,7 +359,7 @@ def main() -> None:
         check("Never send `targetCount` for sourcing" in invite and "`targetCount: 20`" not in invite, f"{package} invite-run skill still sends targetCount for sourcing")
         check("## Which Agent a Lead goes to" in raw_invite, f"{package} invite-run skill lacks the Which Agent section")
         agent_section = invite[invite.index("## Which Agent a Lead goes to"):invite.index("## The colleague check") if "## The colleague check" in invite else invite.index("## Check a candidate against the colleague")]
-        for needle in ("`workflowStatus.sourcingPlan`", "the owner", "`agentId`", "`agentName`", "`leadsPerDay`", "`leadsPerRun`", "`acceptedThisRun`", "`remainingThisRun`", "`open`", "`days-full`", "`workflowStatus.agentId`", "`workflowStatus.nextAgentId`", "`nextOwnerUserId`", "`agent-not-in-sourcing-plan`", "`planned-agent-quota-met`", "`agent-required`", "`sourcing-quota-met`", "`sourcing-days-full`", "never send `targetCount` or `scheduledDate` for sourcing", "Pass the `agentId` the read gave for that owner on every save"):
+        for needle in ("`workflowStatus.sourcingPlan`", "the owner", "`agentId`", "`agentName`", "`leadsPerDay`", "`leadsPerRun`", "`acceptedThisRun`", "`remainingThisRun`", "`open`", "`days-full`", "`workflowStatus.agentId`", "`workNow.agentId`", "`planned-agent-unavailable`", "`agent-not-in-sourcing-plan`", "`planned-agent-quota-met`", "`agent-required`", "`sourcing-quota-met`", "`sourcing-days-full`", "never send `targetCount` or `scheduledDate` for sourcing", "Pass `workNow.agentId` as `agentId` on every `outreach_save_lead` and pass no `ownerUserId`"):
             check(needle in agent_section, f"{package} Which Agent section lacks: {needle}")
         report = invite[invite.index("## Report a sourcing run"):invite.index("## Send approved invitations")]
         check("per Agent, from `workflowStatus.sourcingPlan`" in report and "name the owner and the Agent" in report and "the target (Leads per run)" in report and "per day, from `workflowStatus.runDays`" in report and "the shortfalls in `workflowStatus.shortfalls`" in report, f"{package} invite-run report is not per Agent and per day, with the shortfalls")
@@ -356,7 +367,7 @@ def main() -> None:
         check(f"report \"{FULL_SENTENCE}.\"" in report and "is not a failure" in report and SET_SENTENCE in report, f"{package} invite-run report does not report days-full with nothing saved as nothing to source")
         check("sourcing-plan-already-met" not in invite and "Leads remaining today" not in invite and "acceptedToday" not in invite, f"{package} invite-run skill still holds the removed per-day wording")
         sourcing = invite[invite.index("## Source Leads and prepare drafts"):invite.index("## Source Leads only")]
-        for needle in ("Leave `day` out", "Never send `targetCount` for sourcing", "Never send `scheduledDate`", "`scheduled-date-ignored`", "Mosaico decides when sourcing ends, never your own judgement", "While any line in `workflowStatus.sourcingPlan` has status `open`, keep sourcing", "following `nextOwnerUserId` and `nextAgentId`", "`sourcing-quota-met` (every Agent delivered its Leads per run) or `sourcing-days-full`", "across every day in `workflowStatus.runDays`", "`end_run_days_full`"):
+        for needle in ("Leave `day` out", "Never send `targetCount` for sourcing", "Never send `scheduledDate`", "`scheduled-date-ignored`", "Mosaico decides when sourcing ends, never your own judgement", "While any line in `workflowStatus.sourcingPlan` has status `open`, keep sourcing", "Work `workflowStatus.workNow` and read it again at every decision point", "`sourcing-quota-met` (every Agent delivered its Leads per run), `sourcing-days-full`", "across every day in `workflowStatus.runDays`", "`end_run_days_full`"):
             check(needle in sourcing, f"{package} Source Leads section lacks: {needle}")
         check("targetCount:" not in invite and "scheduledDate:" not in invite, f"{package} invite-run skill passes targetCount or scheduledDate")
         check("## Offer to save the quota" not in raw_invite and "Do you want me to save this into your Source leads schedule" not in invite, f"{package} invite-run skill still offers to save a quota into the schedule")
@@ -371,7 +382,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.11", f"{manifest.name} is not at 0.9.11")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

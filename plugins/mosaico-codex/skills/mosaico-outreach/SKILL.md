@@ -31,7 +31,7 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    - **Repair the Outreach backlog** — List the repair queue Mosaico keeps behind the daily Sync data
      run and what a person should do. Read-only here; the repair itself runs from Claude.
    - **Install the Outreach schedules** — Idempotently create the Source leads schedule (every two
-     hours in business hours). Sync data (connections and messaging, once a day, the only one that
+     hours, whole plan). Sync data (connections and messaging, once a day, the only one that
      sends) and Repair (once a week) are installed from Claude, because Codex cannot capture
      connection evidence.
    Route Agent management to `$mosaico:mosaico-outreach-agent-management`, Lead management to
