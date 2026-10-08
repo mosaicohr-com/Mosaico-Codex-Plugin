@@ -77,6 +77,14 @@ Agent has both numbers, Mosaico answers `sourcing_plan_empty` and the run report
 run on an Agent in Outreach (Agent tab), then rerun." If every Agent is full for the next 10 business days, the
 run reports "Every Agent is full for the next 10 business days; nothing to source" and ends; that is not a failure.
 
+**How a run ends.** A run ends through Mosaico, not on the model's say-so. A Source leads run reads every Agent in its
+plan (`outreach_get_agents` with the `runId`), keeps searching with no search limit, and stops only when Mosaico says
+the run is complete, at the tenth failed candidate, or on a genuine blocker (a code Mosaico gave in the run, or a
+LinkedIn warning, captcha or restriction). Every run ends with `outreach_end_run` and the honest reason, and Mosaico
+decides the outcome; a run left with a line open is recorded as abandoned and reported as "run failed: stopped with N
+open". The start answer names the Mosaico environment (`environmentName`), every report begins with it, and a run on
+anything but production stops.
+
 Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
 LinkedIn public identifier) and tells the run to follow a named routine
 section in the installed plugin's skill: "Sync data routine" in the follow-up-run skill, "Source leads routine"
@@ -148,6 +156,29 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.10
+
+- Source leads now reads every planned Agent. After `outreach_start_run` it calls `outreach_get_agents` with the
+  `runId` (never with `ownerUserId`) and works from each returned Agent's own instructions, colleagues' Agents
+  included.
+- A Source leads run never ends on its own. There is no search limit: few results, weak results, "slow" or "enough
+  found" are never a reason to stop, and when results are few the run widens inside the Agent's brief (more keywords,
+  more pages, other filters, other regions the brief allows, Premium Daily Prospects). An Agent brief that says to
+  report a supply constraint means note it for the final report and keep searching. The run stops only on Mosaico's
+  completion (`sourcing-quota-met` or `sourcing-days-full`), `stop_run` after the tenth failure,
+  `end_run_days_full`, or a genuine blocker. A run that ends with any line open is reported as "run failed: stopped
+  with N open".
+- Every run ends through `outreach_end_run` with reason `complete` or `blocked`; Mosaico decides the outcome and
+  records a claim it cannot back as abandoned. The sourcing report (`outreach_record_sourcing_report`) is written
+  only after the tenth failure; Mosaico refuses it with `sourcing-not-complete` before then.
+- The start answer names the Mosaico environment (`environmentName`). Each report begins with "Mosaico environment:
+  production", and a run on anything else stops. If the answer carries `previous-run-abandoned`, the report says so
+  next: "Previous run failed: stopped with N open". The Follow-up (Sync data) and Repair routines end their runs
+  through `outreach_end_run` and report the environment too.
+- No new routine section, so the saved schedule texts still say "0.9.9 or later" and need no reinstall.
+- Depends on the Mosaico application change that adds `runId` to `outreach_get_agents`, `outreach_end_run`,
+  `runOutcome` and `environmentName` (mosaicohr-com/mosaico pull request 1820) being deployed first.
 
 ### 0.9.9
 
@@ -660,6 +691,7 @@ python3 tests/test_browser_script_gate.py
 python3 tests/test_thread_script.py
 python3 tests/test_schedule_install_skill.py
 python3 tests/test_follow_up_thread_skill.py
+python3 tests/test_run_guards_skill.py
 ```
 
 ## License

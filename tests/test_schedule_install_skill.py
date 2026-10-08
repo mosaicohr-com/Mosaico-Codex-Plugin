@@ -371,7 +371,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.9", f"{manifest.name} is not at 0.9.9")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.10", f"{manifest.name} is not at 0.9.10")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
