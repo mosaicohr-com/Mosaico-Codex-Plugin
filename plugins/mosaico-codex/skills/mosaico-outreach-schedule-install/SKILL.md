@@ -51,7 +51,7 @@ Do these checks first. If one fails, install nothing and tell the person what to
 ## The Source leads schedule
 
 Each scheduled run starts its own Outreach run through the invite-run skill. If Mosaico returns a
-blocker, the run stops and reports it; it does not work around it.
+blocker, the run stops and reports it; it does not work around it. The start answer names the environment (`environmentName`); a run on anything but production stops.
 
 Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved automation stale. Never copy any step of the procedure into an automation text.
 

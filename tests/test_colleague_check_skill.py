@@ -85,7 +85,7 @@ def main() -> None:
     check("the Sales Navigator colleague check" in flat((CLAUDE / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")), "the Claude overview skill does not list the colleague check output")
     # Manifests and the README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.9", f"{manifest.name} is not at 0.9.9")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.10", f"{manifest.name} is not at 0.9.10")
     readme = flat((ROOT / "README.md").read_text(encoding="utf-8"))
     check("### 0.9.5" in readme and "### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
     print("PASS: the invite-run skills run the colleague check before a colleague save, pass its output unchanged, handle every Mosaico answer, and never treat 'not found' as 'not connected'; Codex says it cannot run it.")

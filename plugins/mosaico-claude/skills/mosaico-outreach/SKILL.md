@@ -35,7 +35,7 @@ Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead man
 `/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
 schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
 
-**Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
+**Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids. The `outreach_start_run` answer names the environment (`environmentName`); a run on anything but production stops.
 
 Use the current application-owned read for the resolved intent. For invitation sourcing call
 `outreach_get_day` with `intent: source_invitation_leads` and the sourcing `runId`, no `day` and never a `targetCount`; start the sourcing run with no quota and no colleague, as the invite-run skill describes. For approved invitation delivery use
@@ -48,7 +48,7 @@ write, and stop and tell the person on any blocker. Never pass `ownerUserId` on 
 and follow-up skills give the exact steps. Do
 not ask the menu again when the person's intent is explicit. The schedule action is platform configuration and needs no
 Outreach read before its installer. Follow the returned recommended action and reread status after
-every transition. Call `outreach_get_agents` before qualification or writing and use the selected
+every transition. Call `outreach_get_agents` before qualification or writing (for a sourcing run, with the `runId`, which returns every Agent in the run's plan) and use the selected
 active Agent's search instructions, message instructions and Messaging Checklist for judgment only.
 
 The sourcing plan lives on each Agent in Outreach (Agent tab): Leads per day (the most on one day), Leads per run

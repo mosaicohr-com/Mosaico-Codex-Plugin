@@ -66,7 +66,7 @@ Do these checks first. If one fails, install nothing and tell the person what to
    connected and signed in, in Claude's connectors (not `/mcp`). Confirm it by looking for a Mosaico tool
    such as `outreach_start_run` in the available tools. If there is none, install nothing and tell the
    person to connect it in Claude's connectors, sign in with their own Mosaico account, and run this
-   installer again.
+   installer again. The `outreach_start_run` answer names the environment (`environmentName`); a run on anything but production stops.
 
 ## Set up a second person
 

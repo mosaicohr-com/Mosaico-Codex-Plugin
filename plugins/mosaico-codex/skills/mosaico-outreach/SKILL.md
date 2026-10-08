@@ -41,7 +41,7 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
 3. Use the current application-owned read for the resolved intent. Before any of
    these reads, open LinkedIn's Me page, report the profile URL you see to `outreach_start_run` with
    the matching intent (`inspect_day` for inspection), keep the `runId`, pass it on every Outreach
-   read and write, and stop and tell the person on any blocker. Never pass `ownerUserId` on a write. Never read a Message, Connect or Pending button as a connection state: the invite and follow-up skills carry LinkedIn's own profile data to Mosaico, which decides.
+   read and write, and stop and tell the person on any blocker. The start answer names the environment (`environmentName`); a run on anything but production stops. Never pass `ownerUserId` on a write. Never read a Message, Connect or Pending button as a connection state: the invite and follow-up skills carry LinkedIn's own profile data to Mosaico, which decides.
    The invite and follow-up skills give the exact steps. Do not ask the menu again when the person's intent is already explicit:
    - Invitation sourcing: call `outreach_get_day` with
      `intent: source_invitation_leads` and the sourcing `runId`, no `day` and never a `targetCount`.
@@ -63,7 +63,7 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
 
 ## Qualification and writing
 
-Call `outreach_get_agents` before qualification or message writing. Use the selected active Agent's
+Call `outreach_get_agents` before qualification or message writing (for a sourcing run, with the `runId`, which returns every Agent in the run's plan). Use the selected active Agent's
 search instructions, message instructions and Messaging Checklist for judgment and language only.
 Agent guidance does not determine workflow order, dates, recovery or authorization.
 
