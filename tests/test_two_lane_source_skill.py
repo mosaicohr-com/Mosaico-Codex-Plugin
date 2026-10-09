@@ -55,13 +55,13 @@ def main() -> None:
     installer = " ".join(installer_raw.split())  # backticks kept
     codex_installer = flat(read(CODEX / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md"))
 
-    # 1. Two Source leads tasks: identical texts but for the scope line; both stamped 0.9.12.
+    # 1. Two Source leads tasks: identical texts but for the scope line; both stamped 0.9.13 (0.9.13: Source leads writes no drafts).
     texts = re.findall(r"```text\n(.*?)\n```", installer_raw, re.S)
     check(len(texts) == 4, f"installer must hold four schedule texts, found {len(texts)}")
     _, own_text, colleagues_text, _ = texts
     for scope, text in (("own", own_text), ("colleagues", colleagues_text)):
         check(f"sourcing scope: {scope};" in text, f"the {scope} lane text lacks the line 'sourcing scope: {scope}'")
-        check("(0.9.12 or later)" in text and "is older than 0.9.12 or has no \"Source leads routine\" section" in text, f"the {scope} lane text is not stamped 0.9.12")
+        check("(0.9.13 or later)" in text and "is older than 0.9.13 or has no \"Source leads routine\" section" in text, f"the {scope} lane text is not stamped 0.9.13")
         check("Follow that skill's \"Source leads routine\" section exactly" in text, f"the {scope} lane text does not name its routine section")
         check("Proceed without asking which days or which scope" in text, f"the {scope} lane text may ask which scope")
         check(len(text.split()) <= 200, f"the {scope} lane text is not thin")
@@ -69,7 +69,7 @@ def main() -> None:
             check(procedure not in text, f"the {scope} lane text holds procedure or a number: {procedure}")
     check(own_text.replace("sourcing scope: own;", "sourcing scope: colleagues;") == colleagues_text, "the two lane texts differ in more than the scope line")
     check("sourcing scope" not in " ".join(texts[0].split()) and "sourcing scope" not in texts[3], "Sync data or Repair text carries a scope line")
-    check("(0.9.6 or later)" in texts[0] and "(0.9.6 or later)" in texts[3], "the Sync data or Repair stamp changed")
+    check("(0.9.13 or later)" in texts[0] and "(0.9.6 or later)" in texts[3], "the Sync data stamp is not 0.9.13 or the Repair stamp changed")
     check("Mosaico Outreach — Source leads (own)" in installer and "Mosaico Outreach — Source leads (colleagues)" in installer, "installer lacks the two lane task titles")
     check("sourcing scope" not in codex_installer, "the Codex installer text carries a scope line although it installs one whole-plan task")
 
@@ -116,7 +116,7 @@ def main() -> None:
         end_section = flat(raw[raw.index("## End the run"):raw.index("## Source leads routine")])
 
         # The lane word is passed as given and never chosen.
-        for where, body in (("Start the run", flat(raw[raw.index("## Start the run"):raw.index("## Source Leads and prepare drafts")])), ("Step 1", step1)):
+        for where, body in (("Start the run", flat(raw[raw.index("## Start the run"):raw.index("## Source Leads\n")])), ("Step 1", step1)):
             check("sourcing scope: own" in body and "sourcing scope: colleagues" in body, f"{package} {where} does not name the two scope lines")
             check("exactly that word as sourcingScope on outreach_start_run" in body, f"{package} {where} does not pass the scope word as given")
             check("send nothing" in body and "never choose, change or invent a scope" in body.lower(), f"{package} {where} may choose or invent a scope")
@@ -139,7 +139,7 @@ def main() -> None:
         check("Pass workNow.agentId as agentId on every outreach_save_lead and pass no ownerUserId" in text, f"{package} Which Agent section does not save with workNow.agentId and no owner")
         # Liveness read.
         check("outreach_get_run at least every 10 minutes" in step2, f"{package} Step 2 lacks the liveness read")
-        sourcing_section = flat(raw[raw.index("## Source Leads and prepare drafts"):raw.index("## Source Leads only")])
+        sourcing_section = flat(raw[raw.index("## Source Leads\n"):raw.index("## Which Agent a Lead goes to")])
         check("outreach_get_run at least every 10 minutes" in sourcing_section, f"{package} Source Leads section lacks the liveness read")
 
         # The end rule: two reasons, a refusal is not argued with, a finished run is always ended, an idle close stops the run.
@@ -179,7 +179,7 @@ def main() -> None:
 
     # 6. Versions and the changelog entry that names the server release.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
+        check(json.loads(read(manifest))["version"] == "0.9.13", f"{manifest.name} is not at 0.9.13")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.12") < readme.index("### 0.9.11"), "README changelog lacks 0.9.12 above 0.9.11")
     entry = flat(readme[readme.index("### 0.9.12"):readme.index("### 0.9.11")])

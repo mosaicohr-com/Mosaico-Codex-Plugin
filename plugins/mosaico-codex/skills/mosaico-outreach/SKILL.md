@@ -16,8 +16,10 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    Outreach?" and present these action headers and descriptions. Person-specific recommended actions
    may be mentioned inside the matching action, but must never replace the two all-dates follow-up
    actions:
-   - **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days, and save
-     personalized invitation drafts. Never approve or send.
+   - **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days. A Source
+     run never writes drafts: the Lead owner's Sync data run does. Never approve or send.
+   - **Write missing invitation drafts** — Write the invitation draft for each placed Lead of your own that has
+     none, from the `draftsToWrite` list Mosaico gives. Never approve or send.
    - **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
      for the selected day. Verify each one on LinkedIn before marking it sent.
    - **Check for new follow-ups — all dates** — Check every recorded Outreach Lead regardless of
