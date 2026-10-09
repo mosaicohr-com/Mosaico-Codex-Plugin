@@ -56,8 +56,9 @@ Nothing in the plugin needs updating for this.
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
 action. The schedule option installs per-user local-time schedules: Sync data (connections and
-messaging, once a day, the only one that sends), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
-colleagues lane on the odd hours, each at least 60 minutes from the other lane and from Sync, never sends; how many Leads
+messaging, once a day, the only one that sends; from 0.9.13 it also writes the missing invitation drafts for the person's
+own Leads), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
+colleagues lane on the odd hours, each at least 60 minutes from the other lane and from Sync, never writes drafts and never sends; how many Leads
 it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
 demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
 is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
@@ -101,12 +102,21 @@ The colleague check. When Source leads saves a candidate for a colleague, the Sa
 From 0.9.11 its sealed output also says whether the search could have found them, and Mosaico decides what that
 proves. If the candidate is not listed and the check shows the search could have found them (every result page read,
 her connection list visible to the searching account, no result row unread), the negative is proven: Mosaico saves
-the Lead as verified not connected by the colleague check and the run drafts her invitation at once, in the same run.
-Otherwise the Lead is saved with its connection unknown and stays undrafted until her own run verifies it. A proven
+the Lead as verified not connected by the colleague check; from 0.9.13 the sourcing run writes no draft, and her own
+Sync data run writes her invitation from its `draftsToWrite` list. Otherwise the Lead is saved with its connection unknown
+and stays undrafted until her own run verifies it. A proven
 negative never sends: her invitation is held until her own Sync run records her own LinkedIn connection evidence for
 the Lead (the send guard, `own-evidence-required`), and a run never records connection evidence for a colleague's Lead.
 The risk accepted: nobody has yet tested a colleague who hides her connections, so a proven negative could in rare
 cases be wrong; the send guard contains it, because nothing is sent before her own check.
+
+**Who writes invitation drafts (0.9.13).** A Source leads run finds Leads, saves them and lets Mosaico place them on days,
+then ends. It never writes an invitation draft, for its own Leads or a colleague's: Mosaico refuses the write with
+`sourcing-writes-no-drafts`, which the skill treats as expected. The Lead owner's Sync data run writes the missing drafts,
+for its own Leads only, from the `draftsToWrite` list that `outreach_get_day` (in `workflowStatus`) and
+`outreach_get_follow_ups` return (`count`, `entries` with `leadId`, `name`, `agentId`, `day` and `action`,
+`writableInThisRun` and `recommendedAction`). The application builds the list and its recommended action; the skill
+follows it. A draft is never approved or sent by the run that wrote it.
 
 ## Set up a second person
 
@@ -170,6 +180,33 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.13
+
+Requires the Mosaico server release that carries mosaicohr-com/mosaico#1834 (sourcing writes no drafts; `draftsToWrite`).
+Do not publish or install this plugin before that release is live on main-v2; until then the server still expects Source
+leads to write drafts.
+
+- Source leads finds Leads, saves them and lets Mosaico place them on days, then ends the run. It never writes an
+  invitation draft, for its own Leads or a colleague's. Mosaico refuses the write with `sourcing-writes-no-drafts`
+  (blocked, recommended action `continue_with_next_lead`, nothing saved, the Lead stays saved and placed); the skill treats
+  that answer as expected and moves on, and does not attempt a draft in the first place. After the plan is done a
+  sourcing run's recommended action is `end_run`. The Sync-time drafting of a colleague's proven Lead and the
+  `lead-awaiting-owner-check` and `colleague-draft-invite-only` refusals are gone from the skill. The action name
+  "source Leads and prepare invitation drafts" is gone too: the one action is "source Leads only".
+- Sync data writes the missing invitation drafts for the person's own Leads, from `draftsToWrite` (on `outreach_get_day`
+  in `workflowStatus`, and top-level on `outreach_get_follow_ups`): `count`, `entries` (`leadId`, `name`, `agentId`, `day`,
+  `action`), `writtenBy`, `writableInThisRun`, `allowedActions`, `recommendedAction` (`draft_invitation_messages` or
+  `none`) and `note`. The new invite-run section "Write missing invitation drafts" follows that list and its recommended
+  action, reads the person's own Agents with `outreach_get_agents` (no arguments), and writes each draft with
+  `outreach_record_message` (`kind` `invite`, `direction` `outbound`, `sentAt` null, a `checklistReview` for the Agent's
+  rules, the `runId`). The Sync data routine runs it first in its invitation step; it never approves or sends a draft.
+- Installer: the Sync data text and both Source leads lane texts (and the Codex Source leads text) are stamped 0.9.13 or
+  later. The Sync data text names the actions "write missing invitation drafts" and "send approved invitations"; the
+  Source leads texts name the one action "source Leads only". Repair is unchanged (0.9.6). Run the installer again to move a
+  saved Sync data or Source leads text to the new stamp.
+- The Claude and Codex packages both move to 0.9.13. Codex's invite-run skill carries the same Source leads change and the
+  same "Write missing invitation drafts" section; it still installs only Source leads.
 
 ### 0.9.12
 
@@ -764,6 +801,7 @@ python3 tests/test_thread_script.py
 python3 tests/test_schedule_install_skill.py
 python3 tests/test_follow_up_thread_skill.py
 python3 tests/test_run_guards_skill.py
+python3 tests/test_sync_drafts_skill.py
 ```
 
 ## License

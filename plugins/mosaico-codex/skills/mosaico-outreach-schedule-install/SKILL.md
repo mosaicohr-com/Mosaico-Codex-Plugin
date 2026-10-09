@@ -55,7 +55,7 @@ blocker, the run stops and reports it; it does not work around it. The start ans
 
 Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved automation stale. Never copy any step of the procedure into an automation text.
 
-**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads text needs 0.9.9, the first release where Leads per run and the application's day placement drive it. A saved thin text stays valid across later releases: run the installer again only to change an answer or a time.
+**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts (0.9.9 added Leads per run and the application's day placement), so install it only after the Mosaico release named in the plugin's changelog is live. Run the installer again to move a saved Source leads text to the 0.9.13 stamp, or to change an answer or a time.
 
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<timezone>` is their local timezone. Ask only if it cannot be found.
@@ -66,18 +66,18 @@ Install **Mosaico Outreach — Source leads** every two hours during business ho
 to 6:00 PM local time, unless the person chose other hours. Its text is:
 
 ```text
-Use the installed $mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.9 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
+Use the installed $mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.13 or later). This is the Source leads routine. Follow that skill's "Source leads routine" section exactly; it is the procedure and it is current for the installed plugin version.
 
-Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; actions: "source Leads only", then "source Leads and prepare invitation drafts". Proceed without asking which days or which scope.
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; action: "source Leads only". Proceed without asking which days or which scope.
 
 Use the authenticated LinkedIn browser. A LinkedIn warning or captcha stops the run, which then reports.
 
-If the installed plugin is older than 0.9.9 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
+If the installed plugin is older than 0.9.13 or has no "Source leads routine" section, stop and report that the plugin needs updating. Report as the skill says.
 ```
 
 ### Update the standing answers in place
 
-Use this when a Source leads automation is already installed and only its standing answers have to be set or changed: its timezone. It also covers an automation saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, and one saved before 0.9.9 that still carries a quota map or a day (the thin text drops them; if they are left, Mosaico ignores the extra standing answers). Another skill may follow these steps; they touch the Source leads automation and nothing else.
+Use this when a Source leads automation is already installed and only its standing answers have to be set or changed: its timezone. It also covers an automation saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, one saved before 0.9.9 that still carries a quota map or a day (the thin text drops them; if they are left, Mosaico ignores the extra standing answers), and one that still names the action "source Leads and prepare invitation drafts" (the thin text names "source Leads only"). Another skill may follow these steps; they touch the Source leads automation and nothing else.
 
 1. Ask only for the answer that is missing or changing (the timezone). Ask nothing else. Never ask for a quota: Leads per day, Leads per run and who sources them are set on each Agent in Outreach, Agent tab, not in the schedule.
 2. Find the installed "Mosaico Outreach — Source leads" automation, matching by purpose and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.

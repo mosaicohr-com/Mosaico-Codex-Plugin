@@ -11,8 +11,10 @@ to do in Mosaico Outreach?" and present these action headers and descriptions. P
 recommended actions may be mentioned inside the matching action, but must never replace the two
 all-dates follow-up actions:
 
-- **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days, and save
-  personalized invitation drafts. Never approve or send.
+- **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days. A Source
+  run never writes drafts: the Lead owner's Sync data run does. Never approve or send.
+- **Write missing invitation drafts** — Write the invitation draft for each placed Lead of your own that has
+  none, from the `draftsToWrite` list Mosaico gives. Never approve or send.
 - **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
   for the selected day. Verify each one on LinkedIn before marking it sent.
 - **Check for new follow-ups — all dates** — Check every recorded Outreach Lead regardless of
@@ -61,8 +63,8 @@ A candidate saved for a colleague first goes through the Sales Navigator colleag
 plugin 0.9.11 its output also carries `complete`, `controlTotal`, `visibility` and `unreadableRows`, and it goes to
 Mosaico unchanged. Mosaico, not the model, decides what it proves. When the check shows the search could have found
 the candidate and did not (a proven negative), Mosaico saves the Lead as verified not connected by the colleague
-check and the run drafts her invitation at once; otherwise the Lead is saved with its connection unknown, stays
-undrafted, and her own run verifies it first. The send guard: a colleague's invitation is never sent on that check
+check and her own Sync data run drafts her invitation (it is on her `draftsToWrite` list); otherwise the Lead is saved
+with its connection unknown, stays undrafted, and her own run verifies it first. The send guard: a colleague's invitation is never sent on that check
 alone; her own Sync run must record her own connection evidence first (`own-evidence-required`). A run never
 records connection evidence for a colleague's Lead (`evidence-owner-mismatch`). The risk accepted: nobody has yet
 tested a colleague who hides her connections, so a proven negative could in rare cases be wrong; the send guard

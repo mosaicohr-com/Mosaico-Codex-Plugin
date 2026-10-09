@@ -49,8 +49,9 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 
 MIN_VERSION = "0.9.6"
-SOURCE_MIN_VERSION = "0.9.9"  # Codex's single Source leads text
-LANE_MIN_VERSION = "0.9.12"  # Claude's two Source leads lane texts read the `sourcing scope` line
+SOURCE_MIN_VERSION = "0.9.13"  # Codex's single Source leads text: 0.9.13 writes no drafts (0.9.9 added Leads per run)
+LANE_MIN_VERSION = "0.9.13"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
+SYNC_MIN_VERSION = "0.9.13"  # Claude's Sync data text: 0.9.13 writes the missing invitation drafts
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -141,7 +142,7 @@ def main() -> None:
         ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>",), "authenticated LinkedIn browser"),
     )
     for label, text, skill_name, section_name, placeholders, browser in THIN:
-        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else MIN_VERSION
+        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else (SYNC_MIN_VERSION if label == "Claude Sync data" else MIN_VERSION)
         words = len(text.split())
         check(words <= THIN_CAP, f"{label} schedule text is {words} words, over the {THIN_CAP}-word cap: it must be thin")
         check(f"Use the installed {skill_name} skill from the mosaico plugin ({min_version} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
@@ -158,7 +159,8 @@ def main() -> None:
     for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("<quota map>" not in text and "quota" not in text.lower() and "who receives" not in text.lower(), f"{label} thin text still carries a quota standing answer")
     check("Proceed without asking which days or which scope" in sync_text and "Proceed without asking which days or which scope" in source_text and "Proceed without asking which scope" in repair_text, "A thin text does not say to proceed without asking")
-    check('"one pass per thread"' in sync_text and '"send approved invitations"' in sync_text, "Sync data text lacks its scope answers")
+    check('"one pass per thread"' in sync_text and '"write missing invitation drafts"' in sync_text and '"send approved invitations"' in sync_text, "Sync data text lacks its scope answers")
+    check("prepare invitation drafts" not in source_text and "prepare invitation drafts" not in colleagues_text and "prepare invitation drafts" not in codex_text, "a Source leads text still names the action that prepares drafts")
     check('"source Leads only"' in source_text and '"source Leads only"' in colleagues_text, "Source leads text lacks its scope answers")
     for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("next business day" not in text and "day:" not in text and "scheduledDate" not in text, f"{label} thin text still names a day: the application files the days")
@@ -169,9 +171,9 @@ def main() -> None:
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
         if package == "Claude":
-            check("The Source leads texts need 0.9.12, the first release that reads the `sourcing scope` line" in flat_installer, "Claude skill does not state the Source leads minimum version 0.9.12")
+            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Sync data text needs 0.9.13 too" in flat_installer, "Claude skill does not state the Source leads and Sync data minimum version 0.9.13")
         else:
-            check("The Source leads text needs 0.9.9, the first release where Leads per run and the application's day placement drive it" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.9")
+            check("The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.13")
         check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say both numbers are set on each Agent, and an Agent is sourced only with both")
         check("Never copy any step of the procedure into" in flat_installer, f"{package} skill does not forbid copying procedure into a schedule text")
         update = flat_installer[flat_installer.index("### Update the standing answers in place") :] if "### Update the standing answers in place" in flat_installer else ""
@@ -181,7 +183,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.9" and LANE_MIN_VERSION == "0.9.12", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.13", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -205,7 +207,7 @@ def main() -> None:
     for script in SCRIPTS:
         check(script in sync, f"Sync data routine does not name the approved script {script}")
     check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data routine does not describe paged snapshot submission")
-    check("mosaico:mosaico-outreach-invite-run" in sync and "mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected action \"send approved invitations\"" in sync, "Sync data routine does not chain the invite-run skill by name for the approved invitations")
+    check("mosaico:mosaico-outreach-invite-run" in sync and "mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected actions \"write missing invitation drafts\", then \"send approved invitations\"" in sync, "Sync data routine does not chain the invite-run skill by name for the invitation drafts and the approved invitations")
     flat_sync = " ".join(sync.split())
     for name, text in (("Sync data", sync), ("Repair", repair)):
         check("LEAD_NAME=<" in text and "PUBLIC_IDENTIFIER=<scriptIdentifier>" in text, f"{name} routine does not give the thread directive with the Lead's name")
@@ -366,7 +368,7 @@ def main() -> None:
         check("A run that saved nothing because of a blocker other than `sourcing-days-full` is a failed run" in report and "Never report such a run as successful" in report, f"{package} invite-run report lost the failed-run rule")
         check(f"report \"{FULL_SENTENCE}.\"" in report and "is not a failure" in report and SET_SENTENCE in report, f"{package} invite-run report does not report days-full with nothing saved as nothing to source")
         check("sourcing-plan-already-met" not in invite and "Leads remaining today" not in invite and "acceptedToday" not in invite, f"{package} invite-run skill still holds the removed per-day wording")
-        sourcing = invite[invite.index("## Source Leads and prepare drafts"):invite.index("## Source Leads only")]
+        sourcing = invite[invite.index("## Source Leads "):invite.index("## Which Agent a Lead goes to")]
         for needle in ("Leave `day` out", "Never send `targetCount` for sourcing", "Never send `scheduledDate`", "`scheduled-date-ignored`", "Mosaico decides when sourcing ends, never your own judgement", "While any line in `workflowStatus.sourcingPlan` has status `open`, keep sourcing", "Work `workflowStatus.workNow` and read it again at every decision point", "`sourcing-quota-met` (every Agent delivered its Leads per run), `sourcing-days-full`", "across every day in `workflowStatus.runDays`", "`end_run_days_full`"):
             check(needle in sourcing, f"{package} Source Leads section lacks: {needle}")
         check("targetCount:" not in invite and "scheduledDate:" not in invite, f"{package} invite-run skill passes targetCount or scheduledDate")
@@ -382,7 +384,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.13", f"{manifest.name} is not at 0.9.13")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

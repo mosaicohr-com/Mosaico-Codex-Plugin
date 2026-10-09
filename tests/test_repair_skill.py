@@ -144,7 +144,7 @@ def main() -> None:
 
     # Both packages: the version, the changelog and the overview routes.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.13", f"{manifest.name} is not at 0.9.13")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     entry = " ".join(readme[readme.index("### 0.9.0") : readme.index("### 0.8.7")].split())
     for needle in (

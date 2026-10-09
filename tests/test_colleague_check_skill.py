@@ -39,35 +39,29 @@ def section(text: str, heading: str) -> str:
 
 
 def check_0911(claude_text: str, codex_text: str) -> None:
-    """0.9.11: the colleague check carries proof fields, a proven negative drafts at once, and a send waits for the owner's own evidence."""
+    """0.9.11: the colleague check carries proof fields and a send waits for the owner's own evidence. 0.9.13: a proven negative is drafted by her own Sync data run, never by the sourcing run."""
     colleague = flat(section(claude_text, "Check a candidate against the colleague"))
     for needle in (
         "`complete`, `controlTotal`, `visibility` and `unreadableRows`", "send a `null` as `null`", "`colleague-check-negative-proven`", "verified not connected by the colleague check",
-        "`awaitingOwnerCheck` true", "Draft her invitation at once", "**Draft a colleague's invitation**", "`colleague-check-negative-unproven`", "`lead-awaiting-owner-check`",
-        "it stays undrafted", "Continue sourcing", "`evidence-owner-mismatch`", "never recommends `verify_connection`", "never passed to `outreach_record_connection_evidence`",
+        "`awaitingOwnerCheck` true", "This run writes no draft", "her own Sync data run writes her invitation from its `draftsToWrite` list", "`colleague-check-negative-unproven`",
+        "stays unverified and undrafted", "Continue sourcing", "`evidence-owner-mismatch`", "never recommends `verify_connection`", "never passed to `outreach_record_connection_evidence`",
     ):
         check(needle in colleague, f"Claude colleague check lacks the 0.9.11 sentence: {needle}")
     check("goes through **Capture connection evidence** as before" not in claude_text, "the colleague check still sends a colleague's Lead through Capture connection evidence")
     check("then run **Capture connection evidence** for it. Do not write any invitation draft" not in flat(claude_text), "Source Leads only still captures evidence for a colleague's Lead")
-    draft = flat(section(claude_text, "Draft a colleague's invitation"))
-    for needle in (
-        "`outreach_record_message` as an outbound `invite` draft", "`sentAt` null", "the Lead's `leadId`", "no `ownerUserId` on the call", "Mosaico finds her from the Leads this run accepted",
-        "read her day", "`outreach_get_day` with `intent: source_invitation_leads`", "as `ownerUserId`. This is a read only. Never pass `ownerUserId` on a write", "`workflowStatus.days` lists her Leads without a draft",
-        "`awaitingOwnerCheck`", "`lead-awaiting-owner-check`", "`colleague-draft-invite-only`", "`own-evidence-required`", "Never approve or send it",
-    ):
-        check(needle in draft, f"Claude 'Draft a colleague's invitation' lacks: {needle}")
-    for scope in ("Source Leads and prepare drafts", "Source Leads only"):
+    check("## Draft a colleague's invitation" not in claude_text and "`lead-awaiting-owner-check`" not in claude_text and "`colleague-draft-invite-only`" not in claude_text, "the skill still has a sourcing-time colleague draft or its refusals")
+    for scope in ("Source Leads",):
         text = flat(section(claude_text, scope))
         check("never run **Capture connection evidence**" in text or "never run **Capture connection evidence** for her Lead" in text.replace("and never run", "never run"), f"{scope} does not forbid connection evidence for a colleague's Lead")
-    check("**Draft a colleague's invitation**" in flat(section(claude_text, "Source Leads and prepare drafts")), "Source Leads and prepare drafts does not point at the drafting section")
+        check("Do not write any invitation draft, for your Lead or hers" in text and "`sourcing-writes-no-drafts`" in text, f"{scope} may write a colleague's draft")
     check("`own-evidence-required`" in flat(section(claude_text, "Send approved invitations")) and "`colleague-verified-needs-own-check`" in flat(section(claude_text, "Send approved invitations")), "Send approved invitations lacks the own-evidence rule")
     report = flat(section(claude_text, "Report a sourcing run"))
-    for needle in ('"verified not connected by colleague check (proven)"', '"unproven, awaiting her Sync"', "the invitation drafts written for each colleague"):
+    for needle in ('"verified not connected by colleague check (proven)"', '"unproven, awaiting her Sync"', "no drafts: a Source leads run writes none"):
         check(needle in report, f"Claude sourcing report lacks: {needle}")
     routine = flat(section(claude_text, "Source leads routine"))
     for needle in (
         "complete, controlTotal, visibility and unreadableRows", "colleague-check-negative-proven", "colleague-check-negative-unproven", "stays undrafted, so continue sourcing", "evidence-owner-mismatch",
-        "outreach_get_day with intent source_invitation_leads, the runId and her member id from workflowStatus.sourcingPlan as ownerUserId; a read only", "outreach_record_message (her leadId, no ownerUserId on the call)",
+        "her own Sync data run drafts her invitation",
         'as "verified not connected by colleague check (proven)"', 'as "unproven, awaiting her Sync"',
     ):
         check(needle in routine, f"Claude Source leads routine lacks: {needle}")
@@ -80,7 +74,7 @@ def check_0911(claude_text: str, codex_text: str) -> None:
     check("`colleague-verified-needs-own-check`" in flat(section(follow, "Check for new follow-ups")), "Check for new follow-ups lacks the colleague-verified reason")
     # Codex: the same rules in words, no script.
     codex = flat(section(codex_text, "The colleague check (Claude only)"))
-    for needle in ("`colleague-check-negative-proven`", "`colleague-check-negative-unproven`", "`lead-awaiting-owner-check`", "`own-evidence-required`", "never records connection evidence for a colleague's Lead"):
+    for needle in ("`colleague-check-negative-proven`", "`colleague-check-negative-unproven`", "`own-evidence-required`", "never records connection evidence for a colleague's Lead"):
         check(needle in codex, f"Codex colleague note lacks: {needle}")
     codex_follow = (CODEX / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
     check("`colleague-verified-needs-own-check`" in flat(section(codex_follow, "Check for new follow-ups")), "Codex follow-up-run lacks the colleague-verified reason")
@@ -92,11 +86,8 @@ def check_0911(claude_text: str, codex_text: str) -> None:
     # Thin schedule texts keep their minimum version: no new routine section, the procedure lives in the installed plugin.
     for package in (CLAUDE, CODEX):
         installer = flat((package / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md").read_text(encoding="utf-8"))
-        # 0.9.12: the Claude Source leads lanes move to 0.9.12 (they read the scope line); Codex keeps its single text at 0.9.9.
-        if package is CLAUDE:
-            check("0.9.12 or later" in installer and "0.9.9 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install lacks the 0.9.12 stamp")
-        else:
-            check("0.9.9 or later" in installer and "0.9.12 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install changed a thin text's version")
+        # 0.9.13: the Sync data text, both Claude lane texts and the Codex Source leads text move to 0.9.13 (drafts move from Source leads to Sync data).
+        check("0.9.13 or later" in installer and "0.9.9 or later" not in installer and "0.9.12 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install lacks the 0.9.13 stamp")
     # README: the changelog entry, the script description and the colleague-check paragraph.
     readme_raw = (ROOT / "README.md").read_text(encoding="utf-8")
     check(readme_raw.index("### 0.9.11") < readme_raw.index("### 0.9.10"), "README changelog lacks 0.9.11 above 0.9.10")
@@ -128,7 +119,7 @@ def main() -> None:
         check(f"`{code}`" in colleague, f"Claude invite-run colleague check does not name {code}")
     check("ownerUserId" not in colleague, "the colleague check tells the model about ownerUserId")
     # Where the check applies, and that the evidence goes to Mosaico unchanged like every other script's.
-    for scope in ("Source Leads and prepare drafts", "Source Leads only"):
+    for scope in ("Source Leads",):
         check("**Check a candidate against the colleague**" in flat(section(claude_text, scope)), f"{scope} does not point at the colleague check")
     check("`colleagueConnectionEvidence`" in flat(section(claude_text, "Script output goes to Mosaico exactly as returned")), "the exact-as-returned section does not list colleagueConnectionEvidence")
     # The report counts the skips per owner from Mosaico's data, and never calls them failures.
@@ -158,7 +149,7 @@ def main() -> None:
     check_0911(claude_text, codex_text)
     # Manifests and the README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.12", f"{manifest.name} is not at 0.9.12")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.13", f"{manifest.name} is not at 0.9.13")
     readme = flat((ROOT / "README.md").read_text(encoding="utf-8"))
     check("### 0.9.5" in readme and "### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
     print("PASS: the invite-run skills run the colleague check before a colleague save, pass its output unchanged, handle every Mosaico answer, and never treat 'not found' as 'not connected'; Codex says it cannot run it.")
