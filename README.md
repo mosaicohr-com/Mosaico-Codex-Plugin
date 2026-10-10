@@ -181,6 +181,22 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### Unreleased (methodology convert skill)
+
+Requires the Mosaico server release of 2026-10-10 (app build 308 or later), which carries
+`convert_methodology_from_text`. Do not publish or install this plugin before that release is live on main-v2. The
+plugin version bump and the publish are the owner's step; this change does not move the version.
+
+- New skill `mosaico-methodology-convert`, in both the Claude and the Codex packages. It converts a methodology,
+  playbook or framework document the person gave in the conversation: one `convert_methodology_from_text` preview
+  with the text (the person sees the name, size, checksum and excerpt), one execute call with only the token (the
+  host asks the person to approve it), then it reads `get_methodology_project_status` and follows its
+  `recommendedAction` exactly: wait, show blockers in Mosaico's words, retry only when the status offers it, ask
+  the person before `set_conversion_level_positions` or `discard_conversion_components`, and leave
+  `start_conversion_in_app`, `review_analysis` and approval to the person in the app. A PDF or Word file is
+  uploaded in the Methodology page instead; a methodology in several parts is one project per part.
+- The skill adds no Mosaico server and holds no workflow state; Mosaico owns it.
+
 ### 0.9.13
 
 Requires the Mosaico server release that carries mosaicohr-com/mosaico#1834 (sourcing writes no drafts; `draftsToWrite`).
