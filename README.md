@@ -197,6 +197,25 @@ plugin version bump and the publish are the owner's step; this change does not m
   uploaded in the Methodology page instead; a methodology in several parts is one project per part.
 - The skill adds no Mosaico server and holds no workflow state; Mosaico owns it.
 
+### Unreleased (methodology conversion-run skill)
+
+Requires the Mosaico server release that carries `get_next_methodology_model_request`,
+`submit_methodology_model_response` and `cancel_methodology_analysis` (status contract 9). Do not publish or install
+this plugin before that release is live on main-v2. The version bump and the publish are the owner's step.
+
+- New skill `mosaico-methodology-conversion-run`, in both the Claude and the Codex packages. It runs the "answer model
+  requests" loop of a conversion that uses the person's own connected Claude: find the project with
+  `list_methodology_projects`, start with `start_methodology_analysis` and provider `client` only when the status
+  offers it (the app's preview, approved once by the host, is the single confirmation), then follow
+  `get_methodology_project_status` and its one `recommendedAction` until `analysis.stop.validStops` allows a stop.
+- Where the host can start sub-agents, the skill fans out `parallel` helpers with one fixed brief and no document
+  text, and rereads the status after them. Otherwise it answers one request at a time (`claimNext: true`, status every
+  3 requests). A refused answer is fixed from `issues`, at most twice. After a
+  chat stops, the skill reads the status and says when held parts free up. It gives every refusal code with Mosaico's
+  own sentence, never approves or installs, and sends the person to the app to review.
+- The skill adds no Mosaico server and holds no workflow state. `tests/test_methodology_conversion_run_skill.py` checks
+  the tool, action and code names, the sentences and the loop rules, and with `--app-repo` the application too.
+
 ### 0.9.13
 
 Requires the Mosaico server release that carries mosaicohr-com/mosaico#1834 (sourcing writes no drafts; `draftsToWrite`).
@@ -818,6 +837,7 @@ python3 tests/test_schedule_install_skill.py
 python3 tests/test_follow_up_thread_skill.py
 python3 tests/test_run_guards_skill.py
 python3 tests/test_sync_drafts_skill.py
+python3 tests/test_methodology_conversion_run_skill.py --app-repo ../mosaico-app
 ```
 
 ## License
