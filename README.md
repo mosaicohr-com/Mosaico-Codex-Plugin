@@ -181,11 +181,11 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased (methodology convert skill)
+### 0.9.14
 
-Requires the Mosaico server release of 2026-10-10 (app build 308 or later), which carries
-`convert_methodology_from_text`. Do not publish or install this plugin before that release is live on main-v2. The
-plugin version bump and the publish are the owner's step; this change does not move the version.
+Requires the Mosaico server release of 2026-10-11 (main-v2 at 518b4c5e9, mosaicohr-com/mosaico#1888, production
+build 321), which carries `convert_methodology_from_text`, `get_next_methodology_model_request`,
+`submit_methodology_model_response` and `cancel_methodology_analysis` (status contract 9). That release is live.
 
 - New skill `mosaico-methodology-convert`, in both the Claude and the Codex packages. It converts a methodology,
   playbook or framework document the person gave in the conversation: one `convert_methodology_from_text` preview
@@ -196,12 +196,6 @@ plugin version bump and the publish are the owner's step; this change does not m
   `start_conversion_in_app`, `review_analysis` and approval to the person in the app. A PDF or Word file is
   uploaded in the Methodology page instead; a methodology in several parts is one project per part.
 - The skill adds no Mosaico server and holds no workflow state; Mosaico owns it.
-
-### Unreleased (methodology conversion-run skill)
-
-Requires the Mosaico server release that carries `get_next_methodology_model_request`,
-`submit_methodology_model_response` and `cancel_methodology_analysis` (status contract 9). Do not publish or install
-this plugin before that release is live on main-v2. The version bump and the publish are the owner's step.
 
 - New skill `mosaico-methodology-conversion-run`, in both the Claude and the Codex packages. It runs the "answer model
   requests" loop of a conversion that uses the person's own connected Claude: find the project with
