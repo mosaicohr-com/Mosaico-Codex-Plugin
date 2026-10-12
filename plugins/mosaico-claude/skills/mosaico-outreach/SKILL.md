@@ -12,7 +12,7 @@ recommended actions may be mentioned inside the matching action, but must never 
 all-dates follow-up actions:
 
 - **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days. A Source
-  run never writes drafts: the Lead owner's Sync data run does. Never approve or send.
+  run never writes drafts: the Lead owner's Send invitations run does. Never approve or send.
 - **Write missing invitation drafts** — Write the invitation draft for each placed Lead of your own that has
   none, from the `draftsToWrite` list Mosaico gives. Never approve or send.
 - **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
@@ -25,13 +25,15 @@ all-dates follow-up actions:
 - **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
 - **Manage Outreach Agents** — Review, create, or update owned Agents.
 - **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
-- **Repair the Outreach backlog** — Work the repair queue Mosaico keeps behind the daily Sync data
-  run: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
+- **Repair the Outreach backlog** — Work the repair queue Mosaico keeps behind the daily Follow-up and Send invitations
+  runs: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
   declines nobody applied. Up to the cap Mosaico sets for one run. Never approve or send.
-- **Install the Outreach schedules** — Idempotently create the local-time schedules: Sync data
-  (connections and messaging, once a day), Source leads in two lanes (own, on the even hours, and
-  colleagues, on the odd hours, each at least 60 minutes from the other lane, from Sync and from
-  Repair) and Repair (once a week, Sunday 10:00 AM by default, also on demand). Only Sync data sends.
+- **Install the Outreach schedules** — Idempotently create the local-time schedules: Send invitations
+  (once a day, 1:00 PM by default), Follow-up (once a day, 1:30 PM) and Withdraw stale invitations (once a day,
+  2:00 PM), which replace the older single Sync data schedule and retire it, Source leads in two lanes (own, on the
+  even hours, and colleagues, on the odd hours, each at least 60 minutes from the other lane, from the three daily
+  times and from Repair) and Repair (once a week, Sunday 10:00 AM by default, also on demand). Only Send
+  invitations and Follow-up send; Withdraw stale invitations only withdraws what Mosaico lists.
 
 Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
 `/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
@@ -63,9 +65,9 @@ A candidate saved for a colleague first goes through the Sales Navigator colleag
 plugin 0.9.11 its output also carries `complete`, `controlTotal`, `visibility` and `unreadableRows`, and it goes to
 Mosaico unchanged. Mosaico, not the model, decides what it proves. When the check shows the search could have found
 the candidate and did not (a proven negative), Mosaico saves the Lead as verified not connected by the colleague
-check and her own Sync data run drafts her invitation (it is on her `draftsToWrite` list); otherwise the Lead is saved
+check and her own Send invitations run drafts her invitation (it is on her `draftsToWrite` list); otherwise the Lead is saved
 with its connection unknown, stays undrafted, and her own run verifies it first. The send guard: a colleague's invitation is never sent on that check
-alone; her own Sync run must record her own connection evidence first (`own-evidence-required`). A run never
+alone; her own Send invitations run must record her own connection evidence first (`own-evidence-required`). A run never
 records connection evidence for a colleague's Lead (`evidence-owner-mismatch`). The risk accepted: nobody has yet
 tested a colleague who hides her connections, so a proven negative could in rare cases be wrong; the send guard
 contains it, because nothing goes out before her own check.

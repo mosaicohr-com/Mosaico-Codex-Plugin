@@ -1,6 +1,6 @@
 ---
 name: mosaico-outreach-schedule-install
-description: Install or repair the Mosaico Outreach schedules, Sync data, Source leads (an own lane and a colleagues lane) and Repair, in the user's local timezone.
+description: Install or repair the Mosaico Outreach schedules, Send invitations, Follow-up, Withdraw stale invitations, Source leads (an own lane and a colleagues lane) and Repair, in the user's local timezone.
 ---
 
 # Install the Mosaico Outreach schedules
@@ -54,7 +54,7 @@ Do these checks first. If one fails, install nothing and tell the person what to
 3. **Old Codex automations.** Look for `~/.codex/automations/daily-approved-outreach-sends` and
    `~/.codex/automations/mosaico-lead-preparation`. If either exists and its `automation.toml` says
    `status = "ACTIVE"`, tell the person to disable it. Codex cannot run the connection check, and a
-   parallel run would send invitations twice. Do not install the Sync data schedule while one is active.
+   parallel run would send invitations twice. Do not install the Send invitations, Follow-up or Withdraw stale invitations schedule while one is active.
 4. **Non-production Mosaico server.** Look for an MCP server that points at a non-production Mosaico
    address, in the project's `.mcp.json` and in the project and user entries of `~/.claude.json`
    (`mcpServers`; the project entry is the one for the folder the schedules run in). An address that
@@ -105,26 +105,26 @@ one that fails.
    answers `linkedin_identity_not_registered`, tell her to register the profile there, or to ask an
    Owner to do it, and check again after she says it is done. Do not install anything until the check
    passes.
-6. **Run this installer.** It installs her Sync data schedule and her Repair schedule. Ask once whether
+6. **Run this installer.** It installs her Send invitations, Follow-up and Withdraw stale invitations schedules and her Repair schedule. If she has the older single Sync data task, the installer retires it once the three new ones exist. Ask once whether
    she sources Leads herself; if she does not, install no Source leads task for her. Only if she does, also install her
    own-lane Source leads schedule, and add the colleagues lane only if she also sources Leads for a colleague (an Agent of
    a colleague that names her in Sourced by). Her Source leads schedules need no quota: she sets Leads per day and Leads
    per run on her Agent in Outreach (Agent tab) and may name a colleague as "Sourced by".
 
-Each person's Sync data schedule runs on that person's own Mac, in that person's own browser pane, and
+Each person's Send invitations, Follow-up and Withdraw stale invitations schedules run on that person's own Mac, in that person's own browser pane, and
 sends only from that person's account. Her Repair schedule works only her own backlog and never sends.
 Nobody's run touches another owner's Leads.
 
 ## The schedules
 
-Install active persistent local scheduled tasks for three routines: Sync data, Source leads and Repair. Source
-leads is installed as two tasks, one per lane (own and colleagues), so there are up to four tasks. Each scheduled run
+Install active persistent local scheduled tasks for five routines: Send invitations, Follow-up, Withdraw stale invitations, Source leads and Repair. Source
+leads is installed as two tasks, one per lane (own and colleagues), so there are up to six tasks. The older single "Sync data (connections and messaging)" task is superseded by Send invitations, Follow-up and Withdraw stale invitations and is retired (see Install). Each scheduled run
 starts its own Outreach run through the invite-run, follow-up-run or repair-run skill. If Mosaico returns a blocker, the run stops and
 reports it; it does not work around it.
 
 Each saved text is a thin routine: it holds only the person's standing answers and names the installed plugin's skill and routine section. The procedure lives in that skill, so every run follows the installed plugin's current procedure and a plugin release never leaves a saved schedule stale. Never copy any step of the procedure into a schedule text.
 
-**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line: an older skill ignores it and would work the whole plan in both lanes). The Sync data text needs 0.9.13 too, the first release where Source leads writes no invitation drafts and Sync data writes the missing ones: an older Sync skill would never write them, so install both only after the Mosaico release named in the plugin's changelog is live. The Repair text stays valid across later releases: run the installer again only to change an answer or a time, or to move a saved Sync data or Source leads text to the 0.9.13 stamp.
+**Version stamp.** Each thin text names the minimum plugin version it needs (0.9.6, the first release with the routine sections). A run on an older plugin, or on a plugin that lacks the named section, stops and reports that the plugin needs updating. The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line: an older skill ignores it and would work the whole plan in both lanes). The Send invitations, Follow-up and Withdraw stale invitations texts need 0.9.15, the first release with those three routine sections and the release that splits the old Sync data routine into them: an older plugin has no such section, or still holds the Sync data routine, so install them only after the Mosaico release named in the plugin's changelog for 0.9.15 is live (the Withdraw stale invitations text relies on its outreach_get_withdraw_queue and outreach_record_withdrawal tools). The Repair text stays valid across later releases: run the installer again only to change an answer or a time, or to move a saved Source leads text to the 0.9.13 stamp. A saved Sync data text is retired, never moved to a new stamp: on a 0.9.15 plugin it stops and reports that it is superseded.
 
 Fill the placeholders from the person and the current context, never from a fixed value:
 `<public identifier>` is the last part of the person's LinkedIn profile address (the part after
@@ -132,19 +132,49 @@ Fill the placeholders from the person and the current context, never from a fixe
 
 Leads per day and Leads per run are set on each Agent in Outreach, Agent tab; an Agent is sourced only when it is on and both are set. Who sources an Agent (Sourced by) is set there too, and Mosaico files the Leads into days itself, so none of it is in the schedule. A schedule saved with a quota map or a day needs no change, but to drop it follow **Update the standing answers in place** below.
 
-**Mosaico Outreach — Sync data (connections and messaging)** — once a day, at 1:00 PM local time unless
-the person chose another time. This is the only schedule that clicks Connect or sends a message, and the one that writes the missing invitation drafts for the person's own Leads. Its
-text is:
+**Mosaico Outreach — Send invitations** — once a day, at 1:00 PM local time unless the person chose another time. It writes the
+missing invitation drafts for the person's own Leads, then sends the invitations that are already approved. It never approves a draft
+and does nothing else: no follow-ups and no withdrawals. Its text is:
 
 ```text
-Use the installed mosaico:mosaico-outreach-follow-up-run skill from the mosaico plugin (0.9.13 or later). This is the Sync data routine. Follow that skill's "Sync data routine" section exactly; it is the procedure (it chains the mosaico:mosaico-outreach-invite-run skill for the invitation drafts and the approved invitations) and it is current for the installed plugin version.
+Use the installed mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.15 or later). This is the Send invitations routine. Follow that skill's "Send invitations routine" section exactly; it is the procedure and it is current for the installed plugin version.
 
-Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; scope: follow-ups across all dates with the action "one pass per thread", then invitations for today with the actions "write missing invitation drafts" and "send approved invitations". Proceed without asking which days or which scope.
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; scope: invitations for today with the actions "write missing invitation drafts" and "send approved invitations". Proceed without asking which days or which scope.
 
 Do every LinkedIn step in Claude's built-in browser pane, signed in to my LinkedIn (<public identifier>). A LinkedIn warning or captcha stops the run, which then reports.
 
-If the installed plugin is older than 0.9.13 or has no "Sync data routine" section, stop and report that the plugin needs updating. Report as the skill says.
+If the installed plugin is older than 0.9.15 or has no "Send invitations routine" section, stop and report that the plugin needs updating. Report as the skill says.
 ```
+
+**Mosaico Outreach — Follow-up** — once a day, at 1:30 PM local time unless the person chose another time. It checks accepted
+invitations (the Leads who replied and the Leads who did not), checks message replies to follow-ups, does one pass per thread across
+all dates, and sends the follow-ups that are already approved. It sends no invitation and withdraws nothing. Its text is:
+
+```text
+Use the installed mosaico:mosaico-outreach-follow-up-run skill from the mosaico plugin (0.9.15 or later). This is the Follow-up routine. Follow that skill's "Follow-up routine" section exactly; it is the procedure and it is current for the installed plugin version.
+
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; scope: follow-ups across all dates with the action "one pass per thread". Proceed without asking which days or which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, signed in to my LinkedIn (<public identifier>). A LinkedIn warning or captcha stops the run, which then reports.
+
+If the installed plugin is older than 0.9.15 or has no "Follow-up routine" section, stop and report that the plugin needs updating. Report as the skill says.
+```
+
+**Mosaico Outreach — Withdraw stale invitations** — once a day, at 2:00 PM local time unless the person chose another time. It withdraws
+the pending invitations Mosaico lists as stale, up to the cap Mosaico sets for one run, and records each one. Mosaico owns the 30-day
+rule; the routine never works it out from dates. It never sends anything and never clicks Connect. Its text is:
+
+```text
+Use the installed mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.15 or later). This is the Withdraw stale invitations routine. Follow that skill's "Withdraw stale invitations routine" section exactly; it is the procedure and it is current for the installed plugin version.
+
+Standing answers for this recurring automation, supplied once by the person: timezone <timezone>; LinkedIn public identifier <public identifier>; scope: the whole withdraw queue, up to the cap Mosaico sets for one run. Proceed without asking which scope.
+
+Do every LinkedIn step in Claude's built-in browser pane, signed in to my LinkedIn (<public identifier>). A LinkedIn warning or captcha stops the run, which then reports.
+
+If the installed plugin is older than 0.9.15 or has no "Withdraw stale invitations routine" section, stop and report that the plugin needs updating. Report as the skill says.
+```
+
+The three daily schedules share the person's one LinkedIn account and one browser pane, so they must not overlap: the defaults sit 30 minutes apart, and a person with many invitations to send should space them further apart so one run has finished before the next starts.
 
 **Mosaico Outreach — Source leads (own)** — every two hours on the even hours, at `0 0,2,4,6,8,12,14,16,18,20,22 * * *`
 local time (cron, explicit hours), unless the person chose other hours. It works the Agents the person owns. It runs from
@@ -179,7 +209,7 @@ The two lanes share the person's one LinkedIn account and one browser pane. Mosa
 
 ### Update the standing answers in place
 
-Use this when a schedule is already installed and only its standing answers have to be set or changed: its timezone or its LinkedIn public identifier. It also covers a schedule saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, a Source leads schedule saved before 0.9.9 that still carries a quota map or a day (the thin text drops them; if they are left, Mosaico ignores the extra standing answers), a Source leads schedule with no `sourcing scope` line, which becomes the own lane, a Source leads schedule that still names the action "source Leads and prepare invitation drafts" (the thin text names "source Leads only"), and a Sync data schedule that does not yet name the action "write missing invitation drafts". Another skill may follow these steps; they touch the one schedule and nothing else.
+Use this when a schedule is already installed and only its standing answers have to be set or changed: its timezone or its LinkedIn public identifier. It also covers a schedule saved in the older long form (a text that holds Step 1 and the other steps), which has to become the thin text, a Source leads schedule saved before 0.9.9 that still carries a quota map or a day (the thin text drops them; if they are left, Mosaico ignores the extra standing answers), a Source leads schedule with no `sourcing scope` line, which becomes the own lane, a Source leads schedule that still names the action "source Leads and prepare invitation drafts" (the thin text names "source Leads only"), and a saved Sync data task, which is not updated in place but retired (see Install). Another skill may follow these steps; they touch the one schedule and nothing else.
 
 1. Ask only for the answer that is missing or changing (the timezone or the LinkedIn public identifier). Ask nothing else. Never ask for a quota: Leads per day, Leads per run and who sources them are set on each Agent in Outreach, Agent tab, not in the schedule.
 2. Find the installed task, for example "Mosaico Outreach — Source leads (own)", matching by purpose, scope and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
@@ -189,7 +219,7 @@ Use this when a schedule is already installed and only its standing answers have
 **Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
 `0 10 * * 0`) unless the person chose another day or time, and also whenever the person asks for it. It
 works the backlog Mosaico lists in its repair queue, up to the cap Mosaico sets for one run. It never
-approves, sends or messages; the Sync data schedule does that. Its text is:
+approves, sends or messages; the Send invitations and Follow-up schedules do that. Its text is:
 
 ```text
 Use the installed mosaico:mosaico-outreach-repair-run skill from the mosaico plugin (0.9.6 or later). This is the Repair routine. Follow that skill's "Repair routine" section exactly; it is the procedure and it is current for the installed plugin version.
@@ -204,21 +234,20 @@ If the installed plugin is older than 0.9.6 or has no "Repair routine" section, 
 ## Keep the schedules apart
 
 The schedules must not overlap. Spacing rule: place every Source leads time at least 60 minutes from every time of the
-other lane, from the Sync data time, and on the day Repair runs from the Repair time. The defaults do this:
+other lane, from each of the three daily times (Send invitations, Follow-up and Withdraw stale invitations), and on the day Repair runs from the Repair time. The defaults do this:
 
-- own lane: `0 0,2,4,6,8,12,14,16,18,20,22 * * *` (12:00 AM, 2, 4, 6, 8 AM, 12 noon, 2, 4, 6, 8, 10 PM; never 10 AM and never 1 PM);
-- colleagues lane: `0 1,3,5,7,9,11,15,17,19,21,23 * * *` (1, 3, 5, 7, 9, 11 AM, 3, 5, 7, 9, 11 PM; never 1 PM);
-- Sync data: `0 13 * * *` (1:00 PM), unchanged;
+- own lane: `0 0,2,4,6,8,12,16,18,20,22 * * *` (12:00 AM, 2, 4, 6, 8 AM, 12 noon, 4, 6, 8, 10 PM; never 10 AM, never 1 PM and never 2 PM);
+- colleagues lane: `0 1,3,5,7,9,11,15,17,19,21,23 * * *` (1, 3, 5, 7, 9, 11 AM, 3, 5, 7, 9, 11 PM; never 1 PM or 2 PM);
+- Send invitations: `0 13 * * *` (1:00 PM), Follow-up: `30 13 * * *` (1:30 PM) and Withdraw stale invitations: `0 14 * * *` (2:00 PM);
 - Repair: `0 10 * * 0` (Sunday 10:00 AM), unchanged.
 
-If the person moves the Sync time, move or drop any Source leads time of either lane that falls closer than 60 minutes
-to it. Say in the readback that you did this.
+If the person moves any of the three daily times, move or drop any Source leads time of either lane that falls closer than 60 minutes
+to it, and keep the three daily times apart from each other too. Say in the readback that you did this.
 
-Repair runs once a week, and its default is Sunday at 10:00 AM. On the day Repair runs, keep every Sync
-data and Source leads time at least 60 minutes from the Repair time too: if either schedule also runs on
-that day and a time falls closer than 60 minutes, move or drop that Sync data or Source leads time, never
+Repair runs once a week, and its default is Sunday at 10:00 AM. On the day Repair runs, keep every daily and Source leads time at least 60 minutes from the Repair time too: if either schedule also runs on
+that day and a time falls closer than 60 minutes, move or drop that daily or Source leads time, never
 the Repair time the person chose, and say so in the readback. Repair never sends, so it never takes the
-place of Sync data.
+place of Send invitations or Follow-up.
 
 ## Install
 
@@ -226,9 +255,9 @@ place of Sync data.
    before writing anything.
 2. Match existing tasks by their Mosaico Outreach purpose and instructions, not name alone. An older
    "Prepare invitations" task matches Source leads. An older "Send approved invitations" task matches
-   Sync data. A task that works the repair queue matches Repair. Only one task may send, so update the old
+   Send invitations. A task that works the repair queue matches Repair. Only one task may send, so update the old
    sending task in place or disable it.
-   A saved thin text matches the routine it names ("This is the Sync data routine"). Match a Source leads task by
+   A task for the older single Sync data routine (its title "Mosaico Outreach — Sync data (connections and messaging)", or a text that says "This is the Sync data routine") matches none of the new tasks: it is retired. Create the Send invitations, Follow-up and Withdraw stale invitations tasks first, then retire the Sync data task with `update_scheduled_task` (disable it) or `delete_scheduled_task`, keep its cron times as the defaults for the three new tasks when the person has not chosen others, and say in the readback that it is retired. A reinstall must find and retire it; never leave it enabled beside the three, because it would run the same work twice. A saved thin text matches the routine it names ("This is the Send invitations routine", "This is the Follow-up routine", "This is the Withdraw stale invitations routine"). Match a Source leads task by
    routine and scope: its text holds `sourcing scope: own` (the own lane) or `sourcing scope: colleagues` (the colleagues
    lane). A Source leads task with no scope line is the older whole-plan task: update it in place into the own lane (the
    own text, the own cron, its name and enabled state otherwise kept) and never leave it enabled beside the lanes. If an
@@ -241,8 +270,8 @@ place of Sync data.
 4. If matching tasks exist but differ, update them in place as under **Update the standing answers in
    place**: a text in the older long form is replaced by the thin text, carrying its answers over and keeping
    its cron times, enabled state, name and every unrelated supported metadata and permission setting.
-5. If the host supports only one persistent local task, install Sync data alone and tell the person
-   that Source leads and Repair are not installed. Do not merge the schedules or weaken any of them.
+5. If the host supports only one persistent local task, install Send invitations alone and tell the person
+   that Follow-up, Withdraw stale invitations, Source leads and Repair are not installed. Do not merge the schedules or weaken any of them.
 6. Do not ask the person to repeat the dates, actions, times, folder or timezone. Ask only when a
    host-required human decision cannot be derived from the current context.
 7. Read back the saved task state and confirm names, local timezone, enabled status, next run
@@ -250,7 +279,7 @@ place of Sync data.
    no steps). Read both Source leads lanes back and show, for each, its name, cron, enabled state, next run, its
    `sourcing scope` line, and that its text names the Source leads routine section and holds no steps; confirm that no
    Source leads task without a scope line remains enabled. For Source leads, confirm that every time is at least 60 minutes
-   from the other lane and from the Sync time, and on Sunday from the Repair time. For Repair,
+   from the other lane and from the three daily times, and on Sunday from the Repair time. For Repair,
    confirm the cron `0 10 * * 0` (or the person's own day and time), and that Repair is also available on
    demand through `/mosaico:mosaico-outreach-repair-run`. A write attempt without readback is not
-   completion.
+   completion. Also confirm that no Sync data task remains enabled: read the three new tasks back first, and only then say the old one is retired.

@@ -5,7 +5,7 @@ description: Work the Mosaico Outreach repair backlog (unverified Leads, stale d
 
 # Mosaico Outreach Repair Run
 
-The daily Sync data run keeps threads, approved follow-ups and invitations moving. Everything that piled up
+The daily Follow-up and Send invitations runs keep threads, approved follow-ups and invitations moving. Everything that piled up
 behind it is this routine's work: Leads nobody verified, drafts that break a rule, addresses LinkedIn
 redirected, one person held twice, declines nobody applied. Mosaico owns the list, its order, its cap and
 the exact call for every item. This skill carries LinkedIn's data to Mosaico and judges language; it does
@@ -133,7 +133,7 @@ modify another owner's records.
 
 ## Repair routine
 
-This is the Repair flow of Mosaico Outreach. It works the backlog Mosaico lists in its repair queue: Leads whose connection nobody verified, drafts that break a rule, addresses LinkedIn redirected, one person held under two Leads, and declines nobody applied. It never sends a message or an invitation, never approves, rewrites or replaces a draft, never sets a connection state and never reads a thread by eye; the Sync data schedule does the daily sending. It uses this skill and the procedures it names from mosaico:mosaico-outreach-follow-up-run.
+This is the Repair flow of Mosaico Outreach. It works the backlog Mosaico lists in its repair queue: Leads whose connection nobody verified, drafts that break a rule, addresses LinkedIn redirected, one person held under two Leads, and declines nobody applied. It never sends a message or an invitation, never approves, rewrites or replaces a draft, never sets a connection state and never reads a thread by eye; the Send invitations and Follow-up schedules do the daily sending. It uses this skill and the procedures it names from mosaico:mosaico-outreach-follow-up-run.
 
 **Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
 

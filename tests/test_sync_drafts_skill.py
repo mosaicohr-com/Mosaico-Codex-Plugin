@@ -72,9 +72,9 @@ def main() -> None:
         check("Write the missing outbound Invite draft" not in text and "write a missing invitation draft" not in text.lower(), f"{package} invite-run skill still tells a sourcing run to write a draft")
 
         # 2. The Source leads routine: one action, no drafts, the refusal is expected.
-        routine = flat(raw[raw.index("## Source leads routine"):])
+        routine = flat(raw[raw.index("## Source leads routine"):].split("\n## Send invitations routine")[0])
         check('the action is "source Leads only"' in routine, f'{package} Source leads routine does not name the one action "source Leads only"')
-        check("It never writes invitation drafts, approves, sends or messages; the Sync data schedule" in routine, f"{package} Source leads routine intro still allows drafts")
+        check("It never writes invitation drafts, approves, sends or messages; the Send invitations schedule" in routine, f"{package} Source leads routine intro still allows drafts")
         step3 = routine[routine.index("Step 3."):routine.index("Step 4.")]
         for needle in ("writes no invitation draft, for your Leads or a colleague's", "draftsToWrite list", "do not attempt one", "sourcing-writes-no-drafts", "expected and not a failure", "continue_with_next_lead", "Never approve or send an invitation"):
             check(needle in step3, f"{package} Source leads Step 3 lacks: {needle}")
@@ -91,7 +91,7 @@ def main() -> None:
         for field in LIST_FIELDS:
             check(field in drafts, f"{package} 'Write missing invitation drafts' lacks the field name: {field}")
         for needle in (
-            "the Lead owner's work, done in the Sync data routine for the person's own Leads only",
+            "the Lead owner's work, done in the Send invitations routine for the person's own Leads only",
             "A Source leads run never does it",
             "outreach_get_day for today with intent: send_approved_invitations",
             "outreach_get_follow_ups carries the same list as a top-level draftsToWrite",
@@ -114,21 +114,28 @@ def main() -> None:
         check("Sourcing is always its own run; writing drafts and sending share one send_approved_invitations run" in start, f"{package} Start the run does not keep sourcing apart from drafting and sending")
         check("missing invitation drafts" in flat(raw.split("---", 2)[1]), f"{package} invite-run description does not name drafting")
 
-    # 4. Sync data routine (Claude): drafts first in the invitation step, from the application's list, own Leads only, never approved or sent.
+    # 4. Send invitations routine (Claude, invite-run): drafts first, from the application's list, own Leads only, never approved or sent.
     follow = read(CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md")
-    sync = flat(section(follow, "Sync data routine"))
+    invite_claude = read(CLAUDE / "skills" / "mosaico-outreach-invite-run" / "SKILL.md")
+    sync = flat(section(invite_claude, "Send invitations routine"))
     for needle in (
-        "It does not source or transfer",
-        "It writes the missing invitation drafts for the person's own Leads, from the draftsToWrite list Mosaico gives it, and never approves or sends them",
-        'then invitations for today with the actions "write missing invitation drafts" and "send approved invitations"',
-        'the selected actions "write missing invitation drafts", then "send approved invitations"',
-        "Write missing invitation drafts\" section says",
+        "It never approves a draft, and it does nothing else: no follow-ups, no messages, no withdrawals, no sourcing",
+        "it writes the missing invitation drafts for the person's own Leads, from the draftsToWrite list Mosaico gives it".capitalize() if False else "writes the missing invitation drafts for the person's own Leads, from the draftsToWrite list Mosaico gives it",
+        'the scope is invitations for today with the actions "write missing invitation drafts" and "send approved invitations"',
+        'the selected action "write missing invitation drafts", as its "Write missing invitation drafts" section says',
+        'the selected action "send approved invitations"',
         "draftsToWrite on the day read (outreach_get_follow_ups carries the same list) and follow its recommendedAction",
         "write a draft with sentAt null only for an entry on that list (always one of your own Leads), never approve or send a draft, and never write one for any other Lead",
         "invitation drafts written and Leads skipped for drafting, each with its reason",
     ):
-        check(needle in sync, f"Sync data routine lacks: {needle}")
-    check("draft invitations; the Source leads schedule" not in sync and "does not source, transfer or draft" not in sync, "Sync data routine still says it does not draft invitations")
+        check(needle in sync, f"Send invitations routine lacks: {needle}")
+    # The Follow-up routine writes no invitation draft and sends no invitation; the old Sync data heading is only a superseded note.
+    fu = flat(section(follow, "Follow-up routine"))
+    for gone in ("write missing invitation drafts", "send approved invitations", "linkedin-sent-invitations.js", "draftsToWrite list"):
+        check(gone not in fu, f"Follow-up routine still holds invitation work: {gone}")
+    check("\n## Sync data routine\n" not in follow and "## Sync data routine (superseded)" in follow, "the follow-up-run skill still has a live Sync data routine")
+    old = flat(section(follow, "Sync data routine (superseded)"))
+    check("Do not run any part of it" in old and "has to be reinstalled" in old and "start no Outreach run" in old, "the superseded note does not stop an old saved schedule")
     note = flat(section(follow, "Missing invitation drafts are not follow-up work"))
     check("draftsToWrite" in note and "do not act on it" in note and "a Source leads run never does" in note, "follow-up-run lacks the note that draftsToWrite is not follow-up work")
     codex_follow = read(CODEX / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md")
@@ -137,15 +144,16 @@ def main() -> None:
     # 5. The installer: the Sync data and Source leads texts carry the 0.9.13 stamp, Repair keeps 0.9.6, nothing says 0.9.12 any more.
     installer_raw = read(CLAUDE / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md")
     texts = re.findall(r"```text\n(.*?)\n```", installer_raw, re.S)
-    check(len(texts) == 4, f"Claude installer must hold four schedule texts, found {len(texts)}")
-    sync_text, own_text, colleagues_text, repair_text = texts
-    for label, text, section_name in (("Sync data", sync_text, "Sync data routine"), ("Source leads (own)", own_text, "Source leads routine"), ("Source leads (colleagues)", colleagues_text, "Source leads routine")):
-        check("(0.9.13 or later)" in text and f'is older than 0.9.13 or has no "{section_name}" section' in text, f"the {label} text is not stamped 0.9.13")
+    check(len(texts) == 6, f"Claude installer must hold six schedule texts, found {len(texts)}")
+    sync_text, follow_text, withdraw_text, own_text, colleagues_text, repair_text = texts
+    for label, text, section_name, stamp in (("Send invitations", sync_text, "Send invitations routine", "0.9.15"), ("Follow-up", follow_text, "Follow-up routine", "0.9.15"), ("Withdraw stale invitations", withdraw_text, "Withdraw stale invitations routine", "0.9.15"), ("Source leads (own)", own_text, "Source leads routine", "0.9.13"), ("Source leads (colleagues)", colleagues_text, "Source leads routine", "0.9.13")):
+        check(f"({stamp} or later)" in text and f'is older than {stamp} or has no "{section_name}" section' in text, f"the {label} text is not stamped {stamp}")
         check("0.9.12" not in text, f"the {label} text still names 0.9.12")
         check(len(text.split()) <= 200, f"the {label} text is not thin")
         for procedure in ("outreach_", "draftsToWrite", "Step 1", "checklistReview"):
             check(procedure not in text, f"the {label} text holds procedure: {procedure}")
-    check('"write missing invitation drafts"' in sync_text and '"send approved invitations"' in sync_text and '"one pass per thread"' in sync_text, "the Sync data text lacks its three actions")
+    check('"write missing invitation drafts"' in sync_text and '"send approved invitations"' in sync_text and '"one pass per thread"' not in sync_text, "the Send invitations text lacks its two actions")
+    check('"one pass per thread"' in follow_text and "invitation" not in follow_text.replace("accepted invitations", ""), "the Follow-up text lacks its action or names invitation work")
     check('action: "source Leads only"' in own_text and 'action: "source Leads only"' in colleagues_text, 'a Source leads text does not name the one action "source Leads only"')
     check("(0.9.6 or later)" in repair_text, "the Repair stamp changed")
     codex_installer_raw = read(CODEX / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md")
@@ -153,17 +161,17 @@ def main() -> None:
     check(len(codex_texts) == 1 and "(0.9.13 or later)" in codex_texts[0] and 'action: "source Leads only"' in codex_texts[0], "the Codex Source leads text is not stamped 0.9.13 with the one action")
     check("### Update the standing answers in place" in installer_raw, "the installer lost the update-in-place path")
     flat_installer = " ".join(installer_raw.split())
-    check('a Sync data schedule that does not yet name the action "write missing invitation drafts"' in flat_installer and 'still names the action "source Leads and prepare invitation drafts"' in flat_installer, "the installer does not move older Sync data or Source leads texts in place")
+    check('a saved Sync data task, which is not updated in place but retired' in flat_installer and 'still names the action "source Leads and prepare invitation drafts"' in flat_installer, "the installer does not move older Sync data or Source leads texts in place")
 
     # 6. Overview skills.
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         overview = flat(read(root / "skills" / "mosaico-outreach" / "SKILL.md"))
-        check("A Source run never writes drafts: the Lead owner's Sync data run does" in overview and "Write missing invitation drafts" in overview and "draftsToWrite" in overview, f"{package} overview skill does not describe who writes drafts")
+        check("A Source run never writes drafts: the Lead owner's Send invitations run does" in overview and "Write missing invitation drafts" in overview and "draftsToWrite" in overview, f"{package} overview skill does not describe who writes drafts")
         check("save personalized invitation drafts" not in overview, f"{package} overview skill still says Source saves drafts")
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.14", f"{manifest.name} is not at 0.9.14")
+        check(json.loads(read(manifest))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])

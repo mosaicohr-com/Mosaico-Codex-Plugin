@@ -16,7 +16,9 @@ SKILLS = {
 }
 
 TITLES = (
-    "Mosaico Outreach — Sync data (connections and messaging)",
+    "Mosaico Outreach — Send invitations",
+    "Mosaico Outreach — Follow-up",
+    "Mosaico Outreach — Withdraw stale invitations",
     "Mosaico Outreach — Source leads",
     "Mosaico Outreach — Repair",
 )
@@ -51,7 +53,7 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 MIN_VERSION = "0.9.6"
 SOURCE_MIN_VERSION = "0.9.13"  # Codex's single Source leads text: 0.9.13 writes no drafts (0.9.9 added Leads per run)
 LANE_MIN_VERSION = "0.9.13"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
-SYNC_MIN_VERSION = "0.9.13"  # Claude's Sync data text: 0.9.13 writes the missing invitation drafts
+SYNC_MIN_VERSION = "0.9.15"  # Claude's Send invitations, Follow-up and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -128,21 +130,23 @@ def main() -> None:
     THIN_CAP = 200
     claude_texts = re.findall(r"```text\n(.*?)\n```", claude, re.S)
     codex_texts = re.findall(r"```text\n(.*?)\n```", SKILLS["Codex"], re.S)
-    check(len(claude_texts) == 4, f"Claude skill must hold exactly four schedule texts (Sync data, Source leads own, Source leads colleagues, Repair), found {len(claude_texts)}")
+    check(len(claude_texts) == 6, f"Claude skill must hold exactly six schedule texts (Send invitations, Follow-up, Withdraw stale invitations, Source leads own, Source leads colleagues, Repair), found {len(claude_texts)}")
     for title in LANE_TITLES:
         check(title in claude, f"Claude skill is missing the Source leads lane title: {title}")
     check(len(codex_texts) == 1, f"Codex skill must hold exactly one schedule text, found {len(codex_texts)}")
-    sync_text, source_text, colleagues_text, repair_text = claude_texts
+    sync_text, follow_text, withdraw_text, source_text, colleagues_text, repair_text = claude_texts
     codex_text = codex_texts[0]
     THIN = (
-        ("Claude Sync data", sync_text, "mosaico:mosaico-outreach-follow-up-run", "Sync data routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
+        ("Claude Send invitations", sync_text, "mosaico:mosaico-outreach-invite-run", "Send invitations routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
+        ("Claude Follow-up", follow_text, "mosaico:mosaico-outreach-follow-up-run", "Follow-up routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
+        ("Claude Withdraw stale invitations", withdraw_text, "mosaico:mosaico-outreach-invite-run", "Withdraw stale invitations routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Claude Source leads (own)", source_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Claude Source leads (colleagues)", colleagues_text, "mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Claude Repair", repair_text, "mosaico:mosaico-outreach-repair-run", "Repair routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
         ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>",), "authenticated LinkedIn browser"),
     )
     for label, text, skill_name, section_name, placeholders, browser in THIN:
-        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else (SYNC_MIN_VERSION if label == "Claude Sync data" else MIN_VERSION)
+        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else (SYNC_MIN_VERSION if label in ("Claude Send invitations", "Claude Follow-up", "Claude Withdraw stale invitations") else MIN_VERSION)
         words = len(text.split())
         check(words <= THIN_CAP, f"{label} schedule text is {words} words, over the {THIN_CAP}-word cap: it must be thin")
         check(f"Use the installed {skill_name} skill from the mosaico plugin ({min_version} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
@@ -159,19 +163,23 @@ def main() -> None:
     for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("<quota map>" not in text and "quota" not in text.lower() and "who receives" not in text.lower(), f"{label} thin text still carries a quota standing answer")
     check("Proceed without asking which days or which scope" in sync_text and "Proceed without asking which days or which scope" in source_text and "Proceed without asking which scope" in repair_text, "A thin text does not say to proceed without asking")
-    check('"one pass per thread"' in sync_text and '"write missing invitation drafts"' in sync_text and '"send approved invitations"' in sync_text, "Sync data text lacks its scope answers")
+    check('"write missing invitation drafts"' in sync_text and '"send approved invitations"' in sync_text and '"one pass per thread"' not in sync_text, "Send invitations text lacks its scope answers")
+    check('"one pass per thread"' in follow_text and "invitations for today" not in follow_text, "Follow-up text lacks its scope answer")
+    check("whole withdraw queue" in withdraw_text and "cap Mosaico sets" in withdraw_text and "Proceed without asking which scope" in withdraw_text, "Withdraw stale invitations text lacks its scope answer")
+    for dead in ("Sync data routine", "This is the Sync data"):
+        check(not any(dead in text for text in claude_texts), f"a schedule text still names the deprecated {dead}")
     check("prepare invitation drafts" not in source_text and "prepare invitation drafts" not in colleagues_text and "prepare invitation drafts" not in codex_text, "a Source leads text still names the action that prepares drafts")
     check('"source Leads only"' in source_text and '"source Leads only"' in colleagues_text, "Source leads text lacks its scope answers")
     for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("next business day" not in text and "day:" not in text and "scheduledDate" not in text, f"{label} thin text still names a day: the application files the days")
     check("whole repair queue" in repair_text, "Repair text lacks its scope answer")
-    check("the Source leads schedule" not in sync_text and "Sync data schedule" not in source_text and "Sync data schedule" not in colleagues_text, "A thin text describes another schedule's procedure")
+    check("the Source leads schedule" not in sync_text and "Sync data schedule" not in source_text and "Sync data schedule" not in colleagues_text and "Sync data" not in follow_text, "A thin text describes another schedule's procedure")
     # The installer states the version stamp once and the update-in-place rule for a long-form text.
     for package, text in SKILLS.items():
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
         if package == "Claude":
-            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Sync data text needs 0.9.13 too" in flat_installer, "Claude skill does not state the Source leads and Sync data minimum version 0.9.13")
+            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Send invitations, Follow-up and Withdraw stale invitations texts need 0.9.15" in flat_installer and "named in the plugin's changelog for 0.9.15" in flat_installer and "A saved Sync data text is retired" in flat_installer, "Claude skill does not state the Source leads 0.9.13 and the three new 0.9.15 minimum versions")
         else:
             check("The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.13")
         check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say both numbers are set on each Agent, and an Agent is sourced only with both")
@@ -183,35 +191,39 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.13", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
     repair_claude = (CLAUDE / "skills" / "mosaico-outreach-repair-run" / "SKILL.md").read_text(encoding="utf-8")
     invite_claude = (CLAUDE / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8")
     invite_codex = (CODEX / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8")
-    sync = routine(follow_claude, "Sync data routine")
+    sync = routine(follow_claude, "Follow-up routine")
+    send = routine(invite_claude, "Send invitations routine")
+    withdraw = routine(invite_claude, "Withdraw stale invitations routine")
+    check("## Sync data routine\n" not in follow_claude and "## Sync data routine (superseded)" in follow_claude, "the follow-up-run skill still has a live Sync data routine heading")
+    check("Do not run any part of it" in routine(follow_claude, "Sync data routine (superseded)"), "the superseded Sync data note does not stop an old saved schedule")
     source = routine(invite_claude, "Source leads routine")
     repair = routine(repair_claude, "Repair routine")
     codex_source = routine(invite_codex, "Source leads routine")
-    for label, text in (("Sync data", sync), ("Source leads", source), ("Repair", repair), ("Codex Source leads", codex_source)):
+    for label, text in (("Follow-up", sync), ("Send invitations", send), ("Withdraw stale invitations", withdraw), ("Source leads", source), ("Repair", repair), ("Codex Source leads", codex_source)):
         for placeholder in ("<timezone>", "<public identifier>", "<quota map>"):
             check(placeholder not in text, f"{label} routine section holds the schedule placeholder {placeholder}; it must refer to the standing answers")
         check("standing answers" in text and "do not ask" in text, f"{label} routine section does not say the schedule supplies the answers")
         check("the timezone from the schedule's standing answers" in text, f"{label} routine section does not take the timezone from the standing answers")
-    check("A scheduled run does not ask these questions: the **Sync data routine** section" in follow_claude, "follow-up-run intro does not point at the Sync data routine")
-    check("A scheduled run does not ask these questions: the **Source leads routine** section" in invite_claude and "the **Source leads routine** section" in invite_codex, "invite-run intro does not point at the Source leads routine")
+    check("A scheduled run does not ask these questions: the **Follow-up routine** section" in follow_claude, "follow-up-run intro does not point at the Sync data routine")
+    check("A scheduled run does not ask these questions: the **Source leads**, **Send invitations** and **Withdraw stale invitations** routine sections" in invite_claude and "the **Source leads routine** section" in invite_codex, "invite-run intro does not point at the Source leads routine")
     check("the public identifier from the schedule's standing answers" in sync and "the public identifier from the schedule's standing answers" in source and "the public identifier from the schedule's standing answers" in repair, "A Claude routine section does not take the LinkedIn identifier from the standing answers")
 
-    # Sync data routine (follow-up-run).
-    for script in SCRIPTS:
-        check(script in sync, f"Sync data routine does not name the approved script {script}")
-    check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Sync data routine does not describe paged snapshot submission")
-    check("mosaico:mosaico-outreach-invite-run" in sync and "mosaico:mosaico-outreach-invite-run skill with the selected day today and the selected actions \"write missing invitation drafts\", then \"send approved invitations\"" in sync, "Sync data routine does not chain the invite-run skill by name for the invitation drafts and the approved invitations")
+    # Follow-up routine (follow-up-run).
+    for script in ("browser/linkedin-whoami.js", "browser/linkedin-connection-evidence.js", "browser/linkedin-recent-connections.js"):
+        check(script in sync, f"Follow-up routine does not name the approved script {script}")
+    check("one call per page" in sync and "outreach_record_connections_snapshot" in sync, "Follow-up routine does not describe paged snapshot submission")
+    check("mosaico:mosaico-outreach-invite-run" not in sync and "write missing invitation drafts" not in sync and "send approved invitations" not in sync, "Follow-up routine still chains the invitation work")
     flat_sync = " ".join(sync.split())
-    for name, text in (("Sync data", sync), ("Repair", repair)):
+    for name, text in (("Follow-up", sync), ("Repair", repair)):
         check("LEAD_NAME=<" in text and "PUBLIC_IDENTIFIER=<scriptIdentifier>" in text, f"{name} routine does not give the thread directive with the Lead's name")
-    check("scriptIdentifier" in sync and "after /in/" in sync, "Sync data routine does not name scriptIdentifier and the part after /in/")
+    check("scriptIdentifier" in sync and "after /in/" in sync, "Follow-up routine does not name scriptIdentifier and the part after /in/")
     for needle in (
         "outcome of the Lead's latest message (declined, interested or neutral)",
         "a no ends the Lead",
@@ -222,31 +234,70 @@ def main() -> None:
         "drafts Mosaico discarded (draftsDiscarded)",
         "Leads whose thread was not found in the window",
     ):
-        check(needle in flat_sync, f"Sync data routine lacks: {needle}")
-    check("browser/linkedin-thread-messages.js" in sync, "Sync data routine does not name the thread script")
-    check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Sync data routine does not deposit through the thread script")
-    check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Sync data routine does not keep the by-eye deposit as the fallback only")
-    check("Deposit the complete visible conversation" not in sync, "Sync data routine still deposits by eye as the normal path")
-    check("threads read from data versus by eye" in sync, "Sync data routine report does not count threads read from data versus by eye")
+        check(needle in flat_sync, f"Follow-up routine lacks: {needle}")
+    check("browser/linkedin-thread-messages.js" in sync, "Follow-up routine does not name the thread script")
+    check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Follow-up routine does not deposit through the thread script")
+    check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Follow-up routine does not keep the by-eye deposit as the fallback only")
+    check("Deposit the complete visible conversation" not in sync, "Follow-up routine still deposits by eye as the normal path")
+    check("threads read from data versus by eye" in sync, "Follow-up routine report does not count threads read from data versus by eye")
     step2 = sync[sync.index("Step 2.") : sync.index("Step 3.")]
-    step3 = sync[sync.index("Step 3.") : sync.index("Step 4.")]
-    step4 = sync[sync.index("Step 4.") :]
-    check("run the approved thread script again" in step2 and "threadEvidence to outreach_mark_message_sent" in step2 and "fresh identityEvidence" in step2, "Sync data Step 2 does not confirm a follow-up send from the thread script")
-    check("send-not-confirmed" in step2 and "retry the send once" in step2 and "outreach_record_delivery_block with reason cannot-message" in step2, "Sync data Step 2 does not say what to do on send-not-confirmed")
-    check("verify delivery on LinkedIn" not in step2, "Sync data Step 2 still marks a follow-up from a screen check")
-    check("browser/linkedin-sent-invitations.js" in sync.split("Step 1.")[0], "Sync data approved-scripts sentence does not name the sent-invitations script")
-    check("run the approved sent-invitations script with the Lead's script identifier" in step3 and "sentInvitationEvidence to outreach_mark_message_sent" in step3 and "fresh identityEvidence" in step3, "Sync data Step 3 does not confirm an invitation send from the sent-invitations script")
-    check("run the approved connection-evidence script again" not in step3 and "sendEvidence" not in step3.replace("sentInvitationEvidence", ""), "Sync data Step 3 still passes the connection-evidence script as send evidence")
-    check("cannot show a pending invitation" in step3, "Sync data Step 3 does not say why the Sent invitations list is used")
-    check("send-not-confirmed" in step3 and "retry the send once" in step3 and "do not retype" in step3, "Sync data Step 3 does not say what to do on send-not-confirmed")
-    check("Verify each sent invitation on LinkedIn" not in step3, "Sync data Step 3 still marks an invitation from a screen check")
-    check("from the screen alone" in step2 and "from the screen alone" in step3, "Sync data Steps 2 and 3 do not forbid marking from the screen alone")
-    check("sends confirmed from data versus by screen" in step4, "Sync data Step 4 does not report sends confirmed from data versus by screen")
+    step3 = sync[sync.index("Step 3.") :]
+    check("run the approved thread script again" in step2 and "threadEvidence to outreach_mark_message_sent" in step2 and "fresh identityEvidence" in step2, "Follow-up Step 2 does not confirm a follow-up send from the thread script")
+    check("send-not-confirmed" in step2 and "retry the send once" in step2 and "outreach_record_delivery_block with reason cannot-message" in step2, "Follow-up Step 2 does not say what to do on send-not-confirmed")
+    check("verify delivery on LinkedIn" not in step2, "Follow-up Step 2 still marks a follow-up from a screen check")
+    check("from the screen alone" in step2, "Follow-up Step 2 does not forbid marking from the screen alone")
+    check("sends confirmed from data versus by screen" in step3, "Follow-up Step 3 does not report sends confirmed from data versus by screen")
     check(
-        "When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run" in step4
-        and "Repair needed: n items, run the Repair routine" in step4,
-        "Sync data Step 4 does not recommend Repair instead of working the backlog",
+        "When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run" in step3
+        and "Repair needed: n items, run the Repair routine" in step3,
+        "Follow-up Step 3 does not recommend Repair instead of working the backlog",
     )
+
+    # Send invitations routine (invite-run): drafts first, then the approved invitations, confirmed from LinkedIn's Sent invitations list.
+    for script in ("browser/linkedin-whoami.js", "browser/linkedin-connection-evidence.js", "browser/linkedin-sent-invitations.js"):
+        check(script in send, f"Send invitations routine does not name the approved script {script}")
+    for gone in ("linkedin-thread-messages.js", "linkedin-recent-connections.js", "outreach_deposit_conversation", "one pass per thread", "outreach_get_withdraw_queue"):
+        check(gone not in send, f"Send invitations routine holds work that is not its own: {gone}")
+    check("scriptIdentifier" in send and "after /in/" in send, "Send invitations routine does not name scriptIdentifier and the part after /in/")
+    sstep3 = send[send.index("Step 3.") : send.index("Step 4.")]
+    sstep4 = send[send.index("Step 4.") :]
+    check("run the approved sent-invitations script with the Lead's script identifier" in sstep3 and "sentInvitationEvidence to outreach_mark_message_sent" in sstep3 and "fresh identityEvidence" in sstep3, "Send invitations Step 3 does not confirm an invitation send from the Sent invitations list")
+    check("run the approved connection-evidence script again" not in sstep3 and "sendEvidence" not in sstep3.replace("sentInvitationEvidence", ""), "Send invitations Step 3 still passes the connection-evidence script as send evidence")
+    check("cannot show a pending invitation" in sstep3, "Send invitations Step 3 does not say why the Sent invitations list is used")
+    check("send-not-confirmed" in sstep3 and "retry the send once" in sstep3 and "do not retype" in sstep3, "Send invitations Step 3 does not say what to do on send-not-confirmed")
+    check("Verify each sent invitation on LinkedIn" not in sstep3, "Send invitations Step 3 still marks an invitation from a screen check")
+    check("from the screen alone" in sstep3, "Send invitations Step 3 does not forbid marking from the screen alone")
+    check("sends confirmed from data versus by screen" in sstep4, "Send invitations Step 4 does not report sends confirmed from data versus by screen")
+
+    # Withdraw stale invitations routine (invite-run): Mosaico owns the 30-day rule; the run withdraws, records, and never sends.
+    flat_withdraw = " ".join(withdraw.split())
+    for needle in (
+        "outreach_get_withdraw_queue", "outreach_record_withdrawal", "Mosaico owns the 30-day rule", "never work it out from dates yourself",
+        "with intent manage_leads", "including both withdraw tools", "Never pass ownerUserId", "rule.withdrawAfterDays is 30, cap.perRun is 25",
+        "never recomputes either from dates or counts beyond what the read says", "Follow recommendedAction literally",
+        "withdraw_next", "nothing_to_do", "write_report", "register_linkedin_identity", "start_outreach_run",
+        "linkedin-identity-not-registered", "run-required", "run-intent-not-allowed",
+        "completion (mustContinue, stopReason, validStopReasons)", "next (the Lead to work now, or null)",
+        "Record a withdrawal only after LinkedIn shows the invitation is gone", "withdrawal_recorded", "already_withdrawn",
+        "invitation-accepted", "declined", "lead-not-active", "no-invitation-sent", "invitation-too-recent", "nothing was written: skip that Lead",
+        "Stop when next is null or completion.mustContinue is false", "queue-empty, run-cap-reached or blocked",
+        "never clicks Connect", "never withdraws an invitation Mosaico did not list", "never sends anything",
+        "A LinkedIn warning or captcha also stops the run at once", "outreach_end_run",
+        "https://www.linkedin.com/mynetwork/invitation-manager/sent/",
+    ):
+        check(needle in flat_withdraw, f"Withdraw stale invitations routine lacks: {needle}")
+    for gone in ("outreach_mark_message_sent", "outreach_record_message", "outreach_deposit_conversation", "outreach_save_lead", "observedLinkedInProfile) and"):
+        check(gone not in withdraw, f"Withdraw stale invitations routine names a tool that is not its own: {gone}")
+
+    # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the coordinator's placeholder.
+    entry = " ".join(readme[readme.index("### 0.9.15") : readme.index("### 0.9.14")].split())
+    for needle in (
+        "Send invitations routine", "Follow-up routine", "Withdraw stale invitations routine", "outreach_get_withdraw_queue", "outreach_record_withdrawal",
+        "Mosaico owns the 30-day rule", "Sync data routine (superseded)", "retires (disables or deletes) the old Sync data task", "stamped 0.9.15 or later",
+        "PLACEHOLDER: server release id",
+    ):
+        check(needle in entry, f"README 0.9.15 entry lacks: {needle}")
+    check(readme.index("### 0.9.15") < readme.index("### 0.9.14"), "README changelog lacks 0.9.15 above 0.9.14")
 
     # The third routine: Repair, weekly Sunday 10:00 by default, also on demand, never sends.
     repair_prose = claude[claude.index("**Mosaico Outreach — Repair**") : claude.index("```text", claude.index("**Mosaico Outreach — Repair**"))]
@@ -266,21 +317,21 @@ def main() -> None:
     check("browser/linkedin-sent-invitations.js" not in repair, "Repair routine names the sent-invitations script, which Repair never needs")
     check("outreach_mark_message_sent" not in repair and "outreach_record_message" not in repair, "Repair routine names a sending or drafting tool")
     READ_SENTENCE = "Read each script file with the file-reading tool, one file at a time, by its path under the installed plugin's browser folder; do not print them with a shell command."
-    for name, text in (("Sync data", sync), ("Source leads", source), ("Repair", repair)):
+    for name, text in (("Follow-up", sync), ("Send invitations", send), ("Withdraw stale invitations", withdraw), ("Source leads", source), ("Repair", repair)):
         check(" ".join(text.split()).count(READ_SENTENCE) == 1, f"{name} routine does not tell the run to read the approved scripts with the file-reading tool")
         check("If the installed plugin has no browser folder, stop and report that the plugin needs updating." in text, f"{name} routine lacks the no-browser-folder stop")
     check(READ_SENTENCE not in SKILLS["Codex"] and READ_SENTENCE not in codex_source, "Codex has the browser-script reading sentence, but the Codex package ships no browser scripts")
     check("Repair never sends" in claude, "Claude skill does not say Repair never sends")
-    check("60 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from Sync data and Source leads")
+    check("60 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from the daily schedules and Source leads")
     check("0 10 * * 0" in claude.split("## Install")[1], "Install readback does not confirm the Repair cron")
     check("Her Repair schedule works only her own backlog and never sends" in second_person(claude), "Second-person section does not install her Repair schedule")
     check("Source leads and Repair are not installed" in claude, "Single-task fallback does not mention Repair")
     # Each routine is its own section: none borrows another's steps.
-    check("outreach_get_repair_queue" not in source and "outreach_get_repair_queue" not in sync, "Sync data or Source leads routine reads the repair queue")
+    check("outreach_get_repair_queue" not in source and "outreach_get_repair_queue" not in sync and "outreach_get_repair_queue" not in send and "outreach_get_repair_queue" not in withdraw, "a Follow-up, Send invitations or Source leads routine reads the repair queue")
 
     # Production connector only: every scheduled routine and the overview skill name the connector to use and refuse a stage server.
     overview_claude = (CLAUDE / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
-    for label, text in (("Sync data routine", sync), ("Source leads routine", source), ("Repair routine", repair), ("mosaico-outreach skill", overview_claude)):
+    for label, text in (("Follow-up routine", sync), ("Send invitations routine", send), ("Withdraw stale invitations routine", withdraw), ("Source leads routine", source), ("Repair routine", repair), ("mosaico-outreach skill", overview_claude)):
         flat = " ".join(text.split())
         check(CONNECTOR_RULE in flat, f"{label} lacks the production-connector rule")
         check(flat.count("amplifyapp.com") == 1, f"{label} must name the non-production addresses exactly once")
@@ -303,7 +354,7 @@ def main() -> None:
 
     codex = SKILLS["Codex"]
     check("cannot capture connection evidence" in codex, "Codex skill does not say it cannot capture connection evidence")
-    check("must not send" in codex, "Codex skill does not forbid a Codex-installed Sync data schedule from sending")
+    check("must not send" in codex, "Codex skill does not forbid a Codex-installed daily schedule from sending")
     check("mcp__Claude_Browser__" not in codex, "Codex skill mentions the Claude browser permissions")
 
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
@@ -311,9 +362,9 @@ def main() -> None:
         for old in ("8:00 AM", "8:00 PM"):
             check(old not in overview, f"{package} overview skill still mentions {old}")
         check("mosaico:mosaico-outreach-schedule-install" in overview, f"{package} overview does not name the qualified schedule-install skill")
-        check("Sync data" in overview and "Source leads" in overview, f"{package} overview does not describe the two schedules")
+        check("Send invitations" in overview and "Follow-up" in overview and "Withdraw stale invitations" in overview and "Source leads" in overview, f"{package} overview does not describe the schedules")
     codex_overview = (CODEX / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
-    check("installed from Claude" in codex_overview, "Codex overview does not say Sync data is installed from Claude")
+    check("installed from Claude" in codex_overview, "Codex overview does not say the daily schedules are installed from Claude")
 
     # Source leads routine (0.9.9): Leads per run drives it and the application files the days; the run is started with no quota and no colleague.
     for package, text in (("Claude", source), ("Codex", codex_source)):
@@ -384,7 +435,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.14", f"{manifest.name} is not at 0.9.14")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

@@ -44,7 +44,7 @@ def main() -> None:
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         raw = read(root / "skills" / "mosaico-outreach-invite-run" / "SKILL.md")
         text = flat(raw)
-        routine = flat(raw[raw.index("## Source leads routine"):])
+        routine = flat(raw[raw.index("## Source leads routine"):].split("\n## Send invitations routine")[0])
         sourcing = flat(raw[raw.index("## Source Leads\n"):raw.index("## Which Agent a Lead goes to")])
 
         # 1. Every planned Agent is read by run id, never with an owner.
@@ -98,9 +98,11 @@ def main() -> None:
         # Source leads text are stamped 0.9.13; the Claude Repair text keeps 0.9.6 and nothing is stamped 0.9.12 any more.
         check("0.9.13 or later" in installer and "0.9.12 or later" not in installer and "0.9.9 or later" not in installer and "0.9.10 or later" not in installer, f"{package} schedule-install lacks the 0.9.13 stamp")
 
-    # The follow-up (Sync data) and repair routines end their runs through outreach_end_run and report the environment.
+    # The Follow-up, Send invitations, Withdraw stale invitations and Repair routines end their runs through outreach_end_run and report the environment.
     for name, marker, stop_text in (
-        ("mosaico-outreach-follow-up-run", "## Sync data routine", "continue until Mosaico reports completion (no-approved-invitations-remain)"),
+        ("mosaico-outreach-follow-up-run", "## Follow-up routine", "Continue until Mosaico reports a genuine blocker or every Lead has been handled."),
+        ("mosaico-outreach-invite-run", "## Send invitations routine", "continue until Mosaico reports completion (no-approved-invitations-remain)"),
+        ("mosaico-outreach-invite-run", "## Withdraw stale invitations routine", "A LinkedIn warning or captcha also stops the run at once"),
         ("mosaico-outreach-repair-run", "## Repair routine", "never earlier for volume and never later by starting another run."),
     ):
         raw = read(CLAUDE / "skills" / name / "SKILL.md")
@@ -116,7 +118,7 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.14", f"{manifest.name} is not at 0.9.14")
+        check(json.loads(read(manifest))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])

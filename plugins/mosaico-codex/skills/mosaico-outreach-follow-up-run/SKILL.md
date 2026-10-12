@@ -79,7 +79,7 @@ discarded, for which Leads and for which reasons.
 
 ## Repair is a separate routine
 
-The Sync data run is daily work and does not clear the backlog. Mosaico caps the verification list at 20
+The Follow-up run is daily work and does not clear the backlog. Mosaico caps the verification list at 20
 Leads per run, oldest invitation first (`verifyCap` on `outreach_get_follow_ups`); the rest are counted as
 `summary.deferredToRepair`, and `repairNeeded` counts what the Repair routine would work, per group and in
 total. Work only what `outreach_get_follow_ups` lists, and never go looking for more. When its `notes` hold

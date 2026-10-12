@@ -5,7 +5,7 @@ description: List Mosaico's Outreach repair queue and what a person should do ab
 
 # Mosaico Outreach Repair Queue (read-only)
 
-The Outreach repair backlog is the work behind the daily Sync data run: Leads nobody verified, drafts that
+The Outreach repair backlog is the work behind the daily Follow-up and Send invitations runs: Leads nobody verified, drafts that
 break a rule, addresses LinkedIn redirected, one person held twice, declines nobody applied. Working it
 needs LinkedIn's own data (a profile capture, a thread capture), and only Claude's built-in browser pane
 can capture that. So the Codex package only reads the queue and says what a person should do. It never

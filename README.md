@@ -55,10 +55,12 @@ Nothing in the plugin needs updating for this.
 
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
-action. The schedule option installs per-user local-time schedules: Sync data (connections and
-messaging, once a day, the only one that sends; from 0.9.13 it also writes the missing invitation drafts for the person's
-own Leads), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
-colleagues lane on the odd hours, each at least 60 minutes from the other lane and from Sync, never writes drafts and never sends; how many Leads
+action. The schedule option installs per-user local-time schedules: Send invitations (from 0.9.15, once a day, 1:00 PM by
+default: it writes the missing invitation drafts for the person's own Leads, then sends the approved invitations), Follow-up
+(from 0.9.15, once a day, 1:30 PM: accepted invitations with and without replies, message replies, one pass per thread, and the
+approved follow-ups), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
+stale and never sends; these three replace the older single Sync data schedule, which the installer retires), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
+colleagues lane on the odd hours, each at least 60 minutes from the other lane and from the three daily times, never writes drafts and never sends; how many Leads
 it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
 demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
 is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
@@ -90,8 +92,8 @@ anything but production stops.
 
 Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
 LinkedIn public identifier) and tells the run to follow a named routine
-section in the installed plugin's skill: "Sync data routine" in the follow-up-run skill, "Source leads routine"
-in the invite-run skill and "Repair routine" in the repair-run skill. The procedure is therefore always the one
+section in the installed plugin's skill: "Follow-up routine" in the follow-up-run skill, "Send invitations routine",
+"Withdraw stale invitations routine" and "Source leads routine" in the invite-run skill and "Repair routine" in the repair-run skill. The procedure is therefore always the one
 in the plugin you have installed, so a plugin release no longer leaves a saved schedule stale. A saved text
 names the minimum plugin version it needs; a run on an older plugin stops and reports that the plugin needs
 updating. Run the installer again only to change an answer or a time, or once to replace a schedule saved in the
@@ -103,16 +105,16 @@ From 0.9.11 its sealed output also says whether the search could have found them
 proves. If the candidate is not listed and the check shows the search could have found them (every result page read,
 her connection list visible to the searching account, no result row unread), the negative is proven: Mosaico saves
 the Lead as verified not connected by the colleague check; from 0.9.13 the sourcing run writes no draft, and her own
-Sync data run writes her invitation from its `draftsToWrite` list. Otherwise the Lead is saved with its connection unknown
+Send invitations run writes her invitation from its `draftsToWrite` list. Otherwise the Lead is saved with its connection unknown
 and stays undrafted until her own run verifies it. A proven
-negative never sends: her invitation is held until her own Sync run records her own LinkedIn connection evidence for
+negative never sends: her invitation is held until her own Send invitations run records her own LinkedIn connection evidence for
 the Lead (the send guard, `own-evidence-required`), and a run never records connection evidence for a colleague's Lead.
 The risk accepted: nobody has yet tested a colleague who hides her connections, so a proven negative could in rare
 cases be wrong; the send guard contains it, because nothing is sent before her own check.
 
 **Who writes invitation drafts (0.9.13).** A Source leads run finds Leads, saves them and lets Mosaico place them on days,
 then ends. It never writes an invitation draft, for its own Leads or a colleague's: Mosaico refuses the write with
-`sourcing-writes-no-drafts`, which the skill treats as expected. The Lead owner's Sync data run writes the missing drafts,
+`sourcing-writes-no-drafts`, which the skill treats as expected. The Lead owner's Send invitations run writes the missing drafts,
 for its own Leads only, from the `draftsToWrite` list that `outreach_get_day` (in `workflowStatus`) and
 `outreach_get_follow_ups` return (`count`, `entries` with `leadId`, `name`, `agentId`, `day` and `action`,
 `writableInThisRun` and `recommendedAction`). The application builds the list and its recommended action; the skill
@@ -146,11 +148,11 @@ A colleague sets up her own schedules on her own Mac:
 5. Register her LinkedIn profile in Mosaico Outreach, Agent tab, "LinkedIn profile". The installer checks
    it with `outreach_start_run` (intent `inspect_day`); if Mosaico answers
    `linkedin_identity_not_registered`, register the profile there, or have an Owner do it, and check again.
-6. Run the schedule installer. It installs her Sync data schedule, and Source leads only if she sources
+6. Run the schedule installer. It installs her Send invitations, Follow-up and Withdraw stale invitations schedules (and retires an older Sync data task), and Source leads only if she sources
    Leads herself. Her Source leads schedule needs no quota: she sets Leads per day and Leads per run on her Agent
    in Outreach (Agent tab) and may name a colleague as "Sourced by".
 
-Each person's Sync data schedule runs on that person's own Mac, in that person's own pane, and sends only
+Each person's Send invitations, Follow-up and Withdraw stale invitations schedules run on that person's own Mac, in that person's own pane, and sends only
 from that person's account. Nobody's run touches another owner's Leads.
 
 ## Connection-evidence capability (Claude Code)
@@ -180,6 +182,37 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.15
+
+Requires the Mosaico server release **PLACEHOLDER: server release id, to be filled by the coordinator before this plugin is published**, which ships
+`outreach_get_withdraw_queue` and `outreach_record_withdrawal`. Install the Withdraw stale invitations schedule only after that
+release is live. Send invitations and Follow-up need no new server tools.
+
+- The single daily Sync data routine is split into three daily routines, each with its own schedule, so one slow or blocked
+  step no longer holds up the others. The installer installs three tasks and retires the old one:
+  - **Send invitations** (invite-run skill, "Send invitations routine", default 1:00 PM): for today, writes the owner's missing
+    invitation drafts from `draftsToWrite`, then sends the approved invitations. Nothing else.
+  - **Follow-up** (follow-up-run skill, "Follow-up routine", default 1:30 PM): checks accepted invitations (with replies and with
+    no replies), checks message replies to follow-ups, one pass per thread across all dates, and sends the approved follow-ups.
+  - **Withdraw stale invitations** (invite-run skill, "Withdraw stale invitations routine", default 2:00 PM): starts a run with
+    intent `manage_leads` and passes its `runId` to both tools. It reads `outreach_get_withdraw_queue` (candidates, `count`, `cap`,
+    `completion`, `blockers`, `allowedActions`, `recommendedAction`, `next`) and follows `recommendedAction` literally. For the Lead
+    in `next` it withdraws the pending invitation in Claude's browser pane, then calls `outreach_record_withdrawal`, and rereads
+    after every write. It stops when `next` is null or `completion.mustContinue` is false and reports the `stopReason`. A blocked
+    read (for example `linkedin-identity-not-registered`) stops and reports; a `blocked` write (for example
+    `invitation-accepted` or `invitation-too-recent`) writes nothing, so that Lead is skipped, reported and the run continues.
+    Mosaico owns the 30-day rule and the per-run cap (25); the skill never recomputes either. It never sends, never clicks
+    Connect and never withdraws an invitation Mosaico did not list. A LinkedIn warning or captcha stops the run, which reports.
+- The "Sync data routine" section of the follow-up-run skill is now a short "Sync data routine (superseded)" note. An old saved
+  Sync data schedule starts no run, touches nothing, and reports that it must be reinstalled. Run the installer again: it creates the
+  three tasks first and then retires (disables or deletes) the old Sync data task, so nothing runs twice.
+- The three new texts are stamped 0.9.15 or later. The Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- The three daily schedules share one browser pane and must not overlap (defaults 30 minutes apart). The installer keeps every Source
+  leads time at least 60 minutes from each of them, so the own lane no longer runs at 2:00 PM (`0 0,2,4,6,8,12,16,18,20,22 * * *`);
+  run the installer again to move a saved own-lane cron.
+- The Codex package has no browser capture, so it still installs only Source leads; its installer and overview now name the new
+  schedules as installed from Claude.
 
 ### 0.9.14
 
