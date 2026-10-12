@@ -185,8 +185,8 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ### 0.9.15
 
-Requires the Mosaico server release **PLACEHOLDER: server release id, to be filled by the coordinator before this plugin is published**, which ships
-`outreach_get_withdraw_queue` and `outreach_record_withdrawal`. Install the Withdraw stale invitations schedule only after that
+Requires the Mosaico server release 20261012c (promotion mosaicohr-com/mosaico#1907, stage-v2 to main-v2, carrying
+mosaicohr-com/mosaico#1906), which ships `outreach_get_withdraw_queue` and `outreach_record_withdrawal`. Install the Withdraw stale invitations schedule only after that
 release is live. Send invitations and Follow-up need no new server tools.
 
 - The single daily Sync data routine is split into three daily routines, each with its own schedule, so one slow or blocked

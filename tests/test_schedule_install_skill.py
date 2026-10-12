@@ -289,12 +289,12 @@ def main() -> None:
     for gone in ("outreach_mark_message_sent", "outreach_record_message", "outreach_deposit_conversation", "outreach_save_lead", "observedLinkedInProfile) and"):
         check(gone not in withdraw, f"Withdraw stale invitations routine names a tool that is not its own: {gone}")
 
-    # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the coordinator's placeholder.
+    # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the named server release.
     entry = " ".join(readme[readme.index("### 0.9.15") : readme.index("### 0.9.14")].split())
     for needle in (
         "Send invitations routine", "Follow-up routine", "Withdraw stale invitations routine", "outreach_get_withdraw_queue", "outreach_record_withdrawal",
         "Mosaico owns the 30-day rule", "Sync data routine (superseded)", "retires (disables or deletes) the old Sync data task", "stamped 0.9.15 or later",
-        "PLACEHOLDER: server release id",
+        "Requires the Mosaico server release 20261012c", "mosaicohr-com/mosaico#1907", "mosaicohr-com/mosaico#1906",
     ):
         check(needle in entry, f"README 0.9.15 entry lacks: {needle}")
     check(readme.index("### 0.9.15") < readme.index("### 0.9.14"), "README changelog lacks 0.9.15 above 0.9.14")
