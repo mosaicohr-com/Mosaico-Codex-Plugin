@@ -15,6 +15,15 @@ const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";
 // as given), resolvedIdentifier (the response's publicIdentifier, or the opaque id) and memberUrn (urn:li:fsd_profile:<id>); all
 // three are null when the Profile was not resolved. status is the HTTP status LinkedIn answered, or 0 when the call itself failed.
 // On "error", entries is empty: the script never throws and never returns relationship entries it could not tie to the Profile.
+// Redirect retry (0.9.16): LinkedIn can answer the stored vanity with a 404 (or a 200 that holds no usable Profile) while the page
+// the run opened has already followed the redirect to the person's new public identifier. When, and only when, the first profile
+// call ends that way (404, 410, or a 2xx with no Profile it can use; never a refusal, a rate limit, a server error or a dropped
+// call) and the page's own address is /in/<slug>/ with a slug that differs from the requested identifier (case aside), the script
+// asks the profile query once more with that slug, and never more than once. The retry's Profile is accepted by the same rule as
+// the first call's (for an opaque member id it must carry that very member id). requestedIdentifier and profileIdentifier always
+// stay the value the run asked for; resolvedIdentifier is what LinkedIn's answer says the profile is called now, so the swap is
+// visible in the sealed output and the application stores the old name as an alias. status is the last call's status, except that
+// a retry whose call was dropped (0) keeps the first call's status. No other call is made and no page content is read.
 // Text normalisation (0.8.5; the application mirrors this rule): every free-text field that leaves the page is normalised with
 // normalizeText before it is hashed and returned, in this order: (1) Unicode NFC; (2) every space separator (U+00A0, U+1680,
 // U+2000-U+200A, U+202F, U+205F, U+3000) becomes a plain space; (3) zero-width characters (U+200B-U+200D, U+2060, U+FEFF) are
@@ -70,14 +79,36 @@ const resolveProfile = (profiles, requested) => {
 };
 const csrf = (document.cookie.match(/JSESSIONID="?([^;"]+)/) || [])[1] || "";
 const capturedAt = new Date().toISOString();
-let status = 0;
-let included = [];
-try {
-  const r = await fetch(ENDPOINT + "?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(PUBLIC_IDENTIFIER) + ")&queryId=" + QUERY_ID, { credentials: "include", headers: { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" } });
-  status = r.status;
-  if (r.ok) { const j = await r.json(); included = Array.isArray(j && j.included) ? j.included : []; }
-} catch (e) { status = typeof e === "number" ? e : 0; included = []; }
-const resolved = status >= 200 && status < 300 ? resolveProfile(included.filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e))), PUBLIC_IDENTIFIER) : null;
+const profileCall = async (identifier) => {
+  try {
+    const r = await fetch(ENDPOINT + "?includeWebMetadata=true&variables=(vanityName:" + encodeURIComponent(identifier) + ")&queryId=" + QUERY_ID, { credentials: "include", headers: { "csrf-token": csrf, "x-restli-protocol-version": "2.0.0", "accept": "application/vnd.linkedin.normalized+json+2.1" } });
+    let included = [];
+    if (r.ok) { const j = await r.json(); included = Array.isArray(j && j.included) ? j.included : []; }
+    return { status: r.status, included };
+  } catch (e) { return { status: typeof e === "number" ? e : 0, included: [] }; }
+};
+const profileOf = (call, requested) => (call.status >= 200 && call.status < 300 ? resolveProfile(call.included.filter((e) => isObj(e) && /profile\.Profile$/.test(typeOf(e))), requested) : null);
+const pageSlug = () => {
+  try {
+    const m = typeof location !== "undefined" && isObj(location) && typeof location.pathname === "string" ? /^\/in\/([^/?#]+)/.exec(location.pathname) : null;
+    const slug = m === null ? "" : decodeURIComponent(m[1]);
+    return /^[\p{L}\p{N}_.-]{1,100}$/u.test(slug) ? slug : null;
+  } catch (e) { return null; }
+};
+let call = await profileCall(PUBLIC_IDENTIFIER);
+let usedIdentifier = PUBLIC_IDENTIFIER;
+let resolved = profileOf(call, PUBLIC_IDENTIFIER);
+const retryable = call.status === 404 || call.status === 410 || (call.status >= 200 && call.status < 300);
+const slug = resolved === null && retryable ? pageSlug() : null;
+if (slug !== null && slug.toLowerCase() !== PUBLIC_IDENTIFIER.toLowerCase()) {
+  const retry = await profileCall(slug);
+  const found = profileOf(retry, slug);
+  const sameMember = found !== null && (!OPAQUE_ID.test(PUBLIC_IDENTIFIER) || memberUrn(found.entityUrn) === "urn:li:fsd_profile:" + PUBLIC_IDENTIFIER);
+  if (sameMember) { call = retry; resolved = found; usedIdentifier = slug; }
+  else if (retry.status !== 0) { call = retry; }
+}
+const status = call.status;
+const included = call.included;
 const leadUrn = resolved === null ? null : memberUrn(resolved.entityUrn);
 const entries = [];
 if (resolved !== null && leadUrn !== null) {
@@ -88,5 +119,5 @@ if (resolved !== null && leadUrn !== null) {
   }
 }
 const ok = resolved !== null && leadUrn !== null;
-const payload = { status, signedIn: csrf !== "", capturedAt, state: ok ? "ok" : "error", errorStep: ok ? null : "profile", profileIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, resolvedIdentifier: ok ? (OPAQUE_ID.test(PUBLIC_IDENTIFIER) ? PUBLIC_IDENTIFIER : resolved.publicIdentifier) : null, memberUrn: ok ? leadUrn : null, entries };
+const payload = { status, signedIn: csrf !== "", capturedAt, state: ok ? "ok" : "error", errorStep: ok ? null : "profile", profileIdentifier: PUBLIC_IDENTIFIER, requestedIdentifier: PUBLIC_IDENTIFIER, resolvedIdentifier: ok ? (OPAQUE_ID.test(usedIdentifier) ? usedIdentifier : resolved.publicIdentifier) : null, memberUrn: ok ? leadUrn : null, entries };
 ({ ...payload, integrity: { algorithm: "fnv1a32", digest: fnv1a32(canonical(payload)) } })

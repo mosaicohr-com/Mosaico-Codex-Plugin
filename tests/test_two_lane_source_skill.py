@@ -74,7 +74,7 @@ def main() -> None:
             check(procedure not in text, f"the {scope} lane text holds procedure or a number: {procedure}")
     check(own_text.replace("sourcing scope: own;", "sourcing scope: colleagues;") == colleagues_text, "the two lane texts differ in more than the scope line")
     check(all("sourcing scope" not in " ".join(texts[i].split()) for i in (0, 1, 2, 5)), "a daily or Repair text carries a scope line")
-    check(all("(0.9.15 or later)" in texts[i] for i in (0, 1, 2)) and "(0.9.6 or later)" in texts[5], "a daily stamp is not 0.9.15 or the Repair stamp changed")
+    check("(0.9.15 or later)" in texts[0] and "(0.9.16 or later)" in texts[1] and "(0.9.15 or later)" in texts[2] and "(0.9.6 or later)" in texts[5], "a daily stamp is not 0.9.15 (Follow-up 0.9.16) or the Repair stamp changed")
     check("Mosaico Outreach — Source leads (own)" in installer and "Mosaico Outreach — Source leads (colleagues)" in installer, "installer lacks the two lane task titles")
     check("sourcing scope" not in codex_installer, "the Codex installer text carries a scope line although it installs one whole-plan task")
 
@@ -184,7 +184,7 @@ def main() -> None:
 
     # 6. Versions and the changelog entry that names the server release.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
+        check(json.loads(read(manifest))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.12") < readme.index("### 0.9.11"), "README changelog lacks 0.9.12 above 0.9.11")
     entry = flat(readme[readme.index("### 0.9.12"):readme.index("### 0.9.11")])

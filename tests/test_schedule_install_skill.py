@@ -53,7 +53,8 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 MIN_VERSION = "0.9.6"
 SOURCE_MIN_VERSION = "0.9.13"  # Codex's single Source leads text: 0.9.13 writes no drafts (0.9.9 added Leads per run)
 LANE_MIN_VERSION = "0.9.13"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
-SYNC_MIN_VERSION = "0.9.15"  # Claude's Send invitations, Follow-up and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
+SYNC_MIN_VERSION = "0.9.15"  # Claude's Send invitations and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
+FOLLOW_MIN_VERSION = "0.9.16"  # Claude's Follow-up text: 0.9.16 starts a follow_up_pass run and works outreach_get_follow_up_queue
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -146,7 +147,7 @@ def main() -> None:
         ("Codex Source leads", codex_text, "$mosaico:mosaico-outreach-invite-run", "Source leads routine", ("<timezone>",), "authenticated LinkedIn browser"),
     )
     for label, text, skill_name, section_name, placeholders, browser in THIN:
-        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else (SYNC_MIN_VERSION if label in ("Claude Send invitations", "Claude Follow-up", "Claude Withdraw stale invitations") else MIN_VERSION)
+        min_version = (LANE_MIN_VERSION if label.startswith("Claude Source leads") else SOURCE_MIN_VERSION) if "Source leads" in label else (FOLLOW_MIN_VERSION if label == "Claude Follow-up" else SYNC_MIN_VERSION if label in ("Claude Send invitations", "Claude Withdraw stale invitations") else MIN_VERSION)
         words = len(text.split())
         check(words <= THIN_CAP, f"{label} schedule text is {words} words, over the {THIN_CAP}-word cap: it must be thin")
         check(f"Use the installed {skill_name} skill from the mosaico plugin ({min_version} or later)" in text, f"{label} text does not name the installed skill and the minimum version")
@@ -179,7 +180,12 @@ def main() -> None:
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
         if package == "Claude":
-            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Send invitations, Follow-up and Withdraw stale invitations texts need 0.9.15" in flat_installer and "named in the plugin's changelog for 0.9.15" in flat_installer and "A saved Sync data text is retired" in flat_installer, "Claude skill does not state the Source leads 0.9.13 and the three new 0.9.15 minimum versions")
+            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Send invitations and Withdraw stale invitations texts need 0.9.15" in flat_installer and "named in the plugin's changelog for 0.9.15" in flat_installer and "A saved Sync data text is retired" in flat_installer, "Claude skill does not state the Source leads 0.9.13 and the 0.9.15 minimum versions")
+            check("The Follow-up text needs 0.9.16" in flat_installer and "`follow_up_pass`" in flat_installer and "`outreach_get_follow_up_queue`" in flat_installer and "named in the plugin's changelog for 0.9.16" in flat_installer
+                  and "The Send invitations and Withdraw stale invitations texts stay at 0.9.15" in flat_installer, "Claude skill does not state the Follow-up 0.9.16 minimum version")
+            update_flat = flat_installer[flat_installer.index("### Update the standing answers in place") :]
+            check("a Follow-up schedule saved at 0.9.15" in update_flat and "becomes the 0.9.16 Follow-up text" in update_flat and 'A saved Follow-up text that says "0.9.15 or later"' in flat_installer and "replace it in place with the 0.9.16 Follow-up text" in flat_installer,
+                  "Claude skill does not move a saved 0.9.15 Follow-up text to the 0.9.16 stamp in place")
         else:
             check("The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.13")
         check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say both numbers are set on each Agent, and an Agent is sourced only with both")
@@ -191,7 +197,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15" and FOLLOW_MIN_VERSION == "0.9.16", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -230,14 +236,14 @@ def main() -> None:
         "exactly as returned, every field including integrity",
         "evidence-altered",
         "thread-not-found-in-window",
-        "repair_drafts",
+        "read-thread",
         "drafts Mosaico discarded (draftsDiscarded)",
         "Leads whose thread was not found in the window",
     ):
         check(needle in flat_sync, f"Follow-up routine lacks: {needle}")
     check("browser/linkedin-thread-messages.js" in sync, "Follow-up routine does not name the thread script")
     check("pass its output unchanged as threadEvidence to outreach_deposit_conversation" in sync, "Follow-up routine does not deposit through the thread script")
-    check("Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye" in sync, "Follow-up routine does not keep the by-eye deposit as the fallback only")
+    check("Only if the script cannot run, open the item's messageUrl and deposit the visible conversation by eye" in sync, "Follow-up routine does not keep the by-eye deposit as the fallback only")
     check("Deposit the complete visible conversation" not in sync, "Follow-up routine still deposits by eye as the normal path")
     check("threads read from data versus by eye" in sync, "Follow-up routine report does not count threads read from data versus by eye")
     step2 = sync[sync.index("Step 2.") : sync.index("Step 3.")]
@@ -246,6 +252,34 @@ def main() -> None:
     check("send-not-confirmed" in step2 and "retry the send once" in step2 and "outreach_record_delivery_block with reason cannot-message" in step2, "Follow-up Step 2 does not say what to do on send-not-confirmed")
     check("verify delivery on LinkedIn" not in step2, "Follow-up Step 2 still marks a follow-up from a screen check")
     check("from the screen alone" in step2, "Follow-up Step 2 does not forbid marking from the screen alone")
+    # 0.9.16: the routine starts a follow_up_pass run and works Mosaico's queue instead of the 750 KB follow-ups read.
+    step1 = sync[sync.index("Step 1.") : sync.index("Step 2.")]
+    check("Start one run with intent follow_up_pass" in step1, "Follow-up Step 1 does not start the run with intent follow_up_pass")
+    for needle in (
+        "outreach_get_follow_up_queue", "never read outreach_get_follow_ups as the working read of this run", "Do what next says, once, then read the queue again",
+        "completion.mustContinue", "completion.stopReason", "End the run with outreach_end_run: reason complete when completion.stopReason is queue-empty, needs-a-person or needs-another-intent",
+        "follow each item's recommendedCall literally", "next.kind is connections-capture", "next.script.stopAtCreatedAt",
+        "delivery.state deliverable and recommends send_approved_follow_up", "send that approved follow-up right then", "without rereading the queue",
+        "messageUrlBasis is conversation or stored", "close any open message window before you navigate to the next profile and after each send",
+        "the typed text is proved by the thread capture after the send, not by sight",
+        "thread-person-held-by-other-lead", "never capture that thread again", "profile-capture-failed", "profileCaptureFailures, givenUp and inToSort", "never capture that Lead again in this run",
+        "save the missing outbound follow-up draft Mosaico permits with sentAt null",
+    ):
+        check(needle in " ".join(step1.split()) + " " + " ".join(step2.split()), f"Follow-up routine lacks: {needle}")
+    check("outreach_get_follow_ups" not in step2.replace("never read outreach_get_follow_ups as the working read of this run", ""), "Follow-up Step 2 still reads outreach_get_follow_ups")
+    check("outreach_get_follow_ups" not in step3 or "repair-recommended" in step3, "Follow-up Step 3 reads from the old follow-ups read")
+    queue = " ".join(routine(follow_claude, "The follow-up queue (intent `follow_up_pass`)").split())
+    for needle in (
+        "intent `follow_up_pass`", "It may not save Leads, link duplicate Leads or withdraw invitations", "never read `outreach_get_follow_ups` in a `follow_up_pass` run",
+        "20261012d", "`counts`, `unverified`, `items`, `listed`, `nextCursor`, `next`, `completion`, `cap`, `blockers`, `allowedActions`, `recommendedAction` and `notes`",
+        "`pending-connections-capture`", "never `upperBound`", "`connections-capture`", "`verify-connection`", "`read-thread`", "`send-approved`", "`draft`", "`held`",
+        "`approvedMessage`", "`heldReason`", "`readConversationCall`", "`coveredByRun`", "`messageUrlBasis`", "`conversation`, `stored` or `profile`", "`messageUrlNote`",
+        "`delivery { state, messageId, body, messageUrl, reasons }`", "`delivery.state` is `deliverable`", "Do not reread the queue first",
+        "the typed text is proved by the post-send thread capture, not by sight", "A script that reads the compose box is deferred",
+        "close any open message window before you navigate to the next profile and again after each send",
+        "`queue-empty`", "`needs-a-person`", "`needs-another-intent`", "`blocked`", "One pass per thread still holds",
+    ):
+        check(needle in queue, f"the follow-up queue section lacks: {needle}")
     check("sends confirmed from data versus by screen" in step3, "Follow-up Step 3 does not report sends confirmed from data versus by screen")
     check(
         "When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run" in step3
@@ -289,6 +323,16 @@ def main() -> None:
     for gone in ("outreach_mark_message_sent", "outreach_record_message", "outreach_deposit_conversation", "outreach_save_lead", "observedLinkedInProfile) and"):
         check(gone not in withdraw, f"Withdraw stale invitations routine names a tool that is not its own: {gone}")
 
+    # 0.9.16 changelog: the follow-up queue, the intent, the send-after-deposit, the script retry, the stamp and the named server release.
+    entry16 = " ".join(readme[readme.index("### 0.9.16") : readme.index("### 0.9.15")].split())
+    for needle in (
+        "20261012d", "mosaicohr-com/mosaico#1916", "#1908, #1909, #1910, #1911, #1912 and #1915", "`outreach_get_follow_up_queue`", "`outreach_deposit_conversation`",
+        "`follow_up_pass`", "no longer the working read", "`delivery.state` `deliverable`", "Typed text is proved by the thread capture after the send, not by sight",
+        "`thread-person-held-by-other-lead`", "`profileCaptureFailures`", "redirect retry", "`requestedIdentifier`", "`resolvedIdentifier`", "stamped 0.9.16 or later",
+        "saved 0.9.15 Follow-up text to the 0.9.16 text in place", "stay at 0.9.15",
+    ):
+        check(needle.lower() in entry16.lower(), f"README 0.9.16 entry lacks: {needle}")
+    check(readme.index("### 0.9.16") < readme.index("### 0.9.15"), "README changelog lacks 0.9.16 above 0.9.15")
     # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the named server release.
     entry = " ".join(readme[readme.index("### 0.9.15") : readme.index("### 0.9.14")].split())
     for needle in (
@@ -435,7 +479,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

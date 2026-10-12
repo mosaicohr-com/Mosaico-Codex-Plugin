@@ -410,6 +410,14 @@ your own that calls LinkedIn. The capture does not work through the Chrome exten
 extension's script tool runs outside the signed-in page's session and its network listing returns no
 response bodies.
 
+Redirects (0.9.16). When LinkedIn has moved a person to a new public identifier, the page you opened follows the
+redirect while the first profile query still fails (a 404, or an answer with no usable profile). The script then
+asks once more with the identifier the page itself shows, only when that differs from the one it was given, and
+never more than once. It never swaps identifiers silently: `requestedIdentifier` stays the value you gave it,
+`resolvedIdentifier` is the identifier LinkedIn's answer names, and the two being different is expected after a
+redirect. Pass both on exactly as returned; Mosaico keeps the old identifier as an alias of the Lead. Do not retry
+the script yourself.
+
 Run these steps in order for one Lead:
 
 1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
