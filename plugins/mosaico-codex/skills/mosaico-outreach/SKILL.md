@@ -17,7 +17,7 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    may be mentioned inside the matching action, but must never replace the two all-dates follow-up
    actions:
    - **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days. A Source
-     run never writes drafts: the Lead owner's Sync data run does. Never approve or send.
+     run never writes drafts: the Lead owner's Send invitations run does. Never approve or send.
    - **Write missing invitation drafts** — Write the invitation draft for each placed Lead of your own that has
      none, from the `draftsToWrite` list Mosaico gives. Never approve or send.
    - **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
@@ -30,11 +30,11 @@ reconstruct workflow state from conversation memory, draft lists, batch history 
    - **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
    - **Manage Outreach Agents** — Review, create, or update owned Agents.
    - **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
-   - **Repair the Outreach backlog** — List the repair queue Mosaico keeps behind the daily Sync data
-     run and what a person should do. Read-only here; the repair itself runs from Claude.
+   - **Repair the Outreach backlog** — List the repair queue Mosaico keeps behind the daily Follow-up and Send invitations
+     runs and what a person should do. Read-only here; the repair itself runs from Claude.
    - **Install the Outreach schedules** — Idempotently create the Source leads schedule (every two
-     hours, whole plan). Sync data (connections and messaging, once a day, the only one that
-     sends) and Repair (once a week) are installed from Claude, because Codex cannot capture
+     hours, whole plan). Send invitations, Follow-up and Withdraw stale invitations (once a day each; Send invitations
+     and Follow-up are the only ones that send) and Repair (once a week) are installed from Claude, because Codex cannot capture
      connection evidence.
    Route Agent management to `$mosaico:mosaico-outreach-agent-management`, Lead management to
    `$mosaico:mosaico-outreach-lead-management`, the read-only repair queue to

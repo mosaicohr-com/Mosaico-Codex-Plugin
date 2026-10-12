@@ -1,6 +1,6 @@
 ---
 name: mosaico-outreach-schedule-install
-description: Install or repair the Mosaico Outreach Source leads schedule in the user's local timezone. Sync data is installed from Claude.
+description: Install or repair the Mosaico Outreach Source leads schedule in the user's local timezone. Send invitations, Follow-up, Withdraw stale invitations and Repair are installed from Claude.
 ---
 
 # Install the Mosaico Outreach schedules
@@ -8,13 +8,19 @@ description: Install or repair the Mosaico Outreach Source leads schedule in the
 Use the supported persistent recurring-automation mechanism in this Codex environment. This action
 configures personal automation state; it does not change Mosaico workflow records.
 
-## Three schedules, one installable from Codex
+## Five schedules, one installable from Codex
 
-Mosaico Outreach runs on three schedules:
+Mosaico Outreach runs on five schedules:
 
-- **Mosaico Outreach — Sync data (connections and messaging)** — once a day. It checks LinkedIn
-  connections, handles messages, and sends approved follow-ups and invitations. It is the only
-  schedule that clicks Connect or sends a message.
+- **Mosaico Outreach — Send invitations** — once a day. It writes the missing invitation drafts and sends the approved
+  invitations. With Follow-up it is the only schedule that clicks Connect or sends a message.
+- **Mosaico Outreach — Follow-up** — once a day. It checks accepted invitations and message replies, one pass per
+  thread, and sends the approved follow-ups.
+- **Mosaico Outreach — Withdraw stale invitations** — once a day. It withdraws the pending invitations Mosaico
+  lists as stale and records each one. It never sends.
+
+The older single "Sync data (connections and messaging)" schedule is superseded by Send invitations, Follow-up and
+Withdraw stale invitations.
 - **Mosaico Outreach — Source leads** — every two hours during business hours. It finds Leads and
   writes invitation drafts. It never approves or sends.
 - **Mosaico Outreach — Repair** — once a week (by default Sunday at 10:00 AM local time, cron
@@ -22,9 +28,9 @@ Mosaico Outreach runs on three schedules:
   verify, threads to read, redirected addresses, duplicate Leads and declines. It never approves or sends.
 
 The Codex package cannot capture connection evidence or LinkedIn identity. Only Claude's built-in
-browser pane can. So a Sync data schedule installed from Codex must not send anything, and a Repair
-schedule installed from Codex could not verify or read anything. Do not install either here. Tell the
-person to install Sync data and Repair from Claude, using the Claude plugin's schedule skill. Offer only
+browser pane can. So a Send invitations or Follow-up schedule installed from Codex must not send anything, a Withdraw stale invitations schedule installed from Codex could not withdraw anything, and a Repair
+schedule installed from Codex could not verify or read anything. Do not install any of them here. Tell the
+person to install them from Claude, using the Claude plugin's schedule skill. Offer only
 the Source leads schedule from Codex. The Codex package's repair-run skill is read-only: it lists the
 queue and what a person should do.
 
@@ -84,18 +90,18 @@ Use this when a Source leads automation is already installed and only its standi
 3. Replace the whole text with the Source leads text above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in"; carry them over unchanged unless the person gave a new one, and drop any quota map. Change nothing else: keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
 4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion.
 
-## Keep it apart from Sync data
+## Keep it apart from the daily schedules
 
-The two schedules must not overlap. If the person has a Sync data schedule, place every Source leads
-time at least 60 minutes before or after the Sync time. The default Sync time is 1:00 PM, which leaves
-8:00 AM, 10:00 AM, 12:00 PM, 2:00 PM, 4:00 PM and 6:00 PM. Say in the readback that you did this.
+The schedules must not overlap. If the person has the Claude daily schedules, place every Source leads
+time at least 60 minutes before or after each of their times. The default times are 1:00 PM, 1:30 PM and 2:00 PM, which leaves
+8:00 AM, 10:00 AM, 12:00 PM, 4:00 PM and 6:00 PM. Say in the readback that you did this.
 
 ## Install
 
 1. Use the person's local timezone. Inspect existing recurring automations before writing anything.
 2. Match existing automations by their Mosaico Outreach purpose and instructions, not name alone. An
    older "Prepare invitations" automation matches Source leads. Do not touch an older "Send approved
-   invitations" automation here; tell the person to replace it with Sync data from Claude.
+   invitations" automation here; tell the person to replace it with Send invitations from Claude.
    A saved thin text matches the routine it names ("This is the Source leads routine").
 3. If an equivalent schedule already exists, do not duplicate it. Report its name, timezone, enabled
    status and next runs.
