@@ -102,7 +102,7 @@ def main() -> None:
     for name, marker, stop_text in (
         ("mosaico-outreach-follow-up-run", "## Follow-up routine", "Continue until Mosaico reports a genuine blocker or every Lead has been handled."),
         ("mosaico-outreach-invite-run", "## Send invitations routine", "continue until Mosaico reports completion (no-approved-invitations-remain)"),
-        ("mosaico-outreach-invite-run", "## Withdraw stale invitations routine", "A blocker from Mosaico, or a LinkedIn warning or captcha, stops the run at once"),
+        ("mosaico-outreach-invite-run", "## Withdraw stale invitations routine", "A LinkedIn warning or captcha also stops the run at once"),
         ("mosaico-outreach-repair-run", "## Repair routine", "never earlier for volume and never later by starting another run."),
     ):
         raw = read(CLAUDE / "skills" / name / "SKILL.md")

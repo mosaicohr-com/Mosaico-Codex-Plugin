@@ -273,13 +273,20 @@ def main() -> None:
     flat_withdraw = " ".join(withdraw.split())
     for needle in (
         "outreach_get_withdraw_queue", "outreach_record_withdrawal", "Mosaico owns the 30-day rule", "never work it out from dates yourself",
-        "the count, the cap, the blockers, the allowedActions and the one recommendedAction", "no more than the cap", "the Lead id",
+        "with intent manage_leads", "including both withdraw tools", "Never pass ownerUserId", "rule.withdrawAfterDays is 30, cap.perRun is 25",
+        "never recomputes either from dates or counts beyond what the read says", "Follow recommendedAction literally",
+        "withdraw_next", "nothing_to_do", "write_report", "register_linkedin_identity", "start_outreach_run",
+        "linkedin-identity-not-registered", "run-required", "run-intent-not-allowed",
+        "completion (mustContinue, stopReason, validStopReasons)", "next (the Lead to work now, or null)",
+        "Record a withdrawal only after LinkedIn shows the invitation is gone", "withdrawal_recorded", "already_withdrawn",
+        "invitation-accepted", "declined", "lead-not-active", "no-invitation-sent", "invitation-too-recent", "nothing was written: skip that Lead",
+        "Stop when next is null or completion.mustContinue is false", "queue-empty, run-cap-reached or blocked",
         "never clicks Connect", "never withdraws an invitation Mosaico did not list", "never sends anything",
-        "A blocker from Mosaico, or a LinkedIn warning or captcha, stops the run at once", "outreach_end_run", "Record a withdrawal only after LinkedIn shows the invitation is gone",
+        "A LinkedIn warning or captcha also stops the run at once", "outreach_end_run",
         "https://www.linkedin.com/mynetwork/invitation-manager/sent/",
     ):
         check(needle in flat_withdraw, f"Withdraw stale invitations routine lacks: {needle}")
-    for gone in ("outreach_mark_message_sent", "outreach_record_message", "outreach_deposit_conversation", "outreach_save_lead"):
+    for gone in ("outreach_mark_message_sent", "outreach_record_message", "outreach_deposit_conversation", "outreach_save_lead", "observedLinkedInProfile) and"):
         check(gone not in withdraw, f"Withdraw stale invitations routine names a tool that is not its own: {gone}")
 
     # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the coordinator's placeholder.
