@@ -202,7 +202,7 @@ release is live. Send invitations and Follow-up need no new server tools.
     after every write. It stops when `next` is null or `completion.mustContinue` is false and reports the `stopReason`. A blocked
     read (for example `linkedin-identity-not-registered`) stops and reports; a `blocked` write (for example
     `invitation-accepted` or `invitation-too-recent`) writes nothing, so that Lead is skipped, reported and the run continues.
-    Mosaico owns the per-run cap (25) and the 30-day rule; the skill never recomputes either. It never sends, never clicks
+    Mosaico owns the 30-day rule and the per-run cap (25); the skill never recomputes either. It never sends, never clicks
     Connect and never withdraws an invitation Mosaico did not list. A LinkedIn warning or captcha stops the run, which reports.
 - The "Sync data routine" section of the follow-up-run skill is now a short "Sync data routine (superseded)" note. An old saved
   Sync data schedule starts no run, touches nothing, and reports that it must be reinstalled. Run the installer again: it creates the
