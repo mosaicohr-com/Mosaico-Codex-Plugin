@@ -146,7 +146,7 @@ def main() -> None:
     texts = re.findall(r"```text\n(.*?)\n```", installer_raw, re.S)
     check(len(texts) == 6, f"Claude installer must hold six schedule texts, found {len(texts)}")
     sync_text, follow_text, withdraw_text, own_text, colleagues_text, repair_text = texts
-    for label, text, section_name, stamp in (("Send invitations", sync_text, "Send invitations routine", "0.9.15"), ("Follow-up", follow_text, "Follow-up routine", "0.9.16"), ("Withdraw stale invitations", withdraw_text, "Withdraw stale invitations routine", "0.9.15"), ("Source leads (own)", own_text, "Source leads routine", "0.9.13"), ("Source leads (colleagues)", colleagues_text, "Source leads routine", "0.9.13")):
+    for label, text, section_name, stamp in (("Send invitations", sync_text, "Send invitations routine", "0.9.15"), ("Follow-up", follow_text, "Follow-up routine", "0.9.17"), ("Withdraw stale invitations", withdraw_text, "Withdraw stale invitations routine", "0.9.15"), ("Source leads (own)", own_text, "Source leads routine", "0.9.13"), ("Source leads (colleagues)", colleagues_text, "Source leads routine", "0.9.13")):
         check(f"({stamp} or later)" in text and f'is older than {stamp} or has no "{section_name}" section' in text, f"the {label} text is not stamped {stamp}")
         check("0.9.12" not in text, f"the {label} text still names 0.9.12")
         check(len(text.split()) <= 200, f"the {label} text is not thin")
@@ -171,7 +171,7 @@ def main() -> None:
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
+        check(json.loads(read(manifest))["version"] == "0.9.17", f"{manifest.name} is not at 0.9.17")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])

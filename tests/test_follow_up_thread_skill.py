@@ -130,6 +130,18 @@ def main() -> None:
                    "`profile-capture-failed`", "`profileCaptureFailures`", "`givenUp`", "`inToSort`", "never capture the same Lead again in the same run"):
         check(needle in evidence, f"Capture connection evidence lacks: {needle}")
     check("Redirects (0.9.16)" in flat(section((CLAUDE / "skills/mosaico-outreach-invite-run/SKILL.md").read_text(encoding="utf-8"), "Capture connection evidence")), "invite-run does not describe the redirect retry")
+    # 0.9.17: a gone profile is reported by the script as 404 or 410; a deposit can link two Leads itself.
+    for label, text in (("follow-up-run", evidence), ("invite-run", flat(section((CLAUDE / "skills/mosaico-outreach-invite-run/SKILL.md").read_text(encoding="utf-8"), "Capture connection evidence")))):
+        for needle in ("Gone profiles (0.9.17)", "reports `status` 404 (410 when LinkedIn says 410)", "LinkedIn's own not-found page", "never replaces a first 404 or 410", "never correct `status`", "never retry the script"):
+            check(needle in text, f"{label} Capture connection evidence lacks: {needle}")
+    check("Mosaico gives up on a Lead at once on a 404 or 410, and counts a 200 with no profile only as a first failure" in evidence, "follow-up-run does not say how Mosaico counts a 404 against a 200")
+    for needle in ("stored with `linkedDuplicate` and the note `duplicate-linked`", "`keptLeadId`, `aliasLeadId`, `basis` `member-id`, `draftsMoved`", "`draftsDiscarded`, `declineCarriedOver`",
+                   "carry on with the kept Lead", "Never call `outreach_link_duplicate_leads` yourself", "could prove it only by a public identifier", "`heldBy`", "a person or the Repair routine links the two"):
+        check(needle in deposit_blockers, f"Capture the thread lacks: {needle}")
+    codex_queue = flat(section(codex, "The follow-up queue"))
+    for needle in ("20261013a", "`fix-address`", "`drop-declined`", "`repairGroup`", "`skippedThisRun`", "The Repair routine now works only the backlog outside this queue"):
+        check(needle in codex_queue, f"Codex follow-up-run queue section lacks: {needle}")
+    check("the Repair routine works only the backlog outside that queue" in flat(section(claude, "Repair is a separate routine")), "Claude follow-up-run 'Repair is a separate routine' does not say Repair works only the rest")
     check("`outreach_get_follow_up_queue`" in flat(section(codex, "The follow-up queue")) and "does not run it" in flat(section(codex, "The follow-up queue")),
           "Codex follow-up-run does not state the queue read and that it does not run the routine")
 
@@ -161,7 +173,7 @@ def main() -> None:
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.17", f"{manifest.name} is not at 0.9.17")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 0.7.0" in readme and readme.index("### 0.9.0") < readme.index("### 0.8.7") < readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
@@ -177,7 +189,7 @@ def main() -> None:
     skill = flat(claude)
     check("messaging search by the Lead's name" in skill and "primary-inbox conversation list" in skill and "Other tab are not paged" in skill and "`lookup`" in skill,
           "the Claude follow-up skill does not describe the name search and the paged primary-inbox fallback")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, the follow-up queue is the working read of the scheduled routine, and the version is 0.9.16.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, the follow-up queue is the working read of the scheduled routine, and the version is 0.9.17.")
 
 
 if __name__ == "__main__":

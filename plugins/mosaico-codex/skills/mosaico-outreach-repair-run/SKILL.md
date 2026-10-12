@@ -24,6 +24,8 @@ Only Owners and Admins can use Outreach.
      `repairSuggestions`, `unverified`) and the total, with `summary.needsPerson` counted separately;
    - for each listed item, in the order Mosaico gives them (`workOrder`, then the order inside the group):
      `personName`, its one-line `reason` and the action it needs (`action`);
+   - `excludedAsFollowUpWork` (top level and in `summary`): the Repair queue holds only the backlog outside the follow-up queue
+     (server release 20261013a), because the Follow-up routine makes the repairs of the Leads it lists; duplicate pairs stay here;
    - `progress.remaining` and `nextCursor` when more items exist (pass `nextCursor` as `cursor` to list the
      next ones), and the cap: a Repair run works at most `cap.perRun` items.
 3. Say what a person should do:

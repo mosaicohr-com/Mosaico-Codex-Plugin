@@ -71,6 +71,16 @@ def main() -> None:
             # Only a prohibition, or (0.9.11) the read of a colleague's day and the draft call that carries no ownerUserId.
             if "ownerUserId" in line and not re.search(r"(Never|Do not) pass|no `ownerUserId`|as `ownerUserId`|as ownerUserId", line):
                 raise SystemExit(f"{skill}:{number} tells the model about ownerUserId")
+    # 0.9.17: the fields the Follow-up routine relies on (server release 20261013a) exist in the application.
+    app = args.app_repo.resolve()
+    registry_text = (app / "features/outreach/server/outreach-mcp-registry.ts").read_text(encoding="utf-8")
+    queue_text = (app / "features/outreach/shared/outreach-follow-up-queue.ts").read_text(encoding="utf-8")
+    for stage in ("'fix-address'", "'drop-declined'", "fix_address", "drop_lead", "skippedThisRun", "repairGroup"):
+        if stage not in queue_text:
+            raise SystemExit(f"The application's follow-up queue lacks {stage} (the 0.9.17 Follow-up routine needs server release 20261013a)")
+    for needle in ("skippedThisRun", "linkedDuplicate", "duplicate-linked", "heldBy", "excludedAsFollowUpWork"):
+        if needle not in registry_text:
+            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.17 Follow-up routine needs server release 20261013a)")
     missing = codex - registered
     if missing:
         raise SystemExit(

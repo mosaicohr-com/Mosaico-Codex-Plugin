@@ -418,6 +418,11 @@ never more than once. It never swaps identifiers silently: `requestedIdentifier`
 redirect. Pass both on exactly as returned; Mosaico keeps the old identifier as an alias of the Lead. Do not retry
 the script yourself.
 
+Gone profiles (0.9.17). When LinkedIn says the profile is not there, the script reports `status` 404 (410 when LinkedIn
+says 410): also when its profile data call answered 200 with no profile on a page that is LinkedIn's own not-found page,
+and a redirect retry never replaces a first 404 or 410. Pass the output exactly as returned; never correct `status`,
+never retry the script and never decide yourself that a profile is gone.
+
 Run these steps in order for one Lead:
 
 1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is

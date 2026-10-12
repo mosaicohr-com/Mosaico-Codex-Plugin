@@ -23,7 +23,14 @@ const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";
 // the first call's (for an opaque member id it must carry that very member id). requestedIdentifier and profileIdentifier always
 // stay the value the run asked for; resolvedIdentifier is what LinkedIn's answer says the profile is called now, so the swap is
 // visible in the sealed output and the application stores the old name as an alias. status is the last call's status, except that
-// a retry whose call was dropped (0) keeps the first call's status. No other call is made and no page content is read.
+// a retry whose call was dropped (0) keeps the first call's status, and (0.9.17) a first call's 404 or 410 is never replaced by the
+// retry's answer when the retry finds no Profile either. No other call is made.
+// Gone profiles (0.9.17): status is the HTTP status of LinkedIn's profile data call, not of the page, and the application gives up on a
+// Lead's address at once only on a 404 or 410 (a 200 with no Profile counts as a first failure only). LinkedIn can answer 200 with no
+// Profile for an address whose page shows its not-found page. So when no Profile was resolved, the data call answered 2xx and the page
+// the run opened is LinkedIn's not-found page (its document title says the page or profile was not found, or its address is /404),
+// the script reports status 404. A 410 stays 410. Only document.title and location.pathname are read for this, nothing else of the
+// page; a refusal, a rate limit, a server error or a dropped call is reported as it is.
 // Text normalisation (0.8.5; the application mirrors this rule): every free-text field that leaves the page is normalised with
 // normalizeText before it is hashed and returned, in this order: (1) Unicode NFC; (2) every space separator (U+00A0, U+1680,
 // U+2000-U+200A, U+202F, U+205F, U+3000) becomes a plain space; (3) zero-width characters (U+200B-U+200D, U+2060, U+FEFF) are
@@ -95,6 +102,14 @@ const pageSlug = () => {
     return /^[\p{L}\p{N}_.-]{1,100}$/u.test(slug) ? slug : null;
   } catch (e) { return null; }
 };
+const gone = (s) => s === 404 || s === 410;
+const pageIsNotFound = () => {
+  try {
+    const title = typeof document !== "undefined" && isObj(document) && typeof document.title === "string" ? document.title : "";
+    const path = typeof location !== "undefined" && isObj(location) && typeof location.pathname === "string" ? location.pathname : "";
+    return /(page|profile)\s+not\s+found|this\s+page\s+(doesn['\u2019]t|does\s+not)\s+exist/i.test(title) || /^\/404(\/|$)/.test(path);
+  } catch (e) { return false; }
+};
 let call = await profileCall(PUBLIC_IDENTIFIER);
 let usedIdentifier = PUBLIC_IDENTIFIER;
 let resolved = profileOf(call, PUBLIC_IDENTIFIER);
@@ -105,9 +120,10 @@ if (slug !== null && slug.toLowerCase() !== PUBLIC_IDENTIFIER.toLowerCase()) {
   const found = profileOf(retry, slug);
   const sameMember = found !== null && (!OPAQUE_ID.test(PUBLIC_IDENTIFIER) || memberUrn(found.entityUrn) === "urn:li:fsd_profile:" + PUBLIC_IDENTIFIER);
   if (sameMember) { call = retry; resolved = found; usedIdentifier = slug; }
+  else if (gone(call.status)) { /* LinkedIn already said the profile is gone: the retry's answer never replaces it */ }
   else if (retry.status !== 0) { call = retry; }
 }
-const status = call.status;
+const status = resolved === null && call.status >= 200 && call.status < 300 && pageIsNotFound() ? 404 : call.status;
 const included = call.included;
 const leadUrn = resolved === null ? null : memberUrn(resolved.entityUrn);
 const entries = [];
