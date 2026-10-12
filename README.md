@@ -195,11 +195,15 @@ release is live. Send invitations and Follow-up need no new server tools.
     invitation drafts from `draftsToWrite`, then sends the approved invitations. Nothing else.
   - **Follow-up** (follow-up-run skill, "Follow-up routine", default 1:30 PM): checks accepted invitations (with replies and with
     no replies), checks message replies to follow-ups, one pass per thread across all dates, and sends the approved follow-ups.
-  - **Withdraw stale invitations** (invite-run skill, "Withdraw stale invitations routine", default 2:00 PM): reads
-    `outreach_get_withdraw_queue` (candidates, count, cap, blockers, `allowedActions`, `recommendedAction`), and for each candidate up
-    to the cap withdraws the pending invitation in Claude's browser pane and calls `outreach_record_withdrawal` with the Lead id.
-    Mosaico owns the 30-day rule; the skill never works it out from dates. It never sends, never clicks Connect and never withdraws an
-    invitation Mosaico did not list. A Mosaico blocker, a LinkedIn warning or a captcha stops the run, which reports.
+  - **Withdraw stale invitations** (invite-run skill, "Withdraw stale invitations routine", default 2:00 PM): starts a run with
+    intent `manage_leads` and passes its `runId` to both tools. It reads `outreach_get_withdraw_queue` (candidates, `count`, `cap`,
+    `completion`, `blockers`, `allowedActions`, `recommendedAction`, `next`) and follows `recommendedAction` literally. For the Lead
+    in `next` it withdraws the pending invitation in Claude's browser pane, then calls `outreach_record_withdrawal`, and rereads
+    after every write. It stops when `next` is null or `completion.mustContinue` is false and reports the `stopReason`. A blocked
+    read (for example `linkedin-identity-not-registered`) stops and reports; a `blocked` write (for example
+    `invitation-accepted` or `invitation-too-recent`) writes nothing, so that Lead is skipped, reported and the run continues.
+    Mosaico owns the per-run cap (25) and the 30-day rule; the skill never recomputes either. It never sends, never clicks
+    Connect and never withdraws an invitation Mosaico did not list. A LinkedIn warning or captcha stops the run, which reports.
 - The "Sync data routine" section of the follow-up-run skill is now a short "Sync data routine (superseded)" note. An old saved
   Sync data schedule starts no run, touches nothing, and reports that it must be reinstalled. Run the installer again: it creates the
   three tasks first and then retires (disables or deletes) the old Sync data task, so nothing runs twice.
