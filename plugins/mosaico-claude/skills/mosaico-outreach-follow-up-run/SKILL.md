@@ -32,7 +32,7 @@ Treat the answer as an additional drafting scope, not permission to approve or s
    ```
 
    and run it word for word with the browser pane's `javascript_tool`.
-2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `check_follow_ups` for checking, `send_approved_follow_ups` for sending. When doing both, start a separate run for each scope.
+2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `check_follow_ups` for checking, `send_approved_follow_ups` for sending. When doing both, start a separate run for each scope. The scheduled **Follow-up routine** starts one run with intent `follow_up_pass` instead and works it through **The follow-up queue (intent `follow_up_pass`)**.
 3. Keep the returned `runId` and pass it on every `outreach_get_day` or `outreach_get_follow_ups`
    read and on every `outreach_save_lead`, `outreach_update_lead`, `outreach_record_message`,
    `outreach_deposit_conversation`, `outreach_mark_message_sent`, `outreach_record_delivery_block`,
@@ -260,6 +260,10 @@ Run these steps in order for one Lead:
      person asks;
    - `evidence-altered`: see **Script output goes to Mosaico exactly as returned**; run the script again and
      pass the new output unchanged;
+   - blocked `thread-person-held-by-other-lead`: the person in the thread is already another Lead of this
+     owner (two records of one person). Capturing again returns the same answer, so never capture again and
+     never work around it. Its only allowed action is `continue_with_next_lead`: record the Lead in the
+     report ("held twice; the Repair routine links the two") and go on. Nothing was stored;
    - any other blocker code: follow the action Mosaico names (run the script again once, or continue with
      the next Lead), and do nothing else.
 
@@ -316,6 +320,14 @@ your own that calls LinkedIn. The capture does not work through the Chrome exten
 extension's script tool runs outside the signed-in page's session and its network listing returns no
 response bodies.
 
+Redirects (0.9.16). When LinkedIn has moved a person to a new public identifier, the page you opened follows the
+redirect while the first profile query still fails (a 404, or an answer with no usable profile). The script then
+asks once more with the identifier the page itself shows, only when that differs from the one it was given, and
+never more than once. It never swaps identifiers silently: `requestedIdentifier` stays the value you gave it,
+`resolvedIdentifier` is the identifier LinkedIn's answer names, and the two being different is expected after a
+redirect. Pass both on exactly as returned; Mosaico keeps the old identifier as an alias of the Lead. Do not retry
+the script yourself.
+
 Run these steps in order for one Lead:
 
 1. Open LinkedIn's Me page and read the profile URL of the signed-in account. This is
@@ -351,6 +363,12 @@ Run these steps in order for one Lead:
    not-connected, or the blocker it returned. If Mosaico refused or the capture gave it nothing usable,
    leave the Lead unverified, list it as skipped and continue; follow any action Mosaico names, and do
    nothing else.
+6. A capture that could not read the profile is answered `blocked` with code `profile-capture-failed`, the
+   action `continue_with_next_lead` and three extra fields: `profileCaptureFailures` (`count`, `lastAt`,
+   `lastStatus`, `lastStep`), `givenUp` and `inToSort`. That is a record, not a stop: Mosaico has remembered the
+   failure on the Lead (a 404 or 410 gives up at once, a 200 with no profile on the second failure, and a Lead
+   given up is flagged in To sort and leaves the queue). Report the Lead with those fields in plain words,
+   never capture the same Lead again in the same run, and continue with the next Lead.
 
 When the capability is unavailable (the script file is missing, the gate refuses it, or the pane cannot be
 signed in), do not work around it. Leave the Lead unverified, note in the report only what the LinkedIn
@@ -480,9 +498,107 @@ action. Stop only when the selected scope is complete, Mosaico reports a genuine
 decision is required. Mosaico decides which member a record belongs to from the run; do not try to work that out
 yourself. Only Owners and Admins can use Outreach.
 
+## The follow-up queue (intent `follow_up_pass`)
+
+Needs the Mosaico server release 20261012d or later. If `outreach_get_follow_up_queue` is missing from the connector's tools, or
+`outreach_start_run` refuses the intent `follow_up_pass`, stop and report that Mosaico has to be updated or the Mosaico connector
+disconnected and connected again.
+
+The scheduled **Follow-up routine** starts its run with intent `follow_up_pass`: one pass that reads conversations, writes
+drafts and sends the follow-ups that are already approved. The intent may deposit conversations, record messages (drafts),
+mark a message sent, record delivery blocks, record connection evidence and connections snapshots, update Leads and end the
+run. It may not save Leads, link duplicate Leads or withdraw invitations: Mosaico refuses those writes with
+`run-intent-not-allowed`, so never attempt them.
+
+**The working read.** Call `outreach_get_follow_up_queue` with the `runId`. It is lean and paged (`limit` 1 to 50, default 25;
+`cursor` takes `nextCursor`), and it carries no conversations, no full Lead records and no Agents. It replaces
+`outreach_get_follow_ups` as this run's working read: never read `outreach_get_follow_ups` in a `follow_up_pass` run (about
+750 KB). Mosaico orders the work; never rebuild the order from other reads, reorder it or skip ahead. The answer holds
+`counts`, `unverified`, `items`, `listed`, `nextCursor`, `next`, `completion`, `cap`, `blockers`, `allowedActions`,
+`recommendedAction` and `notes`.
+
+- `next` is the one thing to do now. Do it, then read the queue again. Do not walk `items` or `nextCursor` to decide what to do;
+  they are for the report.
+- `next.kind` `connections-capture` comes first when the owner's connections list is due: run **Capture recent connections**
+  with `STOP_AT` set to `next.script.stopAtCreatedAt` (`0` when it is null) and submit the pages with `next.call`
+  (`outreach_record_connections_snapshot`); `next.pending` names a half-submitted capture whose missing pages go first.
+  Nothing else is worked before it.
+- `next.kind` `lead` is one Lead in its earliest stage. Its fields: `leadId`, `personName`, `publicIdentifier`,
+  `scriptIdentifier` (the first-line value of every approved script for this Lead), `profileUrl`, `agentId`, `stage`, `nextStep`,
+  `reasons`, `messageUrl` with `messageUrlBasis` (`conversation`, `stored` or `profile`) and `messageUrlNote`,
+  `recommendedCall` (`tool`, `arguments`, `supplyAlso`), on a draft a `readConversationCall`, and either `approvedMessage`
+  (`messageId`, `body`) or `heldReason` (`messageId`, `reasons`). Make `recommendedCall` literally: its `tool` and `arguments`
+  unchanged, plus what `supplyAlso` names. Never pick another tool or change an argument.
+- `coveredByRun` is false for an item this run's intent cannot do; `next` never points at one, and the note
+  `work-for-another-intent` counts them. Leave them for the run that can, and report the count.
+- `unverified.state` is `pending-connections-capture` until the connections list is captured, and then `count` is null: report
+  "not known until the connections list is captured", never `upperBound` as a number of unverified Leads. State `known` gives
+  the real count.
+
+**The stages**, in the order Mosaico works them:
+
+1. `verify-connection` (`nextStep` `verify_connection`): open `profileUrl` and run **Capture connection evidence** with the
+   Lead's `scriptIdentifier`; the call is `outreach_record_connection_evidence`. A `profile-capture-failed` answer is recorded
+   and the run moves on (see that section, step 6); the Lead is never captured again in this run.
+2. `read-thread` (`read_thread`): the Lead holds unsent drafts that break a rule or rest on a reply nobody judged. Run
+   **Capture the thread**, judge the outcome with **Judge the Lead's latest message**, and make the deposit call. The deposit
+   decides what is kept and reports `draftsDiscarded`.
+3. `send-approved` (`send_approved_follow_up`): send `approvedMessage.body` exactly as approved with **Send one approved
+   follow-up** below, then mark it sent with the call in `recommendedCall`.
+4. `draft` (`draft_follow_up`): replies first. Make `readConversationCall` (the same thread deposit as stage 2; its answer
+   returns the stored conversation to write from), then write the draft with `outreach_record_message` as `recommendedCall`
+   gives it. Call `outreach_get_agents` with no arguments once per run and use the Agent whose id is the item's `agentId`: write
+   the `body` from that Agent's `messageInstructions`, the Lead's stored profile and the conversation, give a new
+   `messageId` and a `checklistReview` with one pass or fail result for every enabled rule of the Agent's `messagingChecklist`,
+   `sentAt` null and the `runId`. If Mosaico refuses the draft (`follow-up-declined`, `follow-up-awaiting-reply`,
+   `follow-up-thread-unread`, `draft-already-exists`), record what it returned and continue; never work around it. Never
+   approve a draft, and never send a draft written in this run.
+5. `held` (`sort_in_application`): an approved follow-up this run cannot release. It is never `next`. Report it with its
+   `heldReason`; a person sorts it in Outreach.
+
+**After a thread deposit, send in the same step.** The deposit answer carries `delivery { state, messageId, body, messageUrl,
+reasons }`, judged by the same rule the queue uses. When `delivery.state` is `deliverable` and the recommended action is
+`send_approved_follow_up`, send that approved follow-up right now with **Send one approved follow-up**, using
+`delivery.messageId`, `delivery.body` and `delivery.messageUrl`. Do not reread the queue first and do not read
+`outreach_get_follow_ups`; the thread was just read, so do not read it again before the send. When `delivery.state` is `held`,
+send nothing and report its `reasons`. When it is `none`, there is nothing to send (a new reply returned the approval to
+Draft, or a rule discarded it). A declined Lead gets nothing.
+
+**Send one approved follow-up.**
+
+1. The text to send is `approvedMessage.body` or `delivery.body`, and the Message is the one with that `messageId`. Never
+   approve, rewrite or substitute it. If it does not exactly match what you are about to type, stop for that message and
+   report the blocker.
+2. Open the item's `messageUrl` (after a deposit, `delivery.messageUrl`). When `messageUrlBasis` is `conversation` or `stored`
+   it opens the full messaging page of that conversation. When it is `profile` (or the deposit's `messageUrl` is null and you
+   opened the profile), no conversation is known: use the profile's Message button, and read `messageUrlNote`. LinkedIn's
+   message window stays open over the profile page, so close any open message window before you navigate to the next profile
+   and again after each send. If the URL opens a different person's conversation, send nothing: call `outreach_update_lead`
+   with `linkedInMessageUrl: null` and `reason: wrong-person`, then use the Lead's profile and Message button; if that cannot
+   reach the right thread, continue with the next item. If the conversation cannot be opened or the person cannot be messaged,
+   call `outreach_record_delivery_block` with `reason: cannot-message` and continue.
+3. Type the body and send it. Do not judge from the screen whether the typed text is complete or whether it went out: the
+   typed text is proved by the post-send thread capture, not by sight. (A script that reads the compose box is deferred; this
+   release has none, so do not look for one.)
+4. Confirm it from data: run **Capture the thread** steps 1 to 4 again for the same Lead and call
+   `outreach_mark_message_sent` as **Send approved drafts**, steps 5 to 7, describe (`threadEvidence` exactly as returned,
+   fresh `identityEvidence`, the `runId`). Mosaico marks it sent only when the newest message from you in the thread is the
+   approved message. `send-not-confirmed` is handled as those steps say: retry the send once, capture again, and if it is
+   still not confirmed call `outreach_record_delivery_block` with `reason: cannot-message`.
+
+**Stopping.** The run goes on while `completion.mustContinue` is true. When it is false, `completion.stopReason` says why:
+`queue-empty` (nothing is left), `needs-a-person` (only held items are left), `needs-another-intent` (what is left needs a
+run of another intent) or `blocked` (the run cannot work the queue; read `blockers`). Stop on the first three by ending the run
+with reason `complete`; on `blocked`, and on any run-level blocker (see **Start the run**, step 4), end it with reason
+`blocked`, the `blockerCode` Mosaico gave and a note. One Lead that fails is recorded and skipped, never a halt; a Lead
+Mosaico refused stays in the queue's answer, so do not try it again in this run.
+
+One pass per thread still holds: read each Lead's thread once in a run. The only second capture of a thread is the single one
+that confirms a send.
+
 ## Follow-up routine
 
-This is the Follow-up flow of Mosaico Outreach: connections and messaging. It checks accepted invitations (the Leads who replied and the Leads who did not), checks message replies to follow-ups, does one pass per thread across all dates, and sends the follow-ups that are already approved. It does not source, transfer, write invitation drafts, send invitations or withdraw them; the Source leads, Send invitations and Withdraw stale invitations schedules do those. It uses this skill only.
+This is the Follow-up flow of Mosaico Outreach: connections and messaging. It works the follow-up queue Mosaico keeps (intent follow_up_pass): it captures the connections list when it is due, verifies the connections still unknown, reads the threads that need reading (the Leads who replied and the Leads who did not), writes the missing follow-up drafts and sends the follow-ups that are already approved, one pass per thread across all dates. It does not source, transfer, save or link Leads, write invitation drafts, send invitations or withdraw them; the Source leads, Send invitations and Withdraw stale invitations schedules do those. It uses this skill only.
 
 **Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids.
 
@@ -492,11 +608,11 @@ Resolve the current business date and time in the timezone from the schedule's s
 
 Do every LinkedIn step in Claude's built-in browser pane, which is signed in to the person's LinkedIn (the public identifier from the schedule's standing answers). Obtain connection evidence and identity only through the plugin's approved capture scripts, run by sending the browser javascript tool the one-line directive `// mosaico run <script>.js <PLACEHOLDER>=<value>` (the plugin's gate inserts the approved script; never retype a script), exactly as the skills describe; if the gate refuses the directive, run the approved script word for word with only the first line's value changed (the thread script's second line holds the Lead's name). The first-line value for every per-Lead script is the Lead's scriptIdentifier from the Mosaico read when it is present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its linkedInProfileUrl after /in/. The thread script also takes the Lead's name from the Mosaico read, so its directive is `// mosaico run linkedin-thread-messages.js PUBLIC_IDENTIFIER=<scriptIdentifier> LEAD_NAME=<the Lead's name>`. The approved scripts are browser/linkedin-whoami.js, browser/linkedin-connection-evidence.js, browser/linkedin-recent-connections.js and browser/linkedin-thread-messages.js; read each from the installed plugin. Read each script file with the file-reading tool, one file at a time, by its path under the installed plugin's browser folder; do not print them with a shell command. If the installed plugin has no browser folder, stop and report that the plugin needs updating. Never read, copy, export or reconstruct a LinkedIn cookie, token or session; never write a LinkedIn script of your own; never read a Connect, Message or Pending button as a connection state; never set a connection state yourself. If a capture is unavailable or Mosaico cannot use its result, leave that Lead unverified, list it as skipped, and continue.
 
-Step 1. Open https://www.linkedin.com/feed/ once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run and pass its runId on every read and write; before each send-evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. Read environmentName in the start answer: if it is not production, stop and report it, and begin the report with the line "Mosaico environment: production" (the name the answer gave).
+Step 1. Open https://www.linkedin.com/feed/ once. Run the approved whoami script and pass its output unchanged as identityEvidence to outreach_start_run (omit observedLinkedInProfile). Only if the whoami script cannot run, open the Me page and report its profile URL as observedLinkedInProfile instead. Start one run with intent follow_up_pass and pass its runId on every read and write; before each send-evidence write, run the whoami script again and pass its output as identityEvidence. If Mosaico blocks the start, stop and report the blocker; do not work around it. Read environmentName in the start answer: if it is not production, stop and report it, and begin the report with the line "Mosaico environment: production" (the name the answer gave).
 
-Step 2. Run this skill across all dates with the selected action "one pass per thread". Follow workflowStatus.recommendedAction from outreach_get_follow_ups. When Mosaico recommends capture_connections, run the approved recent-connections script once, save its output as returned, submit its pages to outreach_record_connections_snapshot one call per page in index order exactly as this skill describes (submit any pages Mosaico lists as missing, and first any pages left over from an earlier capture), then reread. For each Lead Mosaico returns, run the approved thread script with the Lead's script identifier as the first-line value and pass its output unchanged as threadEvidence to outreach_deposit_conversation with publicLinkedInUrl and fresh identityEvidence; Mosaico derives direction and times. Every thread deposit carries the outcome of the Lead's latest message (declined, interested or neutral), judged as this skill describes; a no ends the Lead, so never draft or send for a Lead who said no. Pass every script's output exactly as returned, every field including integrity, never retyped or edited: if Mosaico answers evidence-altered, run the script again and pass the new output unchanged. If the answer is no-conversation, continue with the next Lead. If the answer is thread-not-found-in-window, report the Lead as thread not found in the window and continue with the next Lead; do not read it by eye. If Mosaico recommends repair_drafts, visit each Lead in repairSuggestions first, as this skill describes. Only if the script cannot run, open navigation.messageUrl and deposit the visible conversation by eye, and say so in the report. If Mosaico still lists an approved outbound Follow-up for that Lead as deliverable, send it exactly as approved, then run the approved thread script again with the Lead's script identifier as the first-line value and pass its output unchanged as threadEvidence to outreach_mark_message_sent with fresh identityEvidence; Mosaico marks it sent only when the thread shows the approved message. If Mosaico answers send-not-confirmed, do not retype it: retry the send once, run the thread script again, and if it is still not confirmed call outreach_record_delivery_block with reason cannot-message and continue with the next Lead. Never mark a message sent from the screen alone unless the script cannot run, and then say so in the report. If the conversation cannot be opened, call outreach_record_delivery_block with reason cannot-message and continue. Save every missing outbound follow-up draft Mosaico permits with sentAt null. If Mosaico lists a Lead as connection unverified, do not draft or send for it: open its profile, run the approved connection-evidence script, pass the result to outreach_record_connection_evidence, and continue only if Mosaico then lists the Lead as connected. The queue may list Leads with the reason colleague-verified-needs-own-check first (a colleague's sourcing run saved them as not connected, and her Leads are yours to verify): verify them from your own pane like any other unverified Lead. Never approve, rewrite, replace or substitute a message. Continue until Mosaico reports a genuine blocker or every Lead has been handled. End the run with outreach_end_run: reason complete when every Lead has been handled, reason blocked, with the blockerCode Mosaico gave in this run or the linkedInIssue (warning, captcha or restricted) and a note, when a genuine blocker stops it.
+Step 2. Work the follow-up queue with the selected action "one pass per thread", exactly as this skill's section "The follow-up queue (intent follow_up_pass)" describes. Read outreach_get_follow_up_queue with the runId; never read outreach_get_follow_ups as the working read of this run. Do what next says, once, then read the queue again, until completion.mustContinue is false; follow each item's recommendedCall literally (its tool and arguments unchanged, plus what supplyAlso names), and never reorder the items or skip ahead. When next.kind is connections-capture, run the approved recent-connections script once with STOP_AT set to next.script.stopAtCreatedAt (0 when it is null), save its output as returned, submit its pages to outreach_record_connections_snapshot one call per page in index order exactly as this skill describes (submit any pages Mosaico lists as missing, and first any pages left over from an earlier capture), then reread. For a verify-connection item, open its profileUrl, run the approved connection-evidence script with the Lead's scriptIdentifier as the first-line value and pass the result to outreach_record_connection_evidence; a blocked answer (profile-capture-failed, with profileCaptureFailures, givenUp and inToSort) is a record: report it, never capture that Lead again in this run, and continue. Do not draft or send for a Lead the queue still lists as unverified. The queue may list Leads with the reason colleague-verified-needs-own-check first (a colleague's sourcing run saved them as not connected, and her Leads are yours to verify): verify them from your own pane like any other unverified Lead. For a read-thread item, and for the readConversationCall of a draft item, run the approved thread script with the Lead's script identifier as the first-line value and pass its output unchanged as threadEvidence to outreach_deposit_conversation with publicLinkedInUrl and fresh identityEvidence; Mosaico derives direction and times. Every thread deposit carries the outcome of the Lead's latest message (declined, interested or neutral), judged as this skill describes; a no ends the Lead, so never draft or send for a Lead who said no. Pass every script's output exactly as returned, every field including integrity, never retyped or edited: if Mosaico answers evidence-altered, run the script again and pass the new output unchanged. If the answer is no-conversation, continue with the next Lead. If the answer is thread-not-found-in-window, report the Lead as thread not found in the window and continue with the next Lead; do not read it by eye. If the answer is blocked thread-person-held-by-other-lead, the person is already another Lead of this owner: record it, never capture that thread again and continue with the next Lead (the Repair routine links the two). Only if the script cannot run, open the item's messageUrl and deposit the visible conversation by eye, and say so in the report. When the deposit answer carries delivery.state deliverable and recommends send_approved_follow_up, send that approved follow-up right then, exactly as approved (delivery.body, delivery.messageId, delivery.messageUrl), without rereading the queue; when delivery.state is held or none, send nothing. A send-approved item is sent the same way from its approvedMessage. To send: open the item's messageUrl (the full messaging page when messageUrlBasis is conversation or stored; when it is profile, use the Message button and close any open message window before you navigate to the next profile and after each send), type the approved text and send it. Do not judge from the screen whether the typed text arrived or went out: the typed text is proved by the thread capture after the send, not by sight. Then run the approved thread script again with the Lead's script identifier as the first-line value and pass its output unchanged as threadEvidence to outreach_mark_message_sent with fresh identityEvidence; Mosaico marks it sent only when the thread shows the approved message. If Mosaico answers send-not-confirmed, do not retype it: retry the send once, run the thread script again, and if it is still not confirmed call outreach_record_delivery_block with reason cannot-message and continue with the next Lead. Never mark a message sent from the screen alone unless the script cannot run, and then say so in the report. If the conversation cannot be opened, call outreach_record_delivery_block with reason cannot-message and continue. For a draft item, after its thread deposit, save the missing outbound follow-up draft Mosaico permits with sentAt null, written from the Agent named by the item's agentId (outreach_get_agents, no arguments, once per run). Never approve, rewrite, replace or substitute a message. Continue until completion.mustContinue is false or Mosaico reports a genuine blocker (Mosaico, sign-in or LinkedIn failure). End the run with outreach_end_run: reason complete when completion.stopReason is queue-empty, needs-a-person or needs-another-intent, reason blocked, with the blockerCode Mosaico gave in this run or the linkedInIssue (warning, captcha or restricted) and a note, when completion.stopReason is blocked or a genuine blocker stops it. One Lead that fails is recorded and skipped, never a halt.
 
-Step 3. Report separately, using Mosaico's counts, not memory: the Mosaico environment (the first line) and each run's runOutcome; how identity was established (whoami evidence or Me page); approved follow-up sends; follow-ups recorded as cannot-message; new follow-up drafts written; drafts Mosaico discarded (draftsDiscarded), each with its Lead and reason; outcomes recorded (declined, interested, neutral); Leads whose thread was not found in the window; whether the connections list was captured and how many Leads it marked connected; sends confirmed from data versus by screen; Leads left unverified; threads read from data versus by eye; skipped Leads with reasons; blockers. Nothing merely drafted may be described as approved or sent. When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run (it is the Repair routine's work) and end the report with the line "Repair needed: n items, run the Repair routine", using Mosaico's repairNeeded total for n. Preserve Mosaico as workflow authority and never modify another owner's records.
+Step 3. Report separately, using Mosaico's counts, not memory: the Mosaico environment (the first line) and each run's runOutcome; how identity was established (whoami evidence or Me page); approved follow-up sends; follow-ups recorded as cannot-message; new follow-up drafts written; drafts Mosaico discarded (draftsDiscarded), each with its Lead and reason; outcomes recorded (declined, interested, neutral); Leads whose thread was not found in the window; whether the connections list was captured and how many Leads it marked connected; the queue's counts and its final completion.stopReason; approved follow-ups the application held (the held items, each with its Lead and heldReason); Leads recorded as held twice (thread-person-held-by-other-lead) and Leads whose profile capture failed (profileCaptureFailures, givenUp, inToSort); sends confirmed from data versus by screen; Leads left unverified; threads read from data versus by eye; skipped Leads with reasons; blockers. Nothing merely drafted may be described as approved or sent. When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run (it is the Repair routine's work) and end the report with the line "Repair needed: n items, run the Repair routine", using Mosaico's repairNeeded total for n. Report unverified Leads from the queue's unverified block: while its state is pending-connections-capture say the count is not known yet, and never present upperBound as a count. Preserve Mosaico as workflow authority and never modify another owner's records.
 
 Guards: pacing between page loads and run expiry are enforced by Mosaico; a LinkedIn warning or captcha stops the run, which then reports.
 

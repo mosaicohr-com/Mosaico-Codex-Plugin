@@ -111,6 +111,28 @@ def main() -> None:
         text = flat((CLAUDE / f"skills/{path}/SKILL.md").read_text(encoding="utf-8"))
         check("scriptIdentifier" in text and "after `/in/`" in text.replace("after /in/", "after `/in/`"), f"Claude {path} does not name scriptIdentifier")
 
+    # 0.9.16: the follow-up queue, the send-after-deposit, record-and-continue answers and the evidence script's redirect retry.
+    queue = flat(section(claude, "The follow-up queue (intent `follow_up_pass`)"))
+    for needle in (
+        "`outreach_get_follow_up_queue`", "intent `follow_up_pass`", "never read `outreach_get_follow_ups` in a `follow_up_pass` run", "`recommendedCall`",
+        "`delivery.state` is `deliverable`", "`delivery.body`", "`delivery.messageUrl`", "Do not reread the queue first",
+        "full messaging page", "close any open message window before you navigate to the next profile and again after each send",
+        "proved by the post-send thread capture, not by sight", "`completion.stopReason`", "`queue-empty`", "`needs-a-person`", "`needs-another-intent`", "`blocked`",
+        "`run-intent-not-allowed`", "Never approve a draft, and never send a draft written in this run",
+    ):
+        check(needle in queue, f"Claude follow-up queue section lacks: {needle}")
+    check("`follow_up_pass`" in flat(section(claude, "Start the run")), "Start the run does not name the follow_up_pass intent")
+    deposit_blockers = flat(section(claude, "Capture the thread"))
+    check("`thread-person-held-by-other-lead`" in deposit_blockers and "never capture again" in deposit_blockers and "`continue_with_next_lead`" in deposit_blockers,
+          "Capture the thread does not say to record thread-person-held-by-other-lead and continue")
+    evidence = flat(section(claude, "Capture connection evidence"))
+    for needle in ("Redirects (0.9.16)", "never more than once", "never swaps identifiers silently", "`requestedIdentifier` stays the value you gave it", "`resolvedIdentifier` is the identifier LinkedIn's answer names",
+                   "`profile-capture-failed`", "`profileCaptureFailures`", "`givenUp`", "`inToSort`", "never capture the same Lead again in the same run"):
+        check(needle in evidence, f"Capture connection evidence lacks: {needle}")
+    check("Redirects (0.9.16)" in flat(section((CLAUDE / "skills/mosaico-outreach-invite-run/SKILL.md").read_text(encoding="utf-8"), "Capture connection evidence")), "invite-run does not describe the redirect retry")
+    check("`outreach_get_follow_up_queue`" in flat(section(codex, "The follow-up queue")) and "does not run it" in flat(section(codex, "The follow-up queue")),
+          "Codex follow-up-run does not state the queue read and that it does not run the routine")
+
     codex_thread = flat(section(codex, "Capture the thread"))
     for needle in (
         "linkedin-thread-messages.js",
@@ -139,7 +161,7 @@ def main() -> None:
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.15", f"{manifest.name} is not at 0.9.15")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 0.7.0" in readme and readme.index("### 0.9.0") < readme.index("### 0.8.7") < readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
@@ -155,7 +177,7 @@ def main() -> None:
     skill = flat(claude)
     check("messaging search by the Lead's name" in skill and "primary-inbox conversation list" in skill and "Other tab are not paged" in skill and "`lookup`" in skill,
           "the Claude follow-up skill does not describe the name search and the paged primary-inbox fallback")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, and the version is 0.9.14.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, the follow-up queue is the working read of the scheduled routine, and the version is 0.9.16.")
 
 
 if __name__ == "__main__":

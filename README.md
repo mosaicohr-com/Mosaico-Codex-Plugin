@@ -57,8 +57,9 @@ The provider packages include dedicated invitation, follow-up and schedule-insta
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
 action. The schedule option installs per-user local-time schedules: Send invitations (from 0.9.15, once a day, 1:00 PM by
 default: it writes the missing invitation drafts for the person's own Leads, then sends the approved invitations), Follow-up
-(from 0.9.15, once a day, 1:30 PM: accepted invitations with and without replies, message replies, one pass per thread, and the
-approved follow-ups), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
+(from 0.9.15, once a day, 1:30 PM; from 0.9.16 it starts a run with intent `follow_up_pass` and works the paged queue
+`outreach_get_follow_up_queue` hands it: the connections list when it is due, connections still to verify, threads to read, the
+approved follow-ups to send and the missing follow-up drafts, one pass per thread), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
 stale and never sends; these three replace the older single Sync data schedule, which the installer retires), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
 colleagues lane on the odd hours, each at least 60 minutes from the other lane and from the three daily times, never writes drafts and never sends; how many Leads
 it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
@@ -170,6 +171,11 @@ of any cookie or session export:
 - Every approved script ends its result with an `integrity` field, `{ algorithm: "fnv1a32", digest }` (0.8.1): FNV-1a 32-bit over the UTF-8 bytes of the canonical JSON (keys sorted, no spaces, object keys whose value is null or undefined omitted at every depth; array items stay) of everything else it returns, computed in the page. The connections script also seals each page. A run passes each output to Mosaico exactly as returned; Mosaico recomputes the digest and refuses an altered copy with `evidence-altered`.
 - `plugins/mosaico-claude/browser/linkedin-sent-invitations.js` is the sent-invitations script (0.8.0): it takes the Lead's public identifier on its first line, reads LinkedIn's Sent invitations list (100 a page, up to five pages) until the Lead is found, and returns only `{ status, signedIn, capturedAt, state, publicIdentifier, invitation, pagesRead }`, where `state` is `found`, `not-found` or `error` and `invitation` is `{ sentTime, inviteeUrn, invitationUrn }` or null. A run passes the output unchanged as `sentInvitationEvidence` to `outreach_mark_message_sent`. The endpoint is not validated against a live account yet (validated: pending). It runs only in Claude's built-in browser pane.
 - `plugins/mosaico-claude/browser/linkedin-salesnav-colleague-connection.js` is the colleague-connection script (0.9.5): it takes the candidate's public identifier on its first line and the colleague's registered public identifier on its second (Mosaico supplies it; the run never chooses it), and asks Sales Navigator's "Connections of" filter whether the candidate is already one of the colleague's connections. It runs only in the signed-in Sales Navigator page (any `https://www.linkedin.com/sales/` page) in Claude's built-in browser pane, calls only LinkedIn's profile query, the filter's typeahead and the lead search, and returns only `{ status, signedIn, capturedAt, state, colleague, candidate, filter, found, resultsTotal, pagesRead, complete, controlTotal, visibility, unreadableRows }` (0.9.11 added the last four; each person as `{ input, salesNavId, memberId }`), where `state` is `ok`, `colleague-not-resolved`, `candidate-not-resolved` or `error`. A run passes the output unchanged as `colleagueConnectionEvidence` to `outreach_save_lead`; Mosaico decides whether to skip the candidate. People are found by numeric member id (decoded from LinkedIn's ids), never by name. `found: false` alone is never proof that two people are not connected: from 0.9.11 the four proof fields let Mosaico decide whether a not-found is a proven negative.
+- Redirect retry (0.9.16): the connection-evidence script asks the profile query once more, with the page's own `/in/<slug>/`, when the
+  first call failed (404, 410, or a 2xx with no usable profile) and the page followed a redirect to a different slug. It never retries a
+  refusal, a rate limit, a server error or a dropped call, never more than once, and never swaps identifiers silently:
+  `requestedIdentifier` stays what the run asked for and `resolvedIdentifier` is what LinkedIn named, so Mosaico can keep the old
+  identifier as an alias.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the values on its leading placeholder lines may change: the first line, for the thread script the second, the Lead's name, and for the colleague-connection script the second, the colleague's identifier), expands a one-line run
   directive (0.8.4, below) into the approved script, and refuses any other script
@@ -182,6 +188,44 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.16
+
+Requires the Mosaico server release 20261012d (promotion mosaicohr-com/mosaico#1916, stage-v2 to main-v2, carrying
+mosaicohr-com/mosaico#1908, #1909, #1910, #1911, #1912 and #1915). The Follow-up routine of this release relies on two tools of that
+release: the new `outreach_get_follow_up_queue` and the extended `outreach_deposit_conversation` (its `delivery` answer). It also needs
+the run intent `follow_up_pass` on `outreach_start_run`. Install or move the Follow-up schedule to the 0.9.16 text only after that
+release is live. Send invitations and Withdraw stale invitations are unchanged and stay at 0.9.15.
+
+- **Follow-up routine** (follow-up-run skill). It starts its run with intent `follow_up_pass` (it may deposit conversations, record
+  messages, mark sent, record delivery blocks, record connection evidence and connections snapshots, update Leads and end the run; it
+  may not save Leads, link duplicates or withdraw) and reads `outreach_get_follow_up_queue` instead of `outreach_get_follow_ups`, which is
+  about 750 KB and is no longer the working read. The queue is lean, paged and ordered by the application: the connections capture first
+  (`next.kind` `connections-capture`, with its call and script parameters), then one item per Lead in its earliest stage
+  (`verify-connection`, `read-thread`, `send-approved`, `draft`, `held`). The routine does `next` once, rereads, and follows each item's
+  `recommendedCall` literally; it never reorders the work. It stops on `completion.stopReason` (`queue-empty`, `needs-a-person`,
+  `needs-another-intent` or `blocked`) and reports `unverified` honestly: while its state is `pending-connections-capture` the count
+  is not known.
+- **Send right after a deposit.** When `outreach_deposit_conversation` answers `delivery.state` `deliverable` and recommends
+  `send_approved_follow_up`, the routine sends that approved follow-up at once with `delivery.body`, `delivery.messageId` and
+  `delivery.messageUrl`, without rereading the queue. `held` and `none` send nothing. It opens the item's `messageUrl`: the full
+  messaging page when the basis is `conversation` or `stored`; when the basis is `profile` it uses the Message button and closes any open
+  message window before it navigates to the next profile and after each send. Typed text is proved by the thread capture after the
+  send, not by sight (a script that reads the compose box is deferred). One pass per thread stays.
+- **Record and continue.** `thread-person-held-by-other-lead` on a deposit (the person is already another Lead of the owner) and a
+  blocked `outreach_record_connection_evidence` (`profile-capture-failed`, with `profileCaptureFailures`, `givenUp` and `inToSort`) are
+  recorded in the report and the run moves on; neither is retried in the same run.
+- **Connection-evidence script, redirect retry (row 21).** When the first profile query fails (404, 410, or a 2xx with no usable
+  profile) and the browser page has followed a redirect to a different `/in/<slug>/`, the script asks once more with the page's own
+  slug, never more than once and never after a refusal, a rate limit, a server error or a dropped call. For an opaque member id the retry
+  is accepted only when its profile carries that member id. The sealed output reports both `requestedIdentifier` (what the run asked
+  for) and `resolvedIdentifier` (what LinkedIn named); nothing is swapped silently. `status` is the last call's status (a dropped retry
+  keeps the first status). Mosaico stores the old identifier as an alias when it receives the resolved one.
+- The Follow-up schedule text is stamped 0.9.16 or later. The installer moves a saved 0.9.15 Follow-up text to the 0.9.16 text in place
+  ("Update the standing answers in place"), keeping its cron, name and enabled state. The Send invitations and Withdraw stale invitations
+  texts stay at 0.9.15; the Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- The Codex package states the queue read for its check and send scopes and still does not run the scheduled routine. Its
+  tool-contract test now also reads the follow-up queue's tool name from the application's shared constant.
 
 ### 0.9.15
 
