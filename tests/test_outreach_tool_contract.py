@@ -81,6 +81,24 @@ def main() -> None:
     for needle in ("skippedThisRun", "linkedDuplicate", "duplicate-linked", "heldBy", "excludedAsFollowUpWork"):
         if needle not in registry_text:
             raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.17 Follow-up routine needs server release 20261013a)")
+    # 0.9.18: the dated follow-ups the Follow-up routine books (server release 20261013c) exist in the application, and the skill names them.
+    dates_text = (app / "features/outreach/shared/outreach-follow-up-dates.ts").read_text(encoding="utf-8")
+    for needle in ("sendNotBefore", "nextTouchOn", "scheduledReason", "retry_with_valid_date", "next-touch-scheduled", "follow-up-scheduled", "wait_for_scheduled_day", "returnedToDraft", "followUpRuleViolations"):
+        if needle not in registry_text and needle not in dates_text:
+            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.18 Follow-up routine needs server release 20261013c)")
+    for needle in ("wait_for_scheduled_day", "scheduledReason", "notBefore", "scheduled:"):
+        if needle not in queue_text:
+            raise SystemExit(f"The application's follow-up queue lacks {needle} (the 0.9.18 Follow-up routine needs server release 20261013c)")
+    date_codes = ("date-invalid", "date-not-future", "date-too-far", "date-not-applicable")
+    for needle in (*date_codes, "next-touch-scheduled", "next-touch-due", "follow-up-scheduled", "'scheduled-due'", "OUTREACH_FOLLOW_UP_DATE_MAX_DAYS_AHEAD = 365"):
+        if needle not in dates_text:
+            raise SystemExit(f"The application's follow-up date module lacks {needle} (the 0.9.18 Follow-up routine needs server release 20261013c)")
+    for package in ("mosaico-claude", "mosaico-codex"):
+        skill_text = (plugin_root / package / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
+        for needle in ("`sendNotBefore`", "`nextTouchOn`", "`notBefore`", "`scheduledReason`", "`wait_for_scheduled_day`", "`retry_with_valid_date`", "`earliestAllowed`", "`latestAllowed`",
+                       "`next-touch-scheduled`", "`follow-up-scheduled`", "`next-touch-due`", "`counts.scheduled`", *(f"`{code}`" for code in date_codes)):
+            if needle not in skill_text:
+                raise SystemExit(f"The {package} follow-up-run skill does not name {needle}, which the application's dated follow-ups use")
     missing = codex - registered
     if missing:
         raise SystemExit(

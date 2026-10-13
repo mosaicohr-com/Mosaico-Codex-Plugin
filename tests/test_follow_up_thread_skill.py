@@ -145,6 +145,69 @@ def main() -> None:
     check("`outreach_get_follow_up_queue`" in flat(section(codex, "The follow-up queue")) and "does not run it" in flat(section(codex, "The follow-up queue")),
           "Codex follow-up-run does not state the queue read and that it does not run the routine")
 
+    # 0.9.18: dated follow-ups. The model proposes a day from the Lead's words; the application owns the rules, the clock and the hold.
+    dated_needles = (
+        "Needs the Mosaico server release 20261013c or later",
+        "\"talk in January\", \"after the holidays\", \"next month\", a named day",
+        "the follow-up is booked for a day instead of being written for now",
+        "You propose the day from the Lead's words; Mosaico owns everything after that",
+        "It checks the day against its own today in the owner's time zone",
+        "If Mosaico refuses `sendNotBefore` or `nextTouchOn` as an unknown argument",
+        "only when that outcome is `interested` or `neutral`",
+        "A bare \"not now\" with no time is a no, a Lead who said no is never booked, and if you doubt whether the message is a no, it is one",
+        "If the words give no time you can name, book nothing and report the Lead with the words",
+        "written YYYY-MM-DD", "counted from the day the Lead wrote them",
+        "Never work out today from a clock: not the machine's, not the page's, and do not run `date`",
+        "it returns it as `today` when it refuses a date",
+        "no more than 365 days ahead",
+        "Mosaico's answer to the thread deposit decides which call to make, not your own reading of the Lead's state",
+        "This is the one case in which a `draft` item's `recommendedCall` is not made exactly as given: it gets `sendNotBefore` added, or it is replaced by the `outreach_update_lead` call below",
+        "lists `draft_follow_up` among its allowed actions (a follow-up is due now)",
+        "add `sendNotBefore` with the day to that `outreach_record_message` call",
+        "once approved, Mosaico holds it until the day (reason `follow-up-scheduled`)",
+        "`followUpRuleViolations` holds nothing but `follow-up-awaiting-reply`", "`delivery.state` is `none`", "`returnedToDraft`", "write no draft",
+        "`outreach_update_lead` with the `leadId`, `changes` set to `nextTouchOn` with the day, and the `runId`",
+        "reason `next-touch-due`", "also when our own message is the latest",
+        "An approved follow-up Mosaico offers (`delivery.state` `deliverable`) is sent as approved: booking never holds back or changes a message a person approved",
+        "`date-invalid`", "`date-not-future`", "`date-too-far`", "`date-not-applicable`", "`field`, `today`, `earliestAllowed` and `latestAllowed`",
+        "`retry_with_valid_date` and `continue_with_next_lead`", "Follow `recommendedAction`: retry once", "between `earliestAllowed` and `latestAllowed`, worked out from the returned `today`",
+        "take `continue_with_next_lead`: write nothing more for this Lead and report the refusal",
+        "Never choose a day only to get past a refusal, never leave the date out to write the draft anyway, and never try a third time",
+        "`wait_for_scheduled_day`", "`notBefore`", "`scheduledReason`", "`counts.scheduled`", "never open, read, draft or send for it",
+        "skipped with `next-touch-scheduled` (with `notBefore`)", "`draft-already-exists` with the recommended action `continue_with_next_lead` and `existingMessage.sendNotBefore`",
+        "`scheduled-due` or `next-touch-due`", "worked like any other, with no date", "Do not book it again from the same message",
+        "A reply before the booked day does not clear the booking", "the note `next-touch-scheduled` with `notBefore`",
+        "move the booking: `outreach_update_lead` with the new `nextTouchOn`", "clear it: `nextTouchOn` `null`", "leave the booking as it is",
+        "when a follow-up is recorded as sent on or after the booked day, which Mosaico clears in the same write; never clear it yourself after a send",
+        "a person's to move (Outreach, the Follow Up card, \"Follow up on or after\")",
+        "The report", "the bookings made", "the bookings changed or cleared", "the booked items waiting (`counts.scheduled`)", "the date refusals",
+    )
+    claude_book = flat(section(claude, "Book a later touch"))
+    codex_book = flat(section(codex, "Book a later touch"))
+    for needle in dated_needles:
+        check(needle in claude_book, f"Claude 'Book a later touch' lacks: {needle}")
+        check(needle in codex_book, f"Codex 'Book a later touch' lacks: {needle}")
+    # The two sections say the same thing: they differ only where Codex has no queue stages and reads a thread by eye.
+    def book_norm(text: str) -> str:
+        return text.replace("as stage `draft` describes", "<<draft step>>").replace("as this scope's draft step describes", "<<draft step>>").replace("in the stored conversation", "in the conversation")
+    check(book_norm(claude_book) == book_norm(codex_book), "the 'Book a later touch' sections differ between the Claude and Codex skills")
+    check(claude.index("## Book a later touch") < claude.index("## Capture connection evidence") and codex.index("## Book a later touch") < codex.index("## Capture connection evidence"),
+          "'Book a later touch' is not placed after the outcome checklist and before the connection evidence")
+    queue_flat = flat(section(claude, "The follow-up queue (intent `follow_up_pass`)"))
+    for needle in ("`notBefore` and `scheduledReason` are on every item", "`scheduled`, `scheduled-due`, `next-touch-scheduled`, `next-touch-due` or null", "never work it out yourself",
+                   "last in stage `held` with `nextStep` `wait_for_scheduled_day` (reasons `follow-up-scheduled` or `next-touch-scheduled`)", "is not due, needs no person and is never `next`",
+                   "`counts.scheduled` counts those Leads for the report", "A queue with only them left stops with `queue-empty`", "On its day a dated item is first in its stage",
+                   "add `sendNotBefore` to the draft or book the Lead instead", "a booked touch whose day has come: write its draft as above, without a date",
+                   "Work booked for a later day is in this stage too, last, with `nextStep` `wait_for_scheduled_day`: it needs no person and nothing is done for it in this run",
+                   "also when only work booked for a later day, or skipped Leads, is left", "`needs-a-person` (only held items that need a person are left)", "20261013c"):
+        check(needle in queue_flat, f"Claude follow-up queue section lacks: {needle}")
+    for scope in ("Check for new follow-ups", "One pass per thread"):
+        for label, text in (("Claude", claude), ("Codex", codex)):
+            check("**Book a later touch**" in flat(section(text, scope)), f"{label} '{scope}' does not point at Book a later touch")
+    codex_dated = flat(section(codex, "The follow-up queue"))
+    for needle in ("20261013c", "`notBefore`", "`scheduledReason`", "`wait_for_scheduled_day`", "`counts.scheduled`", "stops with `queue-empty`", "**Book a later touch**"):
+        check(needle in codex_dated, f"Codex follow-up queue section lacks the dated follow-ups: {needle}")
+
     codex_thread = flat(section(codex, "Capture the thread"))
     for needle in (
         "linkedin-thread-messages.js",
@@ -171,9 +234,13 @@ def main() -> None:
         return flat(match.group(1))
     check(checklist(claude) == checklist(codex), "the outcome checklist differs between the Claude and Codex skills")
     check("`threadEvidence`" not in checklist(codex), "Codex outcome checklist mentions script evidence")
+    # 0.9.18: a named later time is not a refusal even after "not now" (otherwise "not now, talk in January" drops the Lead before it can be booked).
+    for needle in ("A message that asks to be contacted at a later time it names (\"talk in January\", \"after the holidays\", \"next month\", a named day) is not a refusal, even when it begins with \"not now\": judge it `interested` or `neutral`, and book the day (see **Book a later touch**)",
+                   "A \"not now\" with no time, or a \"maybe someday\", stays `declined`"):
+        check(needle in checklist(claude) and needle in checklist(codex), f"the outcome checklist lacks: {needle}")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.17", f"{manifest.name} is not at 0.9.17")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.18", f"{manifest.name} is not at 0.9.18")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 0.7.0" in readme and readme.index("### 0.9.0") < readme.index("### 0.8.7") < readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")
@@ -189,7 +256,7 @@ def main() -> None:
     skill = flat(claude)
     check("messaging search by the Lead's name" in skill and "primary-inbox conversation list" in skill and "Other tab are not paged" in skill and "`lookup`" in skill,
           "the Claude follow-up skill does not describe the name search and the paged primary-inbox fallback")
-    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, the follow-up queue is the working read of the scheduled routine, and the version is 0.9.17.")
+    print("PASS: both follow-up-run skills handle thread evidence as designed (Claude reads it from data, Codex cannot) outcome, no-pressure, repair and integrity rules are stated, the follow-up queue is the working read of the scheduled routine, a conversation that asks for contact later is booked with a day Mosaico validates (never today from a clock), booked work waits, and the version is 0.9.18.")
 
 
 if __name__ == "__main__":

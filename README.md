@@ -60,7 +60,9 @@ default: it writes the missing invitation drafts for the person's own Leads, the
 (from 0.9.15, once a day, 1:30 PM; from 0.9.16 it starts a run with intent `follow_up_pass` and works the paged queue
 `outreach_get_follow_up_queue` hands it: the connections list when it is due, connections still to verify, threads to read, the
 approved follow-ups to send and the missing follow-up drafts, one pass per thread; from 0.9.17 it also fixes redirected addresses and
-drops Leads who said no before anything else, and reports the Leads it skipped), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
+drops Leads who said no before anything else, and reports the Leads it skipped; from 0.9.18 it books a later touch when a conversation
+asks to be picked up later ("talk in January": a day on the follow-up draft, or on the Lead when no draft is due yet) and leaves work
+booked for a later day alone until its day), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
 stale and never sends; these three replace the older single Sync data schedule, which the installer retires), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
 colleagues lane on the odd hours, each at least 60 minutes from the other lane and from the three daily times, never writes drafts and never sends; how many Leads
 it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
@@ -196,6 +198,61 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.18
+
+Requires the Mosaico server release 20261013c (promotion mosaicohr-com/mosaico#1930, stage-v2 to main-v2, carrying
+mosaicohr-com/mosaico#1928, "the Usage audit tab follows the routines", and #1929, "dated follow-ups"; the plugin relies on #1929
+only). The Follow-up routine of this release relies on fields of that release: `sendNotBefore` on `outreach_record_message`,
+`changes.nextTouchOn` on `outreach_update_lead`, `nextTouchOn` on `outreach_get_leads`, `nextTouchOn`, `notBefore` and
+`scheduledReason` on the rows of `outreach_get_follow_ups` (with `summary.scheduled`, the held reason `follow-up-scheduled` on a dated
+approval and the `followUpReason` `next-touch-due`), `notBefore` and `scheduledReason` on the items of `outreach_get_follow_up_queue`
+(with `counts.scheduled`, the `nextStep` `wait_for_scheduled_day` and the held reasons `follow-up-scheduled` and
+`next-touch-scheduled`), the note `next-touch-scheduled` and the `delivery` reasons on `outreach_deposit_conversation`, and the date
+refusals `date-invalid`, `date-not-future`, `date-too-far` and `date-not-applicable` (with `field`, `today`, `earliestAllowed`,
+`latestAllowed` and the recommended action `retry_with_valid_date`). Install or move the Follow-up schedule to the 0.9.18 text only
+after that release is live. Send invitations and Withdraw stale invitations are unchanged and stay at 0.9.15.
+
+- **The Follow-up routine books a later touch** (follow-up-run skill, new section "Book a later touch"). When the Lead's latest
+  message in a deposited conversation (outcome `interested` or `neutral`) asks to be contacted later ("talk in January", "after the
+  holidays", "next month", a named day), the run books that day instead of drafting now. The model proposes the day from the Lead's
+  words (YYYY-MM-DD, counted from the day the Lead wrote them); the application owns the rules. Mosaico's answer to the deposit
+  decides the call: when it lists `draft_follow_up`, the run writes the draft with `sendNotBefore` set to the day; when it offers no
+  draft, refuses nothing but `follow-up-awaiting-reply`, holds no approval and returned nothing to Draft, the run calls
+  `outreach_update_lead` with `nextTouchOn` and writes no draft. Anything else is not booked and is reported with the Lead's words.
+  An approved follow-up that Mosaico offers is still sent as approved: booking never holds back or changes what a person approved.
+- **The outcome checklist** (identical in both packages) now says that a message which asks to be contacted at a time it names is not
+  a refusal, even when it begins with "not now": it is judged `interested` or `neutral` and then booked. Without this, "not now, talk
+  in January" would be judged `declined` and the Lead dropped before it could be booked. A "not now" with no time, or a "maybe
+  someday", stays `declined`.
+- **Never today from a clock.** The skill forbids reading today from the machine, the page or `date`; Mosaico judges every day against
+  its own today in the owner's time zone and returns it as `today` when it refuses a date. The day is only ever counted from the day
+  the Lead wrote.
+- **Date refusals follow `recommendedAction`.** On `date-invalid`, `date-not-future`, `date-too-far` or `date-not-applicable` nothing
+  is written. The run retries once with a day the Lead's words still name between `earliestAllowed` and `latestAllowed`, worked out
+  from the returned `today`; otherwise it takes `continue_with_next_lead`, writes nothing more for that Lead and reports the
+  refusal. It never picks a day only to get past a refusal and never writes the draft undated.
+- **Booked work waits.** A queue item with `nextStep` `wait_for_scheduled_day` (reasons `follow-up-scheduled` or
+  `next-touch-scheduled`, last in stage `held`) is not due: the run never opens, reads, drafts or sends for it and reports it from
+  `counts.scheduled`. A queue left with only those stops with `queue-empty`, and they no longer count as needing a person. A draft
+  skipped with `next-touch-scheduled`, or `draft-already-exists` for a dated approval, means the Lead is already booked: recorded,
+  nothing written. On its day (`scheduledReason` `scheduled-due` or `next-touch-due`) the item is first in its stage and is worked
+  like any other, without a date, and is not booked again from the same message.
+- **A new reply on a booked Lead.** A reply before the day does not clear the booking. When a deposit carries the note
+  `next-touch-scheduled`, the run judges the Lead's latest message against the booked day: another time moves `nextTouchOn`, a request
+  for contact now or a withdrawn request clears it (`null`), anything else leaves it. A booking also ends when a follow-up is recorded as
+  sent on or after the day (Mosaico clears it in the same write). The day of a follow-up that is already written is a person's to move
+  on the Follow Up card; the run does not record a written message again to change its day.
+- **The report** gains the bookings made (Lead, day and the Lead's words), the bookings changed or cleared, the booked items waiting
+  (`counts.scheduled`) and the date refusals.
+- The Follow-up schedule text is stamped 0.9.18 or later. The installer moves a saved 0.9.15, 0.9.16 or 0.9.17 Follow-up text to the
+  0.9.18 text in place ("Update the standing answers in place"), keeping its cron, name and enabled state. The Send invitations and
+  Withdraw stale invitations texts stay at 0.9.15; the Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- The Codex package states the dated fields in its queue section and carries the same "Book a later touch" section for its check and
+  one-pass scopes, and still does not run the scheduled routine.
+- `tests/test_outreach_tool_contract.py` now also checks the application's registry, queue and date module for the fields and codes
+  this release relies on.
+- Not done: the interactive Lead-management skill does not list the next touch among the Lead fields a person can edit.
 
 ### 0.9.17
 
