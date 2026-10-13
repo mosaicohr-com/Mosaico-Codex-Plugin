@@ -101,7 +101,7 @@ def main() -> None:
     # The Follow-up, Send invitations, Withdraw stale invitations and Repair routines end their runs through outreach_end_run and report the environment.
     for name, marker, stop_text in (
         ("mosaico-outreach-follow-up-run", "## Follow-up routine", "Continue until completion.mustContinue is false or Mosaico reports a genuine blocker"),
-        ("mosaico-outreach-invite-run", "## Send invitations routine", "continue until Mosaico reports completion (no-approved-invitations-remain)"),
+        ("mosaico-outreach-invite-run", "## Send invitations routine", "with reason complete only when Mosaico says its work list is empty"),
         ("mosaico-outreach-invite-run", "## Withdraw stale invitations routine", "A LinkedIn warning or captcha also stops the run at once"),
         ("mosaico-outreach-repair-run", "## Repair routine", "never earlier for volume and never later by starting another run."),
     ):
@@ -118,7 +118,7 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.18", f"{manifest.name} is not at 0.9.18")
+        check(json.loads(read(manifest))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])
