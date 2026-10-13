@@ -134,8 +134,9 @@ Leads per day and Leads per run are set on each Agent in Outreach, Agent tab; an
 
 **Mosaico Outreach — Send invitations** — once a day, at 1:00 PM local time unless the person chose another time. It works the one
 ordered list Mosaico keeps for the person's own Leads: it sends the invitations that are already approved, checks the connections
-Mosaico hands out (at most 20 a run), then writes the missing invitation drafts (from 0.9.19; the text below is unchanged because it
-names the routine section of the installed plugin). It never approves a draft and does nothing else: no follow-ups and no
+of the Leads placed on later days that Mosaico hands out, then writes the missing invitation drafts for those found not connected;
+Mosaico sets how many checks and drafts one run gets (`checkLimit` and `draftLimit`). From 0.9.19 the text below is unchanged
+because it names the routine section of the installed plugin. It never approves a draft and does nothing else: no follow-ups and no
 withdrawals. Its text is:
 
 ```text

@@ -418,27 +418,39 @@ def main() -> None:
     flat_readme_top = " ".join(readme[: readme.index("## Changelog")].split())
     check("from 0.9.18 it books a later touch when a conversation asks to be picked up later" in flat_readme_top and "leaves work booked for a later day alone until its day" in flat_readme_top,
           "README current state does not describe the 0.9.18 Follow-up routine")
-    # 0.9.19 changelog: the send run's ordered work list, the refused end, the fields relied on, the named server release and no schedule change.
+    # 0.9.19 changelog: the send run's ordered work list and the owner's limits, the refused end, the fields relied on, the named server release
+    # (20261014a, on top of 20261013d) and no schedule change.
     entry19 = " ".join(readme[readme.index("### 0.9.19") : readme.index("### 0.9.18")].split())
     for needle in (
-        "20261013d", "mosaicohr-com/mosaico#1932", "mosaicohr-com/mosaico#1931", "stage-v2 to main-v2", "Do not publish or install this plugin before that release is live on main-v2",
-        "`workflowStatus.sendRun` on `outreach_get_day`", "`recommendedAction`", "`allowedActions`", "`next`", "`remaining`", "`checksThisRun`", "`checkCap`", "`checksLeft`",
+        "Requires the Mosaico server release 20261014a", "mosaicohr-com/mosaico#1933", "on top of release 20261013d", "mosaicohr-com/mosaico#1932", "mosaicohr-com/mosaico#1931", "stage-v2 to main-v2",
+        "which is already live", "Do not publish or install this plugin before that release is live on main-v2", "the plugin is published only after 20261014a is on production main-v2",
+        "`workflowStatus.sendRun` on `outreach_get_day`", "`recommendedAction`", "`allowedActions`", "`next`", "`remaining`", "`checksThisRun`", "`checkLimit`", "`checksLeft`",
+        "`draftsThisRun`", "`draftLimit`", "`draftsLeft`",
         "`waiting`", "`skippedThisRun`", "`outreach_record_message`", "`outreach_record_connection_evidence`", "`outreach_end_run`", "`send-run-open`", "`end_run`",
-        "One run does send, then check, then draft, in the order Mosaico gives", "at most 20 checks in the run, counted by Mosaico", "needs no reread",
+        "One run does send, then check, then draft, in the order Mosaico gives", "that check never counts toward a limit",
+        "check the connection of every Lead placed on a later day (after today) whose connection is not checked yet, soonest day first, at most 100 checks in the run (`checkLimit`)",
+        "write the invitation draft of every Lead placed on a later day whose connection was checked and is not connected, at most 100 drafts in the run (`draftLimit`)",
+        "counted by Mosaico from the run's own record and never by the model", "carry no limit of their own", "needs no reread",
+        "The opening question", "no longer offers", "Source leads or Send invitations", "runs send, then check, then draft, in one run",
         "A refused end", "does what the answer names, never argues and never asks again", "`blockerCode` Mosaico gave in the run", "three Mosaico errors in a row",
         "The model's own \"never retry\" rule is gone for the send run", "`sendRun.skippedThisRun`",
-        "sends, then checks, then drafts", "Leads that need a person never hold the end", "`check-cap-reached`", "`refused-twice-this-run`",
-        "Mosaico's figures from its answers, not memory", "Codex", "stops there", "No schedule text changes", "stays at 0.9.15", "Update the plugin on every machine that runs the Send invitations schedule",
+        "sends, then checks, then drafts", "Leads that need a person never hold the end, and neither do Leads left over at a limit", "`check-limit-reached`", "`draft-limit-reached`",
+        "that release 20261013d called `check-cap-reached`", "`refused-twice-this-run`",
+        "Mosaico's figures from its answers, not memory", "drafts written (`draftsThisRun`)", "connection checks made (`checksThisRun`)",
+        "Codex", "stops there", "No schedule text changes", "stays at 0.9.15", "Update the plugin on every machine that runs the Send invitations schedule",
     ):
         check(needle.lower() in entry19.lower(), f"README 0.9.19 entry lacks: {needle}")
+    for gone in ("`checkCap`", "at most 20", "counted by Mosaico from the run's own evidence writes", "placed from today on"):
+        check(gone.lower() not in entry19.lower(), f"README 0.9.19 entry still holds the old send-run wording: {gone}")
     check(readme.index("### 0.9.19") < readme.index("### 0.9.18"), "README changelog lacks 0.9.19 above 0.9.18")
     check("from 0.9.19 it works the one ordered list Mosaico keeps: it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in flat_readme_top,
           "README current state does not describe the 0.9.19 Send invitations run")
     # 0.9.19: no schedule text and no minimum-version stamp changes; the Send invitations text still names the routine section of the installed plugin.
     check("(0.9.15 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19")
     claude_flat = " ".join(claude.split())
-    check("it sends the invitations that are already approved, checks the connections Mosaico hands out (at most 20 a run), then writes the missing invitation drafts" in claude_flat
-          and "the text below is unchanged because it names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order")
+    check("it sends the invitations that are already approved, checks the connections of the Leads placed on later days that Mosaico hands out, then writes the missing invitation drafts for those found not connected; Mosaico sets how many checks and drafts one run gets (`checkLimit` and `draftLimit`)" in claude_flat
+          and "the text below is unchanged because it names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order and limits")
+    check("at most 20" not in claude_flat.split("**Mosaico Outreach — Send invitations**")[1].split("```text")[0], "Claude installer still states the old 20-check limit")
     codex_flat = " ".join(SKILLS["Codex"].split())
     check("it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in codex_flat, "Codex installer does not describe the Send invitations order")
     check("It never writes invitation drafts, approves or sends: the Lead owner's Send invitations run writes the drafts" in codex_flat and "It finds Leads and writes invitation drafts" not in codex_flat,

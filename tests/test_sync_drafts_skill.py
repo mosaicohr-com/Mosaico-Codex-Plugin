@@ -11,6 +11,9 @@ Sync data and Source leads texts 0.9.13 while Repair is untouched.
 also pin that the skills follow `sendRun.recommendedAction` after every answer, order the work send, check, draft (never drafts
 first), end `complete` only when Mosaico says `end_run`, do what a refused end (`send-run-open`) names without arguing, and no longer
 carry their own "do not try a refused Lead again" rule (Mosaico skips a Lead it refused twice and lists it under `skippedThisRun`).
+They also pin the owner's limits (server release 20261014a): checks and drafts are for Leads placed on a later day, Mosaico hands out
+at most `checkLimit` checks and `draftLimit` drafts a run and counts them (`checksThisRun`, `draftsThisRun`), the skills point at those
+fields and state no number of their own, and the interactive opening question says that Send invitations is one run (send, check, draft).
 """
 
 from __future__ import annotations
@@ -112,8 +115,10 @@ def main() -> None:
             "the Lead to draft is the one in sendRun.next",
             "the answer to each draft carries sendRun",
             "its next is the next Lead and its recommendedAction the one thing to do, so no reread is needed",
+            # 0.9.19 (server release 20261014a): drafts are for Leads placed on a later day whose connection was checked and is not connected, within the run's draft limit.
+            "Mosaico hands out a draft only for a Lead placed on a later day (after today) whose connection was checked and is not connected, and at most sendRun.draftLimit drafts in the run; it counts them itself (sendRun.draftsThisRun, sendRun.draftsLeft)",
             "Keep no list of Leads tried: Mosaico skips a Lead whose draft it refused twice in the run and lists it under sendRun.skippedThisRun",
-            "the Leads that need a person under sendRun.waiting",
+            "the Leads that need a person, and the Leads left over once the draft limit is reached (draft-limit-reached), under sendRun.waiting",
             "until recommendedAction is no longer draft_invitation_messages",
             "from its answers and not from memory",
         ):
@@ -127,6 +132,19 @@ def main() -> None:
         check("sends come first, then connection checks, then drafts" in both and "Mosaico sets the order, not you" in both, f"{package} Both section does not say Mosaico orders send, check, draft")
         check("Complete **Write missing invitation drafts** first" not in both and both.index("Complete **Send approved invitations** first") < both.index("complete **Write missing invitation drafts**"), f"{package} Both section still drafts first")
         check("Do not write a draft before Mosaico offers it: it recommends none while a send or a check is left" in both, f"{package} Both section does not hold the draft back until Mosaico offers it")
+        check("Mosaico also sets how much one run does: checks and drafts are for Leads placed on a later day (after today), and it hands out at most sendRun.checkLimit checks and sendRun.draftLimit drafts in a run" in both,
+              f"{package} Both section does not point at Mosaico's check and draft limits")
+        # 0.9.19 (server release 20261014a): the skills carry no limit of their own and no old wording of the first draft of this release.
+        for gone in ("at most 20", "up to 20", "20 checks", "from today on", "checkCap", "sendRun.checkCap"):
+            check(gone not in text, f"{package} invite-run skill still holds the old send-run wording: {gone}")
+        # (colleague-check-cap-reached is the Source leads colleague check's own note, not the send run's old waiting reason.)
+        check(not re.search(r"(?<![\w-])check-cap-reached", text), f"{package} invite-run skill still names the send run's old waiting reason check-cap-reached")
+        check(not re.search(r"\b(?:20|100) (?:checks|drafts)\b", text), f"{package} invite-run skill states a send-run limit as a number; it points at sendRun.checkLimit and sendRun.draftLimit")
+        # The interactive opening question tells the person that Mosaico runs send, check, draft in one run (no drafts-only or send-only choice for a send run).
+        opening = flat(raw[raw.index("Before using any Outreach or browser tool"):raw.index("## Start the run")])
+        check('"For those days, do you want to source Leads only, or run Send invitations? Send invitations is one run in which Mosaico first sends the approved invitations, then checks the connections it hands out, then writes the missing invitation drafts, in that order."' in opening,
+              f"{package} opening question does not say that Send invitations is one run in the order send, check, draft")
+        check("write missing invitation drafts, send approved invitations, or write drafts and send" not in opening, f"{package} opening question still offers drafts only or send only for a send run")
         if package == "Codex":
             # Codex cannot capture connection evidence, so it cannot do the check step; it stops there and never asks to end as complete.
             check("follow it, and never count or remember what is left yourself" in both and "when sendRun.recommendedAction is verify_connection, stop there, do not ask to end the run as complete" in both and "left for a Claude Send invitations run" in both, "Codex Both section does not stop at the check step it cannot do")
@@ -164,7 +182,12 @@ def main() -> None:
         "The answer to a connection check or a draft carries sendRun with the next Lead and the one recommendedAction: do that, with no reread",
         "The answer to a send or a recorded delivery block does not: reread the day",
         "Never count, order or remember what is left yourself, and never rebuild the list from draftsToWrite or any other read",
-        "A Lead that needs a person is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
+        "A Lead that needs a person, or that is left over once a limit is reached (reasons check-limit-reached and draft-limit-reached), is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
+        # 0.9.19 (server release 20261014a): checks are for Leads placed on a later day and not checked yet; drafts for those checked and not connected; both within Mosaico's limits, counted by Mosaico.
+        "first the approved invitations to send (a Lead holding one is checked first, and that check never counts toward a limit)",
+        "then the connections to check (every Lead placed on a later day, after today, whose connection is not checked yet, soonest day first)",
+        "then the missing invitation drafts for the person's own Leads placed on a later day whose connection was checked and is not connected",
+        "Mosaico hands out at most sendRun.checkLimit checks and sendRun.draftLimit drafts in one run and counts both itself (sendRun.checksThisRun and sendRun.checksLeft, sendRun.draftsThisRun and sendRun.draftsLeft): you never count them",
         'with the selected action "send approved invitations", when sendRun.recommendedAction is send_approved_invitations',
         # (b) a refused end is not argued with: do what the answer names.
         "End the run with outreach_end_run, with reason complete only when Mosaico says its work list is empty (sendRun.phase done, completion complete, recommendedAction end_run)",
@@ -172,14 +195,16 @@ def main() -> None:
         "a Lead that cannot be invited is not a blocker",
         # the report states Mosaico's figures, not memory.
         "using Mosaico's counts from its answers, not memory",
-        "invitation drafts written, each with its Lead",
-        "connection checks made (sendRun.checksThisRun of sendRun.checkCap)",
-        "the Leads that waited for a person (sendRun.waiting in the end answer, each with its reason)",
+        "invitation drafts written (sendRun.draftsThisRun), each with its Lead",
+        "connection checks made (sendRun.checksThisRun) and what Mosaico answered",
+        "the Leads that waited (sendRun.waiting in the end answer, each with its reason: a person is needed, or check-limit-reached, or draft-limit-reached)",
         "the Leads Mosaico skipped after two refusals (sendRun.skippedThisRun, each with its step and code)",
     ):
         check(needle in sync, f"Send invitations routine lacks: {needle}")
     # (c) the order is send, then check, then draft, in the routine's own words.
     check(sync.index("first the approved invitations to send") < sync.index("then the connections to check") < sync.index("then the missing invitation drafts for the person's own Leads"), "Send invitations routine does not order send, check, draft")
+    for gone in ("at most 20", "Leads placed from today on", "sendRun.checkCap", "checkCap"):
+        check(gone not in sync, f"Send invitations routine still holds the old check wording: {gone}")
     check(sync.index("Step 3. Sending") < sync.index("Step 4. End the run") < sync.index("Step 5. Report"), "Send invitations routine steps are out of order")
     for gone in (
         "draftsToWrite on the day read (outreach_get_follow_ups carries the same list) and follow its recommendedAction",

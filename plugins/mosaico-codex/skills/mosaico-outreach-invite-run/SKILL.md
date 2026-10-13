@@ -9,7 +9,7 @@ Before using any Outreach or browser tool, ask these questions in order unless t
 provided the answer as part of the current invocation:
 
 1. "Which days should this run cover: today, tomorrow, or a specific set of dates?"
-2. "For those days, do you want to source Leads only, write missing invitation drafts, send approved invitations, or write drafts and send?"
+2. "For those days, do you want to source Leads only, or run Send invitations? Send invitations is one run in which Mosaico first sends the approved invitations, then checks the connections it hands out, then writes the missing invitation drafts, in that order."
 
 Resolve today and tomorrow using the person's local business date. Preserve the exact selected dates
 throughout the run. Accept one action and run only the selected scope. A scheduled run does not ask these questions: the **Source leads routine** section at the end of this skill carries its answers.
@@ -216,9 +216,12 @@ connection checks, one Lead at a time (`workflowStatus.sendRun`; see **Both**).
 5. Never approve, send or mark sent a draft you wrote. Mosaico's answer for one Lead is final: a `skipped` result, a
    `blocked` state or `draft-already-exists` is recorded and Mosaico names the next Lead; it is never a halt.
 6. In a Send invitations run the answer to each draft carries `sendRun`: its `next` is the next Lead and its
-   `recommendedAction` the one thing to do, so no reread is needed. Keep no list of Leads tried: Mosaico skips a Lead whose
-   draft it refused twice in the run and lists it under `sendRun.skippedThisRun`, and it leaves the Leads that need a person
-   under `sendRun.waiting`. Work the draft each answer names until `recommendedAction` is no longer
+   `recommendedAction` the one thing to do, so no reread is needed. Mosaico hands out a draft only for a Lead placed on a
+   later day (after today) whose connection was checked and is not connected, and at most `sendRun.draftLimit` drafts in the
+   run; it counts them itself (`sendRun.draftsThisRun`, `sendRun.draftsLeft`). Keep no list of Leads tried: Mosaico skips a
+   Lead whose draft it refused twice in the run and lists it under `sendRun.skippedThisRun`, and it leaves the Leads that
+   need a person, and the Leads left over once the draft limit is reached (`draft-limit-reached`), under `sendRun.waiting`.
+   Work the draft each answer names until `recommendedAction` is no longer
    `draft_invitation_messages`. Stop early only when Mosaico reports a genuine blocker.
 7. In the final report give the drafts written, each with its Lead, and the Leads Mosaico skipped or listed as waiting, each
    with its reason, from its answers and not from memory.
@@ -309,7 +312,9 @@ script either; read LinkedIn's Me page as above:
 Sourcing is never part of this: a Source leads run is its own run and its own schedule.
 
 A `send_approved_invitations` run is one ordered work list that Mosaico keeps (`workflowStatus.sendRun`). Mosaico sets the
-order, not you: sends come first, then connection checks, then drafts. Every read and every draft answer carries `next`
+order, not you: sends come first, then connection checks, then drafts. Mosaico also sets how much one run does: checks and
+drafts are for Leads placed on a later day (after today), and it hands out at most `sendRun.checkLimit` checks and
+`sendRun.draftLimit` drafts in a run. Every read and every draft answer carries `next`
 (the Lead and what to do with it), `remaining` and one `recommendedAction`: follow it, and never count or remember what
 is left yourself.
 

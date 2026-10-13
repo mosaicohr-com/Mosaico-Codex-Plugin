@@ -26,6 +26,23 @@ REGISTRY_FILES = (
     "features/outreach/shared/outreach-follow-up-queue.ts",
 )
 REQUIRED_TOOLS = {"outreach_start_run"}
+# The reasons Mosaico gives a Lead in sendRun.waiting (0.9.19; the two limit reasons are server release 20261014a).
+SEND_RUN_REASONS = (
+    "in-to-sort", "no-agent", "agent-missing", "no-profile-address", "profile-capture-failed",
+    "check-limit-reached", "draft-limit-reached", "refused-twice-this-run",
+)
+
+
+# The names server release 20261013d gave the check limit; 20261014a renamed them. (colleague-check-cap-reached is the Source leads colleague check's own note.)
+OLD_SEND_RUN_NAMES = re.compile(r"\bcheckCap\b|\bOUTREACH_SEND_RUN_CHECK_CAP\b|(?<![\w-])check-cap-reached\b")
+
+
+def type_members(source: str, block_pattern: str, member_pattern: str) -> set[str]:
+    """The members of one TypeScript block (an interface body or a union) of the application, read from its own source."""
+    block = re.search(block_pattern, source, re.S)
+    if block is None:
+        raise SystemExit(f"The application's send-run work list lacks the block {block_pattern!r}")
+    return set(re.findall(member_pattern, block.group(1), re.M))
 
 
 def referenced_tools(skill_root: Path) -> set[str]:
@@ -99,23 +116,57 @@ def main() -> None:
                        "`next-touch-scheduled`", "`follow-up-scheduled`", "`next-touch-due`", "`counts.scheduled`", *(f"`{code}`" for code in date_codes)):
             if needle not in skill_text:
                 raise SystemExit(f"The {package} follow-up-run skill does not name {needle}, which the application's dated follow-ups use")
-    # 0.9.19: the Send invitations run's ordered work list (server release 20261013d) exists in the application, and the skills name it.
+    # 0.9.19: the Send invitations run's ordered work list (server release 20261013d) and the owner's limits for it (100 checks and 100 drafts,
+    # future days only; server release 20261014a, on top of 20261013d) exist in the application, and the skills name them.
     work_text = (app / "features/outreach/server/outreach-send-run-work.ts").read_text(encoding="utf-8")
     run_end_text = (app / "features/outreach/server/outreach-run-end.ts").read_text(encoding="utf-8")
     for needle in (
-        "OUTREACH_SEND_RUN_CHECK_CAP = 20", "OUTREACH_SEND_RUN_REFUSED_LIMIT = 2", "OUTREACH_SEND_RUN_OPEN_CODE = 'send-run-open'",
-        "['send', 'check', 'draft', 'done']", "recommendedAction", "allowedActions", "remaining", "checksThisRun", "checkCap", "checksLeft", "waitingCount",
+        "OUTREACH_SEND_RUN_CHECK_LIMIT = 100", "OUTREACH_SEND_RUN_DRAFT_LIMIT = 100", "OUTREACH_SEND_RUN_REFUSED_LIMIT = 2", "OUTREACH_SEND_RUN_OPEN_CODE = 'send-run-open'",
+        "['send', 'check', 'draft', 'done']", "recommendedAction", "allowedActions", "remaining", "waitingCount",
+        "checksThisRun", "checkLimit", "checksLeft", "draftsThisRun", "draftLimit", "draftsLeft",
         "skippedThisRun", "skippedCount", "verifyBeforeSend", "'end_run'", "work-list-empty", "scriptIdentifier", "verifyAction", "messageId",
-        *(f"'{reason}'" for reason in ("in-to-sort", "no-agent", "agent-missing", "no-profile-address", "profile-capture-failed", "check-cap-reached", "refused-twice-this-run")),
+        *(f"'{reason}'" for reason in SEND_RUN_REASONS),
     ):
         if needle not in work_text:
-            raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
-    for needle in ("readSendRunWork", "sendRunSummary(work)", "OUTREACH_SEND_RUN_OPEN_CODE", "workflowStatus.sendRun", "sendRun: sendRunWork.work", "sendRun.skippedThisRun", "sendRun.waiting"):
+            raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261014a)")
+    for gone in OLD_SEND_RUN_NAMES.findall(work_text):
+        raise SystemExit(f"The application's send-run work list still has {gone}; the 0.9.19 plugin names checkLimit and check-limit-reached (server release 20261014a)")
+    for needle in (
+        "readSendRunWork", "sendRunSummary(work)", "OUTREACH_SEND_RUN_OPEN_CODE", "workflowStatus.sendRun", "sendRun: sendRunWork.work", "sendRun.skippedThisRun", "sendRun.waiting",
+        "OUTREACH_SEND_RUN_CHECK_LIMIT", "OUTREACH_SEND_RUN_DRAFT_LIMIT", "checkLimit", "draftLimit", "checksThisRun", "draftsThisRun", "check-limit-reached", "draft-limit-reached",
+    ):
         if needle not in registry_text:
-            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
+            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261014a)")
+    for gone in OLD_SEND_RUN_NAMES.findall(registry_text):
+        raise SystemExit(f"The application's MCP registry still names {gone} (the 0.9.19 plugin needs server release 20261014a)")
     for needle in ("work-open", "readSendRunWork", "endSendInvitationsRun"):
         if needle not in run_end_text:
-            raise SystemExit(f"The application's run-end module lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
+            raise SystemExit(f"The application's run-end module lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261014a)")
+    # Every sendRun field and waiting reason the plugin names must exist in the application (read from its own types, not from a copy here).
+    server_fields = type_members(work_text, r"export interface SendRunWork \{(.*?)\n\}", r"^\s+readonly (\w+)\??:")
+    server_reasons = type_members(work_text, r"export type SendRunWaitingReason =(.*?);", r"'([a-z-]+)'")
+    if not {"checkLimit", "checksThisRun", "checksLeft", "draftLimit", "draftsThisRun", "draftsLeft", "waiting", "skippedThisRun"} <= server_fields:
+        raise SystemExit(f"The application's SendRunWork interface lacks the limit fields the 0.9.19 plugin names: {sorted(server_fields)}")
+    if set(SEND_RUN_REASONS) != server_reasons:
+        raise SystemExit(f"The application's send-run waiting reasons differ from the plugin's: application-only={sorted(server_reasons - set(SEND_RUN_REASONS))}, plugin-only={sorted(set(SEND_RUN_REASONS) - server_reasons)}")
+    named_texts = {
+        f"{package} {skill.parent.name}": skill.read_text(encoding="utf-8").replace("`", "")
+        for package in ("mosaico-claude", "mosaico-codex")
+        for skill in (plugin_root / package / "skills").glob("*/SKILL.md")
+    }
+    readme_text = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    readme_entry = readme_text[readme_text.index("### 0.9.19"):readme_text.index("### 0.9.18")].replace("`", "")
+    for where, text in {**named_texts, "README 0.9.19 entry": readme_entry}.items():
+        for field in sorted(set(re.findall(r"\bsendRun\.(\w+)", text))):
+            if field not in server_fields:
+                raise SystemExit(f"{where} names sendRun.{field}, which the application's SendRunWork does not have")
+    for where, text in named_texts.items():
+        for reason in sorted(set(re.findall(r"(?<![\w-])((?:check|draft)-(?:limit|cap)-reached)\b", text))):
+            if reason not in server_reasons:
+                raise SystemExit(f"{where} names the waiting reason {reason}, which the application does not have")
+    for reason in sorted(server_reasons):
+        if reason not in readme_entry:
+            raise SystemExit(f"The README 0.9.19 entry does not name the waiting reason {reason}, which the application uses")
     for package in ("mosaico-claude", "mosaico-codex"):
         skill_text = (plugin_root / package / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
         for needle in ("sendRun.recommendedAction", "sendRun.next", "sendRun.skippedThisRun", "sendRun.waiting", "send-run-open", "sendRun.phase", "end_run",
@@ -123,7 +174,8 @@ def main() -> None:
             if needle not in skill_text:
                 raise SystemExit(f"The {package} invite-run skill does not name {needle}, which the application's send-run work list uses")
     claude_routine = (plugin_root / "mosaico-claude" / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
-    for needle in ("sendRun.remaining", "sendRun.checksThisRun", "sendRun.checkCap", "next.verifyAction"):
+    for needle in ("sendRun.remaining", "sendRun.checksThisRun", "sendRun.checkLimit", "sendRun.checksLeft", "sendRun.draftsThisRun", "sendRun.draftLimit", "sendRun.draftsLeft",
+                   "check-limit-reached", "draft-limit-reached", "next.verifyAction"):
         if needle not in claude_routine:
             raise SystemExit(f"The mosaico-claude invite-run skill does not name {needle}, which the application's send-run work list uses")
     missing = codex - registered

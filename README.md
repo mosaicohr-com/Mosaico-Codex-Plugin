@@ -204,22 +204,30 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ### 0.9.19
 
-Requires the Mosaico server release 20261013d (promotion mosaicohr-com/mosaico#1932, stage-v2 to main-v2, carrying
-mosaicohr-com/mosaico#1931, "the send run owns one ordered work list"). Do not publish or install this plugin before that release is
-live on main-v2. The Send invitations routine of this release relies on what that release added: `workflowStatus.sendRun` on
-`outreach_get_day` (`phase`, `complete`, `recommendedAction`, `allowedActions`, `next`, `remaining`, `checksThisRun`, `checkCap`,
-`checksLeft`, `waiting`, `waitingCount`, `skippedThisRun`, `skippedCount` and `message`), `sendRun` on the answers to
+Requires the Mosaico server release 20261014a (carrying mosaicohr-com/mosaico#1933, the send run follows the owner's limits: 100
+checks, 100 drafts, future days), on top of release 20261013d (promotion mosaicohr-com/mosaico#1932, stage-v2 to main-v2, carrying
+mosaicohr-com/mosaico#1931, "the send run owns one ordered work list"), which is already live. Do not publish or install this plugin
+before that release is live on main-v2: the plugin is published only after 20261014a is on production main-v2. The Send invitations
+routine of this release relies on what those releases added: `workflowStatus.sendRun` on `outreach_get_day` (`phase`, `complete`,
+`recommendedAction`, `allowedActions`, `next`, `remaining`, `checksThisRun`, `checkLimit`, `checksLeft`, `draftsThisRun`, `draftLimit`,
+`draftsLeft`, `waiting`, `waitingCount`, `skippedThisRun`, `skippedCount` and `message`), `sendRun` on the answers to
 `outreach_record_message` (an invitation draft) and `outreach_record_connection_evidence` in a send run, `sendRun` and the blocked code
 `send-run-open` on `outreach_end_run`, and `end_run` as the recommended action of a finished list.
 
 - **One run does send, then check, then draft, in the order Mosaico gives** (invite-run skill, "Send invitations routine" and the
   sections it uses). Mosaico keeps one list for the run in `workflowStatus.sendRun`: (1) send the approved invitations, each Lead
-  that holds one checked first; (2) check the connection of the Leads placed from today on that are ready for a draft apart from
-  their connection, soonest day first, at most 20 checks in the run, counted by Mosaico from the run's own evidence writes; (3) write
-  every missing invitation draft. `next` names the one Lead and `recommendedAction` the one thing to do; the answer to a connection
-  check or a draft carries the updated `sendRun`, so the run needs no reread, and the answer to a send or a recorded delivery block
-  does not, so the run rereads the day. The skill no longer counts, orders or remembers what is left, and no longer rebuilds the list
-  from `draftsToWrite`.
+  that holds one checked first (that check never counts toward a limit); (2) check the connection of every Lead placed on a later day
+  (after today) whose connection is not checked yet, soonest day first, at most 100 checks in the run (`checkLimit`), counted by
+  Mosaico from the run's own record and never by the model; (3) write the invitation draft of every Lead placed on a later day whose
+  connection was checked and is not connected, at most 100 drafts in the run (`draftLimit`), counted the same way. `next` names the
+  one Lead and `recommendedAction` the one thing to do; the answer to a connection check or a draft carries the updated `sendRun`
+  (with `checksThisRun`, `checksLeft`, `draftsThisRun` and `draftsLeft`), so the run needs no reread, and the answer to a send or a
+  recorded delivery block does not, so the run rereads the day. The skill no longer counts, orders or remembers what is left, and no
+  longer rebuilds the list from `draftsToWrite`. The skills point at the fields (Mosaico hands out at most `checkLimit` checks and
+  `draftLimit` drafts a run) and carry no limit of their own.
+- **The opening question.** The interactive question in the invite-run skill (both packages) no longer offers "write missing
+  invitation drafts" and "send approved invitations" as separate choices. It offers Source leads or Send invitations and tells the
+  person that Mosaico runs send, then check, then draft, in one run.
 - **A refused end.** The run ends `complete` only when Mosaico says the list is empty (`phase` `done`, recommended action `end_run`).
   Asked earlier, `outreach_end_run` is refused with `send-run-open`: nothing is recorded, the run stays open and the answer names the
   count left and the next action. The skill does what the answer names, never argues and never asks again. `blocked` still needs a
@@ -230,10 +238,14 @@ live on main-v2. The Send invitations routine of this release relies on what tha
   `checklistReview`, `sentAt` null, never approved or sent).
 - **Order.** The "Both" section no longer says drafts first: sends, then checks, then drafts, because Mosaico orders it so, and Mosaico
   recommends no draft while a send or a check is left.
-- **Leads that need a person never hold the end.** Mosaico lists them under `sendRun.waiting` with a reason (`in-to-sort`, `no-agent`,
-  `agent-missing`, `no-profile-address`, `profile-capture-failed`, `check-cap-reached` or `refused-twice-this-run`) and a plain message.
-- **The report** states Mosaico's figures from its answers, not memory: drafts written, connection checks made (`checksThisRun` of
-  `checkCap`), the Leads that waited for a person with their reasons and the Leads Mosaico skipped.
+- **Leads that need a person never hold the end, and neither do Leads left over at a limit.** Mosaico lists them under
+  `sendRun.waiting` with a reason (`in-to-sort`, `no-agent`, `agent-missing`, `no-profile-address`, `profile-capture-failed`,
+  `check-limit-reached`, `draft-limit-reached` or `refused-twice-this-run`) and a plain message. `check-limit-reached` is the reason
+  that release 20261013d called `check-cap-reached`; `draft-limit-reached` is new. A Lead left over after the 100 checks or the 100
+  drafts waits for a later run.
+- **The report** states Mosaico's figures from its answers, not memory: drafts written (`draftsThisRun`), connection checks made
+  (`checksThisRun`), the Leads that waited with their reasons (a person is needed, `check-limit-reached` or `draft-limit-reached`)
+  and the Leads Mosaico skipped.
 - **Codex.** The Codex invite-run skill carries the matching wording. It cannot capture connection evidence, so when the next action
   is `verify_connection` it stops there, does not ask to end the run as complete and reports that the checks, and the drafts behind
   them, are left for a Claude Send invitations run. The Codex schedule-install skill no longer says that Source leads writes drafts:
@@ -243,7 +255,8 @@ live on main-v2. The Send invitations routine of this release relies on what tha
   schedule; an older plugin does not know the list, and Mosaico refuses to end its run while the list is not empty. The Follow-up
   (0.9.18), Withdraw stale invitations (0.9.15), Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
 - `tests/test_outreach_tool_contract.py` now also checks the application's work-list module and registry for the fields, codes and
-  reasons this release relies on, and the skills name them.
+  reasons this release relies on (including `checkLimit`, `draftLimit` and the two limit reasons), that every `sendRun` field and
+  waiting reason the skills and this entry name exists in the application, and that the skills name them.
 
 ### 0.9.18
 
