@@ -54,7 +54,7 @@ MIN_VERSION = "0.9.6"
 SOURCE_MIN_VERSION = "0.9.13"  # Codex's single Source leads text: 0.9.13 writes no drafts (0.9.9 added Leads per run)
 LANE_MIN_VERSION = "0.9.13"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
 SYNC_MIN_VERSION = "0.9.15"  # Claude's Send invitations and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
-FOLLOW_MIN_VERSION = "0.9.17"  # Claude's Follow-up text: 0.9.16 started a follow_up_pass run and works outreach_get_follow_up_queue; 0.9.17 works its repair stages, skippedThisRun and linkedDuplicate
+FOLLOW_MIN_VERSION = "0.9.18"  # Claude's Follow-up text: 0.9.16 started a follow_up_pass run and works outreach_get_follow_up_queue; 0.9.17 works its repair stages, skippedThisRun and linkedDuplicate; 0.9.18 books a later touch and leaves booked work alone
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -181,13 +181,19 @@ def main() -> None:
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
         if package == "Claude":
             check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Send invitations and Withdraw stale invitations texts need 0.9.15" in flat_installer and "named in the plugin's changelog for 0.9.15" in flat_installer and "A saved Sync data text is retired" in flat_installer, "Claude skill does not state the Source leads 0.9.13 and the 0.9.15 minimum versions")
-            check("The Follow-up text needs 0.9.17" in flat_installer and "`follow_up_pass`" in flat_installer and "`outreach_get_follow_up_queue`" in flat_installer and "named in the plugin's changelog for 0.9.17" in flat_installer
+            check("The Follow-up text needs 0.9.18" in flat_installer and "`follow_up_pass`" in flat_installer and "`outreach_get_follow_up_queue`" in flat_installer and "named in the plugin's changelog for 0.9.18" in flat_installer
                   and "`fix-address`" in flat_installer and "`drop-declined`" in flat_installer and "`skippedThisRun`" in flat_installer and "`linkedDuplicate`" in flat_installer
-                  and "The Send invitations and Withdraw stale invitations texts stay at 0.9.15" in flat_installer, "Claude skill does not state the Follow-up 0.9.17 minimum version")
+                  and "`sendNotBefore` on a follow-up draft, `nextTouchOn` on a Lead" in flat_installer and "`wait_for_scheduled_day`" in flat_installer
+                  and "a 0.9.17 plugin works the repairs the queue carries" in flat_installer and "knows no dates and would draft at once for a Lead who asked for January" in flat_installer
+                  and "The Send invitations and Withdraw stale invitations texts stay at 0.9.15" in flat_installer, "Claude skill does not state the Follow-up 0.9.18 minimum version")
             update_flat = flat_installer[flat_installer.index("### Update the standing answers in place") :]
-            check("a Follow-up schedule saved at 0.9.15 or 0.9.16" in update_flat and "becomes the 0.9.17 Follow-up text" in update_flat and 'A saved Follow-up text that says "0.9.15 or later" or "0.9.16 or later"' in flat_installer and "replace it in place with the 0.9.17 Follow-up text" in flat_installer
-                  and "its stamp moved to 0.9.17" in flat_installer,
-                  "Claude skill does not move a saved 0.9.15 or 0.9.16 Follow-up text to the 0.9.17 stamp in place")
+            check("a Follow-up schedule saved at 0.9.15, 0.9.16 or 0.9.17" in update_flat and "becomes the 0.9.18 Follow-up text" in update_flat and 'A saved Follow-up text that says "0.9.15 or later", "0.9.16 or later" or "0.9.17 or later"' in flat_installer and "replace it in place with the 0.9.18 Follow-up text" in flat_installer
+                  and "its stamp moved to 0.9.18" in flat_installer and "to move a saved Follow-up text from the 0.9.15, 0.9.16 or 0.9.17 stamp to the 0.9.18 stamp" in flat_installer,
+                  "Claude skill does not move a saved 0.9.15, 0.9.16 or 0.9.17 Follow-up text to the 0.9.18 stamp in place")
+            follow_start = flat_installer.index("**Mosaico Outreach — Follow-up**")
+            follow_prose = flat_installer[follow_start : flat_installer.index("```text", follow_start)]
+            check("From 0.9.18 it books a later touch when a conversation asks to be picked up later" in follow_prose and "leaves work booked for a later day alone until its day" in follow_prose
+                  and "reports the bookings it made, changed or cleared" in follow_prose, "Claude installer's Follow-up description does not say what 0.9.18 adds")
         else:
             check("The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.13")
         check(PLAN_SENTENCE in flat_installer and "to drop it follow **Update the standing answers in place** below" in flat_installer, f"{package} skill does not say both numbers are set on each Agent, and an Agent is sourced only with both")
@@ -199,7 +205,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15" and FOLLOW_MIN_VERSION == "0.9.17", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15" and FOLLOW_MIN_VERSION == "0.9.18", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -304,6 +310,31 @@ def main() -> None:
         check(needle in queue, f"the follow-up queue section lacks: {needle}")
     stage_order = [queue.index(f"{n}. `{stage}`") for n, stage in ((1, "fix-address"), (2, "drop-declined"), (3, "verify-connection"), (4, "read-thread"), (5, "send-approved"), (6, "draft"), (7, "held"))]
     check(stage_order == sorted(stage_order), "the follow-up queue section does not list the stages in Mosaico's order (fix-address, drop-declined, verify-connection, read-thread, send-approved, draft, held)")
+    # 0.9.18: the routine books a later touch (a day Mosaico validates), leaves booked work alone and reports it.
+    flat_steps = " ".join(step2.split())
+    for needle in (
+        "When the Lead's latest message asks to be contacted later (\"talk in January\", \"after the holidays\", \"next month\", a named day) and its outcome is interested or neutral, book it instead of drafting for now, exactly as this skill's section \"Book a later touch\" describes",
+        "when the deposit answer lists draft_follow_up, write the draft with sendNotBefore set to the day you propose (YYYY-MM-DD)",
+        "when it offers no draft and refuses nothing but follow-up-awaiting-reply, call outreach_update_lead with changes nextTouchOn set to that day and write no draft",
+        "Never work out today from a clock (the machine's, the page's; never run date): Mosaico judges every day against its own today in the owner's time zone and returns it as today in a date refusal",
+        "If Mosaico refuses a date (date-invalid, date-not-future, date-too-far or date-not-applicable), follow its recommendedAction: retry once with a day the Lead's words still name between earliestAllowed and latestAllowed, otherwise take continue_with_next_lead, write nothing more for that Lead and report the refusal",
+        "never pick a day only to get past it and never write the draft undated",
+        "A queue item with nextStep wait_for_scheduled_day is booked for a later day: it is not due, so never open, read, draft or send for it; report it from counts.scheduled (a queue left with only those ends with queue-empty)",
+        "When its day has come (scheduledReason scheduled-due or next-touch-due) work the item like any other, without a date",
+        "Booking is the one case in which a draft item's recommendedCall is not made exactly as given (sendNotBefore is added, or the outreach_update_lead call replaces it), and only as the deposit answer says",
+        "When a thread deposit shows a new reply for a Lead with a booking (the note next-touch-scheduled), decide whether the booking still stands: if the reply names another time call outreach_update_lead with the new nextTouchOn, if it asks for contact now or takes the request back call it with nextTouchOn null, otherwise leave the booking as it is",
+    ):
+        check(needle in flat_steps, f"Follow-up routine lacks: {needle}")
+    flat_follow_routine = " ".join(sync.split())
+    check("That date is for the report only: the day a follow-up may be booked for is counted from the day the Lead wrote and judged by Mosaico against its own today, never against a clock you read" in flat_follow_routine
+          and "the timezone from the schedule's standing answers" in flat_follow_routine, "Follow-up routine still lets the model take today from its own clock")
+    check("it books that day instead of drafting now (a day on the follow-up draft, or on the Lead when no draft is due yet) and leaves work booked for a later day alone until its day" in flat_follow_routine,
+          "Follow-up routine's opening does not say it books a later touch")
+    for needle in (
+        "bookings made (each Lead, the day and the Lead's words that asked for it)", "bookings changed or cleared (Lead, old and new day, why)", "booked items waiting (the queue's counts.scheduled)",
+        "date refusals (Lead, field, code, the day tried and what was done)", "the held items that need a person, not the ones booked for a later day",
+    ):
+        check(needle in " ".join(step3.split()), f"Follow-up Step 3 lacks: {needle}")
     check("sends confirmed from data versus by screen" in step3, "Follow-up Step 3 does not report sends confirmed from data versus by screen")
     check(
         "When Mosaico notes repair-recommended on the follow-ups read, do not work the backlog in this run" in step3
@@ -367,6 +398,26 @@ def main() -> None:
     ):
         check(needle.lower() in entry17.lower(), f"README 0.9.17 entry lacks: {needle}")
     check(readme.index("### 0.9.17") < readme.index("### 0.9.16"), "README changelog lacks 0.9.17 above 0.9.16")
+    # 0.9.18 changelog: dated follow-ups, the day the model proposes and the application checks, the fields relied on, the stamp and the named server release.
+    entry18 = " ".join(readme[readme.index("### 0.9.18") : readme.index("### 0.9.17")].split())
+    for needle in (
+        "20261013c", "mosaicohr-com/mosaico#1930", "stage-v2 to main-v2", "mosaicohr-com/mosaico#1928", "#1929", "dated follow-ups",
+        "`sendNotBefore` on `outreach_record_message`", "`changes.nextTouchOn` on `outreach_update_lead`", "`nextTouchOn` on `outreach_get_leads`",
+        "`nextTouchOn`, `notBefore` and `scheduledReason` on the rows of `outreach_get_follow_ups`", "`summary.scheduled`", "`follow-up-scheduled`", "`next-touch-due`",
+        "`notBefore` and `scheduledReason` on the items of `outreach_get_follow_up_queue`", "`counts.scheduled`", "`wait_for_scheduled_day`", "`next-touch-scheduled`",
+        "`outreach_deposit_conversation`", "`date-invalid`", "`date-not-future`", "`date-too-far`", "`date-not-applicable`", "`earliestAllowed`", "`latestAllowed`", "`retry_with_valid_date`",
+        "Book a later touch", "`draft_follow_up`", "`outreach_update_lead` with `nextTouchOn`", "writes no draft", "booking never holds back or changes what a person approved",
+        "The outcome checklist", "is not a refusal, even when it begins with \"not now\"", "stays `declined`",
+        "Never today from a clock", "returns it as `today`", "Date refusals follow `recommendedAction`", "`continue_with_next_lead`", "never writes the draft undated",
+        "Booked work waits", "stops with `queue-empty`", "no longer count as needing a person", "A new reply on a booked Lead", "another time moves `nextTouchOn`", "clears it (`null`)",
+        "recorded as sent on or after the day", "Mosaico clears it in the same write", "stamped 0.9.18 or later",
+        "saved 0.9.15, 0.9.16 or 0.9.17 Follow-up text to the 0.9.18 text in place", "stay at 0.9.15", "does not run the scheduled routine",
+    ):
+        check(needle.lower() in entry18.lower(), f"README 0.9.18 entry lacks: {needle}")
+    check(readme.index("### 0.9.18") < readme.index("### 0.9.17"), "README changelog lacks 0.9.18 above 0.9.17")
+    flat_readme_top = " ".join(readme[: readme.index("## Changelog")].split())
+    check("from 0.9.18 it books a later touch when a conversation asks to be picked up later" in flat_readme_top and "leaves work booked for a later day alone until its day" in flat_readme_top,
+          "README current state does not describe the 0.9.18 Follow-up routine")
     # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the named server release.
     entry = " ".join(readme[readme.index("### 0.9.15") : readme.index("### 0.9.14")].split())
     for needle in (
@@ -513,7 +564,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.17", f"{manifest.name} is not at 0.9.17")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.18", f"{manifest.name} is not at 0.9.18")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
