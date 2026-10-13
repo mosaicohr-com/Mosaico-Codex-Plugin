@@ -342,7 +342,7 @@ def main() -> None:
         "Follow-up Step 3 does not recommend Repair instead of working the backlog",
     )
 
-    # Send invitations routine (invite-run): drafts first, then the approved invitations, confirmed from LinkedIn's Sent invitations list.
+    # Send invitations routine (invite-run): the ordered list (0.9.19), with the approved invitations confirmed from LinkedIn's Sent invitations list.
     for script in ("browser/linkedin-whoami.js", "browser/linkedin-connection-evidence.js", "browser/linkedin-sent-invitations.js"):
         check(script in send, f"Send invitations routine does not name the approved script {script}")
     for gone in ("linkedin-thread-messages.js", "linkedin-recent-connections.js", "outreach_deposit_conversation", "one pass per thread", "outreach_get_withdraw_queue"):
@@ -418,6 +418,31 @@ def main() -> None:
     flat_readme_top = " ".join(readme[: readme.index("## Changelog")].split())
     check("from 0.9.18 it books a later touch when a conversation asks to be picked up later" in flat_readme_top and "leaves work booked for a later day alone until its day" in flat_readme_top,
           "README current state does not describe the 0.9.18 Follow-up routine")
+    # 0.9.19 changelog: the send run's ordered work list, the refused end, the fields relied on, the named server release and no schedule change.
+    entry19 = " ".join(readme[readme.index("### 0.9.19") : readme.index("### 0.9.18")].split())
+    for needle in (
+        "20261013d", "mosaicohr-com/mosaico#1932", "mosaicohr-com/mosaico#1931", "stage-v2 to main-v2", "Do not publish or install this plugin before that release is live on main-v2",
+        "`workflowStatus.sendRun` on `outreach_get_day`", "`recommendedAction`", "`allowedActions`", "`next`", "`remaining`", "`checksThisRun`", "`checkCap`", "`checksLeft`",
+        "`waiting`", "`skippedThisRun`", "`outreach_record_message`", "`outreach_record_connection_evidence`", "`outreach_end_run`", "`send-run-open`", "`end_run`",
+        "One run does send, then check, then draft, in the order Mosaico gives", "at most 20 checks in the run, counted by Mosaico", "needs no reread",
+        "A refused end", "does what the answer names, never argues and never asks again", "`blockerCode` Mosaico gave in the run", "three Mosaico errors in a row",
+        "The model's own \"never retry\" rule is gone for the send run", "`sendRun.skippedThisRun`",
+        "sends, then checks, then drafts", "Leads that need a person never hold the end", "`check-cap-reached`", "`refused-twice-this-run`",
+        "Mosaico's figures from its answers, not memory", "Codex", "stops there", "No schedule text changes", "stays at 0.9.15", "Update the plugin on every machine that runs the Send invitations schedule",
+    ):
+        check(needle.lower() in entry19.lower(), f"README 0.9.19 entry lacks: {needle}")
+    check(readme.index("### 0.9.19") < readme.index("### 0.9.18"), "README changelog lacks 0.9.19 above 0.9.18")
+    check("from 0.9.19 it works the one ordered list Mosaico keeps: it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in flat_readme_top,
+          "README current state does not describe the 0.9.19 Send invitations run")
+    # 0.9.19: no schedule text and no minimum-version stamp changes; the Send invitations text still names the routine section of the installed plugin.
+    check("(0.9.15 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19")
+    claude_flat = " ".join(claude.split())
+    check("it sends the invitations that are already approved, checks the connections Mosaico hands out (at most 20 a run), then writes the missing invitation drafts" in claude_flat
+          and "the text below is unchanged because it names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order")
+    codex_flat = " ".join(SKILLS["Codex"].split())
+    check("it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in codex_flat, "Codex installer does not describe the Send invitations order")
+    check("It never writes invitation drafts, approves or sends: the Lead owner's Send invitations run writes the drafts" in codex_flat and "It finds Leads and writes invitation drafts" not in codex_flat,
+          "Codex installer still says that Source leads writes invitation drafts")
     # 0.9.15 changelog: the split, the stamp, the two server tools, the retirement of the old task, and the named server release.
     entry = " ".join(readme[readme.index("### 0.9.15") : readme.index("### 0.9.14")].split())
     for needle in (
@@ -564,7 +589,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.18", f"{manifest.name} is not at 0.9.18")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")

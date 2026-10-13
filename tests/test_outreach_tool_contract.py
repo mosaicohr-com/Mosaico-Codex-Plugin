@@ -99,6 +99,33 @@ def main() -> None:
                        "`next-touch-scheduled`", "`follow-up-scheduled`", "`next-touch-due`", "`counts.scheduled`", *(f"`{code}`" for code in date_codes)):
             if needle not in skill_text:
                 raise SystemExit(f"The {package} follow-up-run skill does not name {needle}, which the application's dated follow-ups use")
+    # 0.9.19: the Send invitations run's ordered work list (server release 20261013d) exists in the application, and the skills name it.
+    work_text = (app / "features/outreach/server/outreach-send-run-work.ts").read_text(encoding="utf-8")
+    run_end_text = (app / "features/outreach/server/outreach-run-end.ts").read_text(encoding="utf-8")
+    for needle in (
+        "OUTREACH_SEND_RUN_CHECK_CAP = 20", "OUTREACH_SEND_RUN_REFUSED_LIMIT = 2", "OUTREACH_SEND_RUN_OPEN_CODE = 'send-run-open'",
+        "['send', 'check', 'draft', 'done']", "recommendedAction", "allowedActions", "remaining", "checksThisRun", "checkCap", "checksLeft", "waitingCount",
+        "skippedThisRun", "skippedCount", "verifyBeforeSend", "'end_run'", "work-list-empty", "scriptIdentifier", "verifyAction", "messageId",
+        *(f"'{reason}'" for reason in ("in-to-sort", "no-agent", "agent-missing", "no-profile-address", "profile-capture-failed", "check-cap-reached", "refused-twice-this-run")),
+    ):
+        if needle not in work_text:
+            raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
+    for needle in ("readSendRunWork", "sendRunSummary(work)", "OUTREACH_SEND_RUN_OPEN_CODE", "workflowStatus.sendRun", "sendRun: sendRunWork.work", "sendRun.skippedThisRun", "sendRun.waiting"):
+        if needle not in registry_text:
+            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
+    for needle in ("work-open", "readSendRunWork", "endSendInvitationsRun"):
+        if needle not in run_end_text:
+            raise SystemExit(f"The application's run-end module lacks {needle} (the 0.9.19 Send invitations routine needs server release 20261013d)")
+    for package in ("mosaico-claude", "mosaico-codex"):
+        skill_text = (plugin_root / package / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
+        for needle in ("sendRun.recommendedAction", "sendRun.next", "sendRun.skippedThisRun", "sendRun.waiting", "send-run-open", "sendRun.phase", "end_run",
+                       "verify_connection", "draft_invitation_messages", "send_approved_invitations"):
+            if needle not in skill_text:
+                raise SystemExit(f"The {package} invite-run skill does not name {needle}, which the application's send-run work list uses")
+    claude_routine = (plugin_root / "mosaico-claude" / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
+    for needle in ("sendRun.remaining", "sendRun.checksThisRun", "sendRun.checkCap", "next.verifyAction"):
+        if needle not in claude_routine:
+            raise SystemExit(f"The mosaico-claude invite-run skill does not name {needle}, which the application's send-run work list uses")
     missing = codex - registered
     if missing:
         raise SystemExit(

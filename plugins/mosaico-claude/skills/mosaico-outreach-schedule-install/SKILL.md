@@ -132,9 +132,11 @@ Fill the placeholders from the person and the current context, never from a fixe
 
 Leads per day and Leads per run are set on each Agent in Outreach, Agent tab; an Agent is sourced only when it is on and both are set. Who sources an Agent (Sourced by) is set there too, and Mosaico files the Leads into days itself, so none of it is in the schedule. A schedule saved with a quota map or a day needs no change, but to drop it follow **Update the standing answers in place** below.
 
-**Mosaico Outreach — Send invitations** — once a day, at 1:00 PM local time unless the person chose another time. It writes the
-missing invitation drafts for the person's own Leads, then sends the invitations that are already approved. It never approves a draft
-and does nothing else: no follow-ups and no withdrawals. Its text is:
+**Mosaico Outreach — Send invitations** — once a day, at 1:00 PM local time unless the person chose another time. It works the one
+ordered list Mosaico keeps for the person's own Leads: it sends the invitations that are already approved, checks the connections
+Mosaico hands out (at most 20 a run), then writes the missing invitation drafts (from 0.9.19; the text below is unchanged because it
+names the routine section of the installed plugin). It never approves a draft and does nothing else: no follow-ups and no
+withdrawals. Its text is:
 
 ```text
 Use the installed mosaico:mosaico-outreach-invite-run skill from the mosaico plugin (0.9.15 or later). This is the Send invitations routine. Follow that skill's "Send invitations routine" section exactly; it is the procedure and it is current for the installed plugin version.

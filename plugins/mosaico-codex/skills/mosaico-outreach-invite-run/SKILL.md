@@ -19,7 +19,7 @@ Sourcing takes no day from the person: Mosaico files each Lead on the first busi
 
 1. Open LinkedIn's Me page in the authenticated browser and read the profile URL of the signed-in
    account. Report what you see; do not decide or correct it.
-2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `source_invitation_leads` for sourcing, `send_approved_invitations` for sending and for writing missing invitation drafts. Sourcing is always its own run; writing drafts and sending share one `send_approved_invitations` run.
+2. Call `outreach_start_run` with that URL as `observedLinkedInProfile` and the intent: `source_invitation_leads` for sourcing, `send_approved_invitations` for sending, for the connection checks that go with it and for writing missing invitation drafts. Sourcing is always its own run; writing drafts and sending share one `send_approved_invitations` run.
    A sourcing start sends no quota and no colleague. Mosaico holds the sourcing plan on the Agents: each
    Agent has Leads per day (the most it may hold on one day), Leads per run (what one run must deliver) and
    Sourced by, set by a person in Outreach (Agent tab). Mosaico takes every active Agent that has both
@@ -193,6 +193,8 @@ not sent before that (`own-evidence-required`).
 Writing an invitation draft is the Lead owner's work, done in the Send invitations routine for the person's own Leads only.
 A Source leads run never does it: Mosaico refuses a draft write inside a sourcing run with `sourcing-writes-no-drafts`.
 A draft is only a draft: a person approves it in Outreach before it can be sent.
+In a Send invitations run Mosaico hands the drafts out as the last step of its one work list, after the sends and the
+connection checks, one Lead at a time (`workflowStatus.sendRun`; see **Both**).
 
 1. Read `outreach_get_day` for today with `intent: send_approved_invitations` and the `runId`.
    `workflowStatus.draftsToWrite` is the work: `count`, `entries` (each with `leadId`, `name`, `agentId`, `day` and
@@ -200,7 +202,8 @@ A draft is only a draft: a person approves it in Outreach before it can be sent.
    `entries` is empty when nothing is missing. `outreach_get_follow_ups` carries the same list as a top-level
    `draftsToWrite`. Mosaico builds it from the owner's own Leads; never rebuild it from other reads or from memory.
 2. Follow `draftsToWrite.recommendedAction`. Work the list only when it is `draft_invitation_messages`. When it is `none`,
-   write nothing: `note` says why.
+   write nothing: `note` says why. In a Send invitations run it agrees with `workflowStatus.sendRun.recommendedAction`,
+   and the Lead to draft is the one in `sendRun.next`.
 3. Call `outreach_get_agents` with no arguments. It returns the person's own Agents, each with its `messageInstructions`
    and `messagingChecklist`. For each entry use the Agent whose id is the entry's `agentId`. If the entry has no
    `agentId`, or that Agent is not returned, skip the Lead and list it with the reason.
@@ -211,10 +214,14 @@ A draft is only a draft: a person approves it in Outreach before it can be sent.
    review, correct the body as its guidance says and send it once more. Write a draft for an entry on this list and for
    no other Lead.
 5. Never approve, send or mark sent a draft you wrote. Mosaico's answer for one Lead is final: a `skipped` result, a
-   `blocked` state or `draft-already-exists` is recorded and the next entry is worked; it is never a halt.
-6. Reread `outreach_get_day` once every entry has been tried. A Lead Mosaico refused stays on the list; do not try it
-   again in this run. Stop when every entry has been tried or Mosaico reports a genuine blocker.
-7. In the final report give the drafts written, each with its Lead, and the Leads skipped, each with its reason.
+   `blocked` state or `draft-already-exists` is recorded and Mosaico names the next Lead; it is never a halt.
+6. In a Send invitations run the answer to each draft carries `sendRun`: its `next` is the next Lead and its
+   `recommendedAction` the one thing to do, so no reread is needed. Keep no list of Leads tried: Mosaico skips a Lead whose
+   draft it refused twice in the run and lists it under `sendRun.skippedThisRun`, and it leaves the Leads that need a person
+   under `sendRun.waiting`. Work the draft each answer names until `recommendedAction` is no longer
+   `draft_invitation_messages`. Stop early only when Mosaico reports a genuine blocker.
+7. In the final report give the drafts written, each with its Lead, and the Leads Mosaico skipped or listed as waiting, each
+   with its reason, from its answers and not from memory.
 
 ## Report a sourcing run
 
@@ -250,7 +257,9 @@ or every Agent without a free day) is not a failure: report "Every Agent is full
    Approved and permitted by `workflowStatus`. Messages listed under
    `workflowStatus.blockedDeliveries` are never sent; do not retry them. When the recommended action
    is `verify_connection`, run **Capture connection evidence** for each Lead in
-   `workflowStatus.unverifiedLeads` and reread the day before sending anything.
+   `workflowStatus.unverifiedLeads` and reread the day before sending anything. In a Send invitations run
+   `workflowStatus.sendRun` is the whole work list (see **Both**): send only the invitation `sendRun.next` names, when
+   `sendRun.recommendedAction` is `send_approved_invitations`.
 2. Never approve, rewrite, replace or substitute an invitation. If the approved body does not exactly
    match the body about to be sent, stop for that invitation and report the blocker.
 3. Before each invitation run **Capture connection evidence** for its Lead. Mosaico answers connected,
@@ -270,8 +279,9 @@ or every Agent without a free day) is not a failure: report "Every Agent is full
    LinkedIn's data and is the one to send invitations. If Mosaico answers `send-not-confirmed` it did
    not go out: do not retype it and do not mark it sent; call `outreach_record_delivery_block` with
    `reason: cannot-message` and continue.
-7. Reread the same day after each send, capture or recorded outcome and continue until Mosaico reports
-   completion or a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
+7. Reread the same day after each send or recorded delivery block (their answers carry no `sendRun`); the answer to a
+   draft carries `sendRun` and names the next step, so it needs no reread. Continue until Mosaico says `end_run` or
+   reports a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
    invited never stops the run.
 8. In the final report list recorded outcomes and Leads left unverified separately from sends and
    blockers, each with its Lead and reason, and name the sends marked by screen.
@@ -298,10 +308,21 @@ script either; read LinkedIn's Me page as above:
 
 Sourcing is never part of this: a Source leads run is its own run and its own schedule.
 
-1. Complete **Write missing invitation drafts** first.
-2. Reread the current Mosaico state for those dates.
-3. Complete **Send approved invitations** only for messages that were already human-approved. Never
+A `send_approved_invitations` run is one ordered work list that Mosaico keeps (`workflowStatus.sendRun`). Mosaico sets the
+order, not you: sends come first, then connection checks, then drafts. Every read and every draft answer carries `next`
+(the Lead and what to do with it), `remaining` and one `recommendedAction`: follow it, and never count or remember what
+is left yourself.
+
+1. Complete **Send approved invitations** first, only for messages that were already human-approved. Never
    approve a newly created draft automatically.
+2. Then the connection checks Mosaico hands out. Codex cannot do them (see **Capture connection evidence**): when
+   `sendRun.recommendedAction` is `verify_connection`, stop there, do not ask to end the run as complete (Mosaico
+   refuses that while the list is not empty) and report that the checks, and the drafts behind them, are left for a
+   Claude Send invitations run.
+3. Then complete **Write missing invitation drafts**, for the Leads Mosaico names.
+
+Do not write a draft before Mosaico offers it: it recommends none while a send or a check is left. A person who chose only
+sending or only drafting still gets this one list in this order.
 
 For every scope, Mosaico is the workflow authority for stored state, target completion, ownership,
 validation, allowed actions and recovery. Stop only when the selected scope is complete, Mosaico
@@ -312,10 +333,11 @@ Only Owners and Admins can use Outreach.
 
 End every run with `outreach_end_run` and the honest reason. Mosaico decides how the run ended, not you:
 
-- `complete`: Mosaico says the plan is done: every planned Agent delivered its Leads per run, ran out of free days, or became unavailable (for sourcing, `sourcing-quota-met`, `sourcing-days-full` or `sourcing-agent-unavailable`; a sourcing run with nothing left to source, verify or sort has the recommended action `end_run` or `end_run_days_full`). Always call it on a finished run, even when nothing is left to do: a run you leave unended keeps the account busy for 30 minutes.
+- `complete`: Mosaico says the plan is done: every planned Agent delivered its Leads per run, ran out of free days, or became unavailable (for sourcing, `sourcing-quota-met`, `sourcing-days-full` or `sourcing-agent-unavailable`; a sourcing run with nothing left to source, verify or sort has the recommended action `end_run` or `end_run_days_full`; a Send invitations run is done when Mosaico says its work list is empty: `workflowStatus.sendRun.phase` is `done` and the recommended action is `end_run`). Always call it on a finished run, even when nothing is left to do: a run you leave unended keeps the account busy for 30 minutes.
 - `blocked`: a genuine blocker stops the run. Give `blockerCode` (`linkedin_account_changed` or `linkedin_identity_invalid`, given by Mosaico in this run, or `INTERNAL_SERVER_ERROR` when Mosaico's last three calls all failed) or `linkedInIssue` (`warning`, `captcha` or `restricted`) with a `note`.
 
 These are the only two reasons. Never ask for `abandoned`; it no longer exists. If you ask to end a sourcing run while a line is open and nothing proves a blocker, Mosaico refuses: the answer is blocked with `sourcing-run-open`, the run stays open and writable, and it carries `workNow` and the one allowed action `continue_sourcing`. Do not retry the end and do not argue; read `workNow` and keep sourcing.
+Mosaico refuses the same way for a Send invitations run whose work list is not empty: the answer is blocked with `send-run-open`, the run stays open, nothing is recorded, and the answer names the count left and the next action (`sendRun.next`, `recommendedAction`). Do not argue and do not ask again: do what the answer names and go on from there. A blocked end needs the same proof as above.
 If a write answers `run_ended` (recommended action `report_run_closed`), Mosaico closed the run after 30 minutes without a call: stop, report "Mosaico closed this run after 30 minutes without a call", and do not start another run. A second `outreach_end_run` on a closed run answers `report_run_closed`.
 Read the answer's `runOutcome` and report it. When it names `unavailableAgents`, say so.
 

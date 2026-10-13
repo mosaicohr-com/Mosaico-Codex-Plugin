@@ -12,8 +12,8 @@ configures personal automation state; it does not change Mosaico workflow record
 
 Mosaico Outreach runs on five schedules:
 
-- **Mosaico Outreach — Send invitations** — once a day. It writes the missing invitation drafts and sends the approved
-  invitations. With Follow-up it is the only schedule that clicks Connect or sends a message.
+- **Mosaico Outreach — Send invitations** — once a day. It works one ordered list Mosaico keeps: it sends the approved
+  invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts. With Follow-up it is the only schedule that clicks Connect or sends a message.
 - **Mosaico Outreach — Follow-up** — once a day. It checks accepted invitations and message replies, one pass per
   thread, and sends the approved follow-ups.
 - **Mosaico Outreach — Withdraw stale invitations** — once a day. It withdraws the pending invitations Mosaico
@@ -21,8 +21,9 @@ Mosaico Outreach runs on five schedules:
 
 The older single "Sync data (connections and messaging)" schedule is superseded by Send invitations, Follow-up and
 Withdraw stale invitations.
-- **Mosaico Outreach — Source leads** — every two hours during business hours. It finds Leads and
-  writes invitation drafts. It never approves or sends.
+- **Mosaico Outreach — Source leads** — every two hours during business hours. It finds Leads and lets Mosaico
+  place them on days. It never writes invitation drafts, approves or sends: the Lead owner's Send invitations run
+  writes the drafts.
 - **Mosaico Outreach — Repair** — once a week (by default Sunday at 10:00 AM local time, cron
   `0 10 * * 0`), and on demand. It works the backlog Mosaico lists in its repair queue: connections to
   verify, threads to read, redirected addresses, duplicate Leads and declines. It never approves or sends.

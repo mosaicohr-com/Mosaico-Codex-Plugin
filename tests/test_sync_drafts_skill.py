@@ -6,6 +6,11 @@ with `sourcing-writes-no-drafts`, and `outreach_get_day` (in `workflowStatus`) a
 These checks pin that the skills only follow that list: Source leads never attempts a draft and treats the refusal as expected, the
 Sync data routine writes drafts for the owner's own Leads from the list, never approves or sends one, and the installer stamps the
 Sync data and Source leads texts 0.9.13 while Repair is untouched.
+
+0.9.19: the Send invitations run works one ordered list Mosaico keeps (`workflowStatus.sendRun`: send, check, draft). These checks
+also pin that the skills follow `sendRun.recommendedAction` after every answer, order the work send, check, draft (never drafts
+first), end `complete` only when Mosaico says `end_run`, do what a refused end (`send-run-open`) names without arguing, and no longer
+carry their own "do not try a refused Lead again" rule (Mosaico skips a Lead it refused twice and lists it under `skippedThisRun`).
 """
 
 from __future__ import annotations
@@ -102,33 +107,86 @@ def main() -> None:
             "outreach_record_message", "kind invite", "direction outbound", "sentAt null", "Pass no ownerUserId",
             "for no other Lead",
             "Never approve, send or mark sent a draft you wrote",
-            "do not try it again in this run",
+            # 0.9.19: a Send invitations run follows the work list Mosaico keeps; Mosaico, not the model, skips a Lead it refused twice.
+            "In a Send invitations run Mosaico hands the drafts out as the last step of its one work list, after the sends and the connection checks",
+            "the Lead to draft is the one in sendRun.next",
+            "the answer to each draft carries sendRun",
+            "its next is the next Lead and its recommendedAction the one thing to do, so no reread is needed",
+            "Keep no list of Leads tried: Mosaico skips a Lead whose draft it refused twice in the run and lists it under sendRun.skippedThisRun",
+            "the Leads that need a person under sendRun.waiting",
+            "until recommendedAction is no longer draft_invitation_messages",
+            "from its answers and not from memory",
         ):
             check(needle in drafts, f"{package} 'Write missing invitation drafts' lacks: {needle}")
+        for gone in ("do not try it again in this run", "A Lead Mosaico refused stays on the list", "once every entry has been tried", "Stop when every entry has been tried"):
+            check(gone not in drafts, f"{package} 'Write missing invitation drafts' still holds the model-side retry rule: {gone}")
         check(not re.search(r"ownerUserId", drafts_raw.replace("Pass no `ownerUserId`", "")), f"{package} 'Write missing invitation drafts' tells the model about ownerUserId")
         both = flat(section(raw, "Both"))
-        check("Complete **Write missing invitation drafts** first" in both and "Never approve a newly created draft automatically" in both and "Sourcing is never part of this" in both, f"{package} Both section does not draft first, send approved only, and keep sourcing out")
+        # 0.9.19: Mosaico orders a send run's list: sends, then checks, then drafts. The model never drafts first.
+        check("Never approve a newly created draft automatically" in both and "Sourcing is never part of this" in both, f"{package} Both section does not send approved only and keep sourcing out")
+        check("sends come first, then connection checks, then drafts" in both and "Mosaico sets the order, not you" in both, f"{package} Both section does not say Mosaico orders send, check, draft")
+        check("Complete **Write missing invitation drafts** first" not in both and both.index("Complete **Send approved invitations** first") < both.index("complete **Write missing invitation drafts**"), f"{package} Both section still drafts first")
+        check("Do not write a draft before Mosaico offers it: it recommends none while a send or a check is left" in both, f"{package} Both section does not hold the draft back until Mosaico offers it")
+        if package == "Codex":
+            # Codex cannot capture connection evidence, so it cannot do the check step; it stops there and never asks to end as complete.
+            check("follow it, and never count or remember what is left yourself" in both and "when sendRun.recommendedAction is verify_connection, stop there, do not ask to end the run as complete" in both and "left for a Claude Send invitations run" in both, "Codex Both section does not stop at the check step it cannot do")
+        # 0.9.19: a refused end of a send run is not argued with, in the End the run section of both packages.
+        end = flat(section(raw, "End the run"))
+        for needle in (
+            "a Send invitations run is done when Mosaico says its work list is empty: workflowStatus.sendRun.phase is done and the recommended action is end_run",
+            "Mosaico refuses the same way for a Send invitations run whose work list is not empty: the answer is blocked with send-run-open, the run stays open, nothing is recorded, and the answer names the count left and the next action (sendRun.next, recommendedAction)",
+            "Do not argue and do not ask again: do what the answer names and go on from there",
+            "A blocked end needs the same proof as above",
+        ):
+            check(needle in end, f"{package} End the run section lacks: {needle}")
         send = flat(section(raw, "Send approved invitations"))
         check("outreach_record_message" not in send, f"{package} Send approved invitations may write a draft")
         start = flat(raw[raw.index("## Start the run"):raw.index("## Source Leads\n")])
         check("Sourcing is always its own run; writing drafts and sending share one send_approved_invitations run" in start, f"{package} Start the run does not keep sourcing apart from drafting and sending")
         check("missing invitation drafts" in flat(raw.split("---", 2)[1]), f"{package} invite-run description does not name drafting")
 
-    # 4. Send invitations routine (Claude, invite-run): drafts first, from the application's list, own Leads only, never approved or sent.
+    # 4. Send invitations routine (Claude, invite-run): since 0.9.19 one run works the ordered list Mosaico keeps (send, check, draft),
+    #    follows its recommended action after every answer, ends only when Mosaico says end_run and never argues with a refused end.
     follow = read(CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md")
     invite_claude = read(CLAUDE / "skills" / "mosaico-outreach-invite-run" / "SKILL.md")
     sync = flat(section(invite_claude, "Send invitations routine"))
     for needle in (
         "It never approves a draft, and it does nothing else: no follow-ups, no messages, no withdrawals, no sourcing",
-        "it writes the missing invitation drafts for the person's own Leads, from the draftsToWrite list Mosaico gives it".capitalize() if False else "writes the missing invitation drafts for the person's own Leads, from the draftsToWrite list Mosaico gives it",
+        "One run works one ordered list that Mosaico keeps for the person's own Leads: it sends the invitations that are already approved, then checks the connections Mosaico hands out, then writes the missing invitation drafts",
         'the scope is invitations for today with the actions "write missing invitation drafts" and "send approved invitations"',
-        'the selected action "write missing invitation drafts", as its "Write missing invitation drafts" section says',
-        'the selected action "send approved invitations"',
-        "draftsToWrite on the day read (outreach_get_follow_ups carries the same list) and follow its recommendedAction",
-        "write a draft with sentAt null only for an entry on that list (always one of your own Leads), never approve or send a draft, and never write one for any other Lead",
-        "invitation drafts written and Leads skipped for drafting, each with its reason",
+        # (a) the run follows the application's recommended action; it never counts, orders or rebuilds the list.
+        "Call outreach_get_day for today with intent send_approved_invitations and the runId",
+        "Follow sendRun.recommendedAction for the Lead in sendRun.next, and do that action and nothing else",
+        "verify_connection means run the approved connection-evidence script for that Lead (next.verifyAction is the exact call",
+        "send_approved_invitations means send, as Step 3 says",
+        "draft_invitation_messages means write one draft with sentAt null for that Lead, as the \"Write missing invitation drafts\" section says, and never approve or send it",
+        "end_run means end the run (see Step 4 below)",
+        "The answer to a connection check or a draft carries sendRun with the next Lead and the one recommendedAction: do that, with no reread",
+        "The answer to a send or a recorded delivery block does not: reread the day",
+        "Never count, order or remember what is left yourself, and never rebuild the list from draftsToWrite or any other read",
+        "A Lead that needs a person is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
+        'with the selected action "send approved invitations", when sendRun.recommendedAction is send_approved_invitations',
+        # (b) a refused end is not argued with: do what the answer names.
+        "End the run with outreach_end_run, with reason complete only when Mosaico says its work list is empty (sendRun.phase done, completion complete, recommendedAction end_run)",
+        "Mosaico refuses with send-run-open, records nothing and keeps the run open; its answer names the count left and the next action. Do not argue and do not ask again: do what the answer names",
+        "a Lead that cannot be invited is not a blocker",
+        # the report states Mosaico's figures, not memory.
+        "using Mosaico's counts from its answers, not memory",
+        "invitation drafts written, each with its Lead",
+        "connection checks made (sendRun.checksThisRun of sendRun.checkCap)",
+        "the Leads that waited for a person (sendRun.waiting in the end answer, each with its reason)",
+        "the Leads Mosaico skipped after two refusals (sendRun.skippedThisRun, each with its step and code)",
     ):
         check(needle in sync, f"Send invitations routine lacks: {needle}")
+    # (c) the order is send, then check, then draft, in the routine's own words.
+    check(sync.index("first the approved invitations to send") < sync.index("then the connections to check") < sync.index("then the missing invitation drafts for the person's own Leads"), "Send invitations routine does not order send, check, draft")
+    check(sync.index("Step 3. Sending") < sync.index("Step 4. End the run") < sync.index("Step 5. Report"), "Send invitations routine steps are out of order")
+    for gone in (
+        "draftsToWrite on the day read (outreach_get_follow_ups carries the same list) and follow its recommendedAction",
+        "Reread the day after every write and continue until Mosaico reports completion (no-approved-invitations-remain)",
+        "Step 2. Run this skill with the selected day today and the selected action \"write missing invitation drafts\"",
+    ):
+        check(gone not in sync, f"Send invitations routine still holds the drafts-first procedure: {gone}")
     # The Follow-up routine writes no invitation draft and sends no invitation; the old Sync data heading is only a superseded note.
     fu = flat(section(follow, "Follow-up routine"))
     for gone in ("write missing invitation drafts", "send approved invitations", "linkedin-sent-invitations.js", "draftsToWrite list"):
@@ -171,7 +229,7 @@ def main() -> None:
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.18", f"{manifest.name} is not at 0.9.18")
+        check(json.loads(read(manifest))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])
@@ -195,7 +253,7 @@ def main() -> None:
             registry_text = read(registry)
             check("draftsToWrite: draftsToWrite(" in registry_text and "SOURCING_WRITES_NO_DRAFTS" in registry_text, "the application registry does not return draftsToWrite or refuse sourcing drafts")
 
-    print("PASS: Source leads saves and places Leads only and treats sourcing-writes-no-drafts as expected; Sync data writes the missing invitation drafts from draftsToWrite for its own Leads and never approves or sends; the Sync data and Source leads texts are stamped 0.9.13.")
+    print("PASS: Source leads saves and places Leads only and treats sourcing-writes-no-drafts as expected; Sync data writes the missing invitation drafts from draftsToWrite for its own Leads and never approves or sends; the Sync data and Source leads texts are stamped 0.9.13; the Send invitations run follows Mosaico's ordered work list (send, check, draft) and its refused end.")
 
 
 if __name__ == "__main__":

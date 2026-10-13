@@ -56,7 +56,8 @@ Nothing in the plugin needs updating for this.
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
 Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
 action. The schedule option installs per-user local-time schedules: Send invitations (from 0.9.15, once a day, 1:00 PM by
-default: it writes the missing invitation drafts for the person's own Leads, then sends the approved invitations), Follow-up
+default; from 0.9.19 it works the one ordered list Mosaico keeps: it sends the approved invitations, checks the connections Mosaico
+hands out, then writes the missing invitation drafts for the person's own Leads), Follow-up
 (from 0.9.15, once a day, 1:30 PM; from 0.9.16 it starts a run with intent `follow_up_pass` and works the paged queue
 `outreach_get_follow_up_queue` hands it: the connections list when it is due, connections still to verify, threads to read, the
 approved follow-ups to send and the missing follow-up drafts, one pass per thread; from 0.9.17 it also fixes redirected addresses and
@@ -90,7 +91,9 @@ plan (`outreach_get_agents` with the `runId`), keeps searching with no search li
 the run is complete (every Agent delivered, ran out of free days, or became unavailable), or on a genuine blocker (a
 code Mosaico gave in the run, or a LinkedIn warning, captcha or restriction). Every run ends with `outreach_end_run`
 and the honest reason (`complete` or `blocked`); Mosaico refuses an end it cannot back while a line is open
-(`sourcing-run-open`) and the run keeps going. A run with no Mosaico call for 30 minutes is closed by the next Source
+(`sourcing-run-open`) and the run keeps going. A Send invitations run (from 0.9.19) ends `complete` only when Mosaico says its work list
+is empty (`workflowStatus.sendRun.phase` `done`, recommended action `end_run`); asked earlier, Mosaico refuses with `send-run-open`, keeps
+the run open and names the next action. A run with no Mosaico call for 30 minutes is closed by the next Source
 leads run and reported as "run failed: stopped with N open". The start answer names the Mosaico environment (`environmentName`), every report begins with it, and a run on
 anything but production stops.
 
@@ -198,6 +201,49 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.19
+
+Requires the Mosaico server release 20261013d (promotion mosaicohr-com/mosaico#1932, stage-v2 to main-v2, carrying
+mosaicohr-com/mosaico#1931, "the send run owns one ordered work list"). Do not publish or install this plugin before that release is
+live on main-v2. The Send invitations routine of this release relies on what that release added: `workflowStatus.sendRun` on
+`outreach_get_day` (`phase`, `complete`, `recommendedAction`, `allowedActions`, `next`, `remaining`, `checksThisRun`, `checkCap`,
+`checksLeft`, `waiting`, `waitingCount`, `skippedThisRun`, `skippedCount` and `message`), `sendRun` on the answers to
+`outreach_record_message` (an invitation draft) and `outreach_record_connection_evidence` in a send run, `sendRun` and the blocked code
+`send-run-open` on `outreach_end_run`, and `end_run` as the recommended action of a finished list.
+
+- **One run does send, then check, then draft, in the order Mosaico gives** (invite-run skill, "Send invitations routine" and the
+  sections it uses). Mosaico keeps one list for the run in `workflowStatus.sendRun`: (1) send the approved invitations, each Lead
+  that holds one checked first; (2) check the connection of the Leads placed from today on that are ready for a draft apart from
+  their connection, soonest day first, at most 20 checks in the run, counted by Mosaico from the run's own evidence writes; (3) write
+  every missing invitation draft. `next` names the one Lead and `recommendedAction` the one thing to do; the answer to a connection
+  check or a draft carries the updated `sendRun`, so the run needs no reread, and the answer to a send or a recorded delivery block
+  does not, so the run rereads the day. The skill no longer counts, orders or remembers what is left, and no longer rebuilds the list
+  from `draftsToWrite`.
+- **A refused end.** The run ends `complete` only when Mosaico says the list is empty (`phase` `done`, recommended action `end_run`).
+  Asked earlier, `outreach_end_run` is refused with `send-run-open`: nothing is recorded, the run stays open and the answer names the
+  count left and the next action. The skill does what the answer names, never argues and never asks again. `blocked` still needs a
+  `blockerCode` Mosaico gave in the run, three Mosaico errors in a row, or a `linkedInIssue` with a note.
+- **The model's own "never retry" rule is gone for the send run.** The draft section no longer says that a refused Lead stays on a
+  list that is not tried again: Mosaico skips a Lead whose check or draft it refused twice in the run and lists it under
+  `sendRun.skippedThisRun`. The draft-writing rules are unchanged (the Agent's `messageInstructions` and `messagingChecklist`, a
+  `checklistReview`, `sentAt` null, never approved or sent).
+- **Order.** The "Both" section no longer says drafts first: sends, then checks, then drafts, because Mosaico orders it so, and Mosaico
+  recommends no draft while a send or a check is left.
+- **Leads that need a person never hold the end.** Mosaico lists them under `sendRun.waiting` with a reason (`in-to-sort`, `no-agent`,
+  `agent-missing`, `no-profile-address`, `profile-capture-failed`, `check-cap-reached` or `refused-twice-this-run`) and a plain message.
+- **The report** states Mosaico's figures from its answers, not memory: drafts written, connection checks made (`checksThisRun` of
+  `checkCap`), the Leads that waited for a person with their reasons and the Leads Mosaico skipped.
+- **Codex.** The Codex invite-run skill carries the matching wording. It cannot capture connection evidence, so when the next action
+  is `verify_connection` it stops there, does not ask to end the run as complete and reports that the checks, and the drafts behind
+  them, are left for a Claude Send invitations run. The Codex schedule-install skill no longer says that Source leads writes drafts:
+  the Lead owner's Send invitations run does.
+- **No schedule text changes.** The Send invitations text stays at 0.9.15: it names the "Send invitations routine" section of the
+  installed plugin, so the plugin update is what changes the run. Update the plugin on every machine that runs the Send invitations
+  schedule; an older plugin does not know the list, and Mosaico refuses to end its run while the list is not empty. The Follow-up
+  (0.9.18), Withdraw stale invitations (0.9.15), Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- `tests/test_outreach_tool_contract.py` now also checks the application's work-list module and registry for the fields, codes and
+  reasons this release relies on, and the skills name them.
 
 ### 0.9.18
 
