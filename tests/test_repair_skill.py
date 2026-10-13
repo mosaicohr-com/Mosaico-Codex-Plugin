@@ -144,7 +144,7 @@ def main() -> None:
 
     # Both packages: the version, the changelog and the overview routes.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.16", f"{manifest.name} is not at 0.9.16")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.17", f"{manifest.name} is not at 0.9.17")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     entry = " ".join(readme[readme.index("### 0.9.0") : readme.index("### 0.8.7")].split())
     for needle in (
@@ -156,6 +156,11 @@ def main() -> None:
     for package, root, route in (("Claude", CLAUDE, "/mosaico:mosaico-outreach-repair-run"), ("Codex", CODEX, "$mosaico:mosaico-outreach-repair-run")):
         overview = (root / "skills" / "mosaico-outreach" / "SKILL.md").read_text(encoding="utf-8")
         check(route in overview and "Repair the Outreach backlog" in overview, f"{package} overview does not route to the repair-run skill")
+    # 0.9.17: the Repair queue holds only the backlog outside the follow-up queue.
+    check("`excludedAsFollowUpWork`" in flat_claude and "20261013a" in flat_claude and "except duplicate pairs, which only this routine links" in flat_claude and "never go looking for those Leads" in flat_claude,
+          "Claude repair-run skill does not say the queue leaves out the follow-up queue's Leads and counts them in excludedAsFollowUpWork")
+    check("(`excludedAsFollowUpWork`)" in flat_claude.split("## Report")[1] and "excludedAsFollowUpWork" in flat_claude.split("## Repair routine")[1].split("Step 3.")[1], "Claude repair-run skill does not report the excludedAsFollowUpWork count")
+    check("`excludedAsFollowUpWork`" in flat_codex and "20261013a" in flat_codex and "duplicate pairs stay here" in flat_codex, "Codex repair-run skill does not name excludedAsFollowUpWork")
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         follow = " ".join((root / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").split())
         for needle in ("## Repair is a separate routine", "`verifyCap`", "`summary.deferredToRepair`", "`repair-recommended`", "Repair needed: n items, run the Repair routine"):
@@ -188,6 +193,7 @@ def main() -> None:
             check(f"'{action}'" in queue, f"the application's repair queue has no action {action}")
         description = re.search(r"name: 'outreach_get_repair_queue'.*?description: '(.*?)',\n    inputSchema", registry, re.S)
         check(description is not None, "cannot read the repair queue tool description")
+        check("excludedAsFollowUpWork" in description.group(1) and "excludedAsFollowUpWork" in queue, "the application's repair queue does not carry excludedAsFollowUpWork (needs server release 20261013a)")
         for field in ("workOrder", "recommendedCall", "supplyAlso", "scriptIdentifier", "summary.needsPerson", "processedInThisRun", "cap.perRun", "nextCursor", "completion", "run-cap-reached", "queue-empty", "end-of-queue", "capture_connections", "write_report"):
             check(field in description.group(1), f"the application's repair queue description lacks {field}")
         follow_ups = re.search(r"name: 'outreach_get_follow_ups'.*?description: '(.*?)',\n    inputSchema", registry, re.S)

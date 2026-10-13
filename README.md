@@ -59,7 +59,8 @@ action. The schedule option installs per-user local-time schedules: Send invitat
 default: it writes the missing invitation drafts for the person's own Leads, then sends the approved invitations), Follow-up
 (from 0.9.15, once a day, 1:30 PM; from 0.9.16 it starts a run with intent `follow_up_pass` and works the paged queue
 `outreach_get_follow_up_queue` hands it: the connections list when it is due, connections still to verify, threads to read, the
-approved follow-ups to send and the missing follow-up drafts, one pass per thread), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
+approved follow-ups to send and the missing follow-up drafts, one pass per thread; from 0.9.17 it also fixes redirected addresses and
+drops Leads who said no before anything else, and reports the Leads it skipped), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
 stale and never sends; these three replace the older single Sync data schedule, which the installer retires), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
 colleagues lane on the odd hours, each at least 60 minutes from the other lane and from the three daily times, never writes drafts and never sends; how many Leads
 it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
@@ -176,6 +177,13 @@ of any cookie or session export:
   refusal, a rate limit, a server error or a dropped call, never more than once, and never swaps identifiers silently:
   `requestedIdentifier` stays what the run asked for and `resolvedIdentifier` is what LinkedIn named, so Mosaico can keep the old
   identifier as an alias.
+- Gone profiles (0.9.17): the connection-evidence script's `status` is the HTTP status of LinkedIn's profile data call, which can answer
+  200 with no profile for an address whose page shows LinkedIn's not-found page, so the application counted a first failure instead of
+  giving up. When no profile was resolved, the data call answered 2xx and the page the run opened is LinkedIn's not-found page (its
+  document title says the page or profile was not found, or its address is `/404`), the script reports `status` 404; a 410 stays 410. A
+  first call's 404 or 410 is also never replaced by a redirect retry that finds no profile either. Only `document.title` and
+  `location.pathname` are read for this. A refusal, a rate limit, a server error or a dropped call is reported as it is. The not-found
+  marker has been tested against a fake page only, not yet against a live LinkedIn page.
 - `plugins/mosaico-claude/hooks/browser-script-gate.py` runs before every browser script call. It allows
   an approved script word for word (only the values on its leading placeholder lines may change: the first line, for the thread script the second, the Lead's name, and for the colleague-connection script the second, the colleague's identifier), expands a one-line run
   directive (0.8.4, below) into the approved script, and refuses any other script
@@ -188,6 +196,45 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.17
+
+Requires the Mosaico server release 20261013a (promotion of stage-v2 to main-v2 carrying mosaicohr-com/mosaico#1921, "the Follow-up run
+owns the repairs of its own Leads"). The Follow-up routine of this release relies on fields of that release: the new queue stages
+`fix-address` and `drop-declined`, `repairGroup` on every queue item, `skippedThisRun` and `counts.skippedThisRun`, `linkedDuplicate`
+(with the note `duplicate-linked`) and `heldBy` on `outreach_deposit_conversation`, and `excludedAsFollowUpWork` on
+`outreach_get_repair_queue`. Install or move the Follow-up schedule to the 0.9.17 text only after that release is live. Send invitations
+and Withdraw stale invitations are unchanged and stay at 0.9.15.
+
+- **Connection-evidence script: a gone profile is reported as 404 or 410.** The script's `status` was the HTTP status of LinkedIn's
+  profile data call, not of the page. A page that shows "not found" can still answer 200 with no profile, so the server counted a first
+  failure instead of giving up (a 404 or 410 gives up at once), and the 0.9.16 redirect retry made it worse: it replaced a first call's
+  404 with the retry's own status when the retry also found no profile. Now the script reports 404 when no profile was resolved, the
+  data call answered 2xx and the page itself is LinkedIn's not-found page (read from `document.title` and `location.pathname` only), a
+  410 stays 410, and a retry never replaces a first 404 or 410. A true 200 with a profile, a refusal, a rate limit, a server error and
+  a dropped call are unchanged, and `requestedIdentifier` and `resolvedIdentifier` behave as in 0.9.16. The title marker is checked
+  against a fake page; it has not been checked against a live LinkedIn not-found page yet.
+- **Follow-up routine works the repairs the queue now carries** (follow-up-run skill). `fix-address` (`nextStep` `fix_address`) and
+  `drop-declined` (`nextStep` `drop_lead`) are worked before every other stage, each by its `recommendedCall` (`outreach_update_lead`)
+  with nothing done on LinkedIn; a profile check of a listed Lead is in `verify-connection` and a history mismatch is in `read-thread`.
+  Every item carries `repairGroup` (`addresses`, `declinedPending`, `mismatches`, `repairSuggestions`, `unverified` or null).
+- **`skippedThisRun` is information for the report.** A Lead whose call in this run came back with an answer nothing in the run can
+  change (`profile-capture-failed`, `thread-person-held-by-other-lead` and the others Mosaico lists) is left out of `items` and `next`;
+  `completion.stopReason` is `queue-empty` when only those remain. The routine never tries a skipped Lead again in the same run; a later
+  run offers it again when it is still work.
+- **`linkedDuplicate` on a deposit.** When the thread proves by member id that two Leads are one person, Mosaico links them inside
+  `outreach_deposit_conversation` and stores the messages and outcome on the kept Lead. The routine reports the link and continues with
+  the kept Lead. A match by identifier only still refuses with `thread-person-held-by-other-lead` (now with `heldBy` and `leadId`): the
+  routine records it and continues as before. A follow-up pass still may not call `outreach_link_duplicate_leads`.
+- **The report** lists the Leads skipped this run with their codes, the links made, the addresses fixed and the Leads dropped as
+  declined. The standing answers and the stop-and-report structure are unchanged.
+- **Repair now works only the backlog outside the follow-up queue.** `outreach_get_repair_queue` leaves out every Lead the follow-up
+  queue lists except duplicates and counts them in `excludedAsFollowUpWork`; the repair-run skills (Claude and Codex) say so and report
+  the count.
+- The Follow-up schedule text is stamped 0.9.17 or later. The installer moves a saved 0.9.15 or 0.9.16 Follow-up text to the 0.9.17 text
+  in place ("Update the standing answers in place"), keeping its cron, name and enabled state. The Send invitations and Withdraw stale
+  invitations texts stay at 0.9.15; the Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- The Codex package states the new queue stages and `skippedThisRun` in its queue section and still does not run the scheduled routine.
 
 ### 0.9.16
 

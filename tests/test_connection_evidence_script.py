@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """The approved connection-evidence script resolves a vanity, a redirected vanity or an opaque member id, and reports why it failed.
 
+Since 0.9.17 `status` says whether LinkedIn gave the profile up: a first call's 404 or 410 is never replaced by a retry that finds no
+Profile either, and a 2xx answer with no Profile on a page that is LinkedIn's not-found page is reported as 404 (the application gives up
+on a Lead's address at once on a 404 or 410, and counts a 200 with no Profile only as a first failure).
+
 Since 0.9.16 it also retries the profile query once with the page's own slug when the first call failed (404, 410 or a 2xx with no
 usable Profile) and the page the run opened has followed a redirect to a different /in/<slug>/. It never retries on a refusal, a rate
 limit, a server error, a dropped call, when the slug is the one asked for, or when the page is not a profile page.
@@ -24,11 +28,11 @@ const fs = require('fs');
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const SRC = fs.readFileSync(process.argv[1], 'utf8');
 const TOKEN = 'ajax:SECRET-TOKEN';
-async function run(id, routes, cookie = 'JSESSIONID="' + TOKEN + '"', pathname = null) {
+async function run(id, routes, cookie = 'JSESSIONID="' + TOKEN + '"', pathname = null, title = undefined) {
   const calls = [];
   const body = SRC.replace('const PUBLIC_IDENTIFIER = "PUBLIC_IDENTIFIER";', 'const PUBLIC_IDENTIFIER = ' + JSON.stringify(id) + ';');
   const wrapped = new AsyncFunction('document', 'fetch', 'location', 'return await (async () => {' + body.replace(/\n\(\{/, '\nreturn ({') + '})();');
-  const result = await wrapped({ cookie }, async (url, init) => { calls.push({ url, init }); return routes(url, init); }, pathname === null ? undefined : { pathname });
+  const result = await wrapped({ cookie, title }, async (url, init) => { calls.push({ url, init }); return routes(url, init); }, pathname === null ? undefined : { pathname });
   return { result, calls };
 }
 const ok = (j) => ({ ok: true, status: 200, json: async () => j });
@@ -88,6 +92,44 @@ const answer = (...profiles) => () => ok({ included: [relationship, ...profiles]
   out.retryFails = r.result; out.retryFailsCalls = r.calls.length;
   r = await run('old-vanity', ((n) => () => { n += 1; return n === 1 ? bad(404) : ok({ included: [relationship] }); })(0), undefined, '/in/the-new-vanity/');
   out.retryEmpty = r.result; out.retryEmptyCalls = r.calls.length;
+  // 0.9.17: a first 404 or 410 is never replaced by a retry that finds no Profile; a first 200 with no Profile still takes the retry's own 404.
+  r = await run('old-vanity', ((n) => () => { n += 1; return n === 1 ? bad(410) : ok({ included: [relationship] }); })(0), undefined, '/in/the-new-vanity/');
+  out.retryEmpty410 = r.result; out.retryEmpty410Calls = r.calls.length;
+  r = await run('old-vanity', ((n) => () => { n += 1; return n === 1 ? bad(404) : bad(403); })(0), undefined, '/in/the-new-vanity/');
+  out.retryRefused404 = r.result;
+  r = await run('old-vanity', ((n) => () => { n += 1; return n === 1 ? ok({ included: [relationship] }) : bad(404); })(0), undefined, '/in/the-new-vanity/');
+  out.firstEmptyRetry404 = r.result;
+  r = await run('old-vanity', ((n) => () => { n += 1; return n === 1 ? ok({ included: [relationship] }) : bad(403); })(0), undefined, '/in/the-new-vanity/');
+  out.firstEmptyRetry403 = r.result;
+  // 0.9.17: LinkedIn's not-found page with a 200 that holds no Profile is reported as 404 (and 410 stays 410, a refusal stays a refusal).
+  const NOT_FOUND = 'Page not found | LinkedIn';
+  for (const [name, route, title, pathname] of [
+    ['notFoundTitle', answer(), NOT_FOUND, '/in/old-vanity/'],
+    ['notFoundTitleLower', answer(), 'profile not found | linkedin', '/in/old-vanity/'],
+    ['notFoundCurlyApostrophe', answer(), 'This page doesn\u2019t exist | LinkedIn', '/in/old-vanity/'],
+    ['notFound404Path', answer(), 'LinkedIn', '/404/'],
+    ['notFound404Bare', answer(), undefined, '/404'],
+    ['notFoundNoPath', answer(), NOT_FOUND, null],
+    ['notFoundWith410', () => bad(410), NOT_FOUND, '/in/old-vanity/'],
+    ['notFoundWith404', () => bad(404), NOT_FOUND, '/in/old-vanity/'],
+    ['notFoundTitleProfilePage', answer(), 'Jane Doe | LinkedIn', '/in/old-vanity/'],
+    ['notFoundNoTitle', answer(), undefined, '/in/old-vanity/'],
+    ['notFoundBadTitleType', answer(), 42, '/in/old-vanity/'],
+    ['notFoundOtherPath', answer(), 'LinkedIn', '/feed/404-tips/'],
+    ['notFound403', () => bad(403), NOT_FOUND, '/in/old-vanity/'],
+    ['notFound429', () => bad(429), NOT_FOUND, '/in/old-vanity/'],
+    ['notFound500', () => bad(500), NOT_FOUND, '/in/old-vanity/'],
+    ['notFoundDropped', () => { throw new Error('net'); }, NOT_FOUND, '/in/old-vanity/'],
+    ['notFoundSignedOut401', () => bad(401), NOT_FOUND, '/in/old-vanity/'],
+  ]) {
+    r = await run('old-vanity', route, undefined, pathname, title);
+    out[name] = r.result; out[name + 'Calls'] = r.calls.length;
+  }
+  // A page that says not found never turns an answered Profile into an error, and the retry keeps the first 404 whatever the page says.
+  r = await run('jane-doe', answer(profile('jane-doe', 'LEADID01')), undefined, '/in/jane-doe/', NOT_FOUND);
+  out.profileOnNotFoundPage = r.result;
+  r = await run('old-vanity', byName({ 'old-vanity': bad(404), 'the-new-vanity': ok({ included: [relationship] }) }), undefined, '/in/the-new-vanity/', NOT_FOUND);
+  out.retryEmptyNotFoundPage = r.result; out.retryEmptyNotFoundPageCalls = r.calls.length;
   r = await run('old-vanity', ((n) => () => { n += 1; if (n === 1) return bad(404); throw new Error('net'); })(0), undefined, '/in/the-new-vanity/');
   out.retryDropped = r.result; out.retryDroppedCalls = r.calls.length;
   // A retry whose Profile is not the requested vanity's person is still the page's person (the redirect); two Profiles with no exact name are not.
@@ -196,10 +238,32 @@ def main() -> None:
     check(out["workedNoRetryCalls"] == 1 and out["workedNoRetry"]["resolvedIdentifier"] == "jane-doe", "a call that worked was retried because the page shows another slug")
     check(out["retryFailsCalls"] == 2 and out["retryFails"]["state"] == "error" and out["retryFails"]["status"] == 404 and out["retryFails"]["requestedIdentifier"] == "old-vanity"
           and out["retryFails"]["resolvedIdentifier"] is None and out["retryFails"]["entries"] == [], "a failed retry was repeated or not reported as an error")
-    check(out["retryEmptyCalls"] == 2 and out["retryEmpty"]["state"] == "error" and out["retryEmpty"]["status"] == 200 and out["retryEmpty"]["entries"] == [],
-          "a retry that answered 200 with no Profile did not report its own status")
+    # 0.9.17: LinkedIn said 404 on the first call; a retry that finds no Profile (200 with none, or a refusal) never replaces that.
+    check(out["retryEmptyCalls"] == 2 and out["retryEmpty"]["state"] == "error" and out["retryEmpty"]["status"] == 404 and out["retryEmpty"]["entries"] == [],
+          f"a retry that answered 200 with no Profile replaced the first call's 404: {out['retryEmpty']}")
+    check(out["retryEmpty410Calls"] == 2 and out["retryEmpty410"]["status"] == 410 and out["retryEmpty410"]["state"] == "error",
+          f"a retry that answered 200 with no Profile replaced the first call's 410: {out['retryEmpty410']}")
+    check(out["retryRefused404"]["status"] == 404 and out["retryRefused404"]["state"] == "error", f"a refused retry replaced the first call's 404: {out['retryRefused404']}")
+    check(out["firstEmptyRetry404"]["status"] == 404 and out["firstEmptyRetry404"]["state"] == "error", f"a retry's own 404 after a first 200 with no Profile was not reported: {out['firstEmptyRetry404']}")
+    check(out["firstEmptyRetry403"]["status"] == 403, f"a retry's refusal after a first 200 with no Profile was not reported as before: {out['firstEmptyRetry403']}")
+    # 0.9.17: a 200 with no Profile on LinkedIn's not-found page is a 404.
+    for name in ("notFoundTitle", "notFoundTitleLower", "notFoundCurlyApostrophe", "notFound404Path", "notFound404Bare", "notFoundNoPath", "notFoundWith404"):
+        record = out[name]
+        check(out[name + "Calls"] == 1 and record["status"] == 404 and record["state"] == "error" and record["errorStep"] == "profile" and record["entries"] == []
+              and record["resolvedIdentifier"] is None and record["requestedIdentifier"] == "old-vanity", f"{name}: a not-found page was not reported as 404: {record}")
+    check(out["notFoundWith410"]["status"] == 410 and out["notFoundWith410"]["state"] == "error", f"a 410 on the not-found page was not kept as 410: {out['notFoundWith410']}")
+    for name in ("notFoundTitleProfilePage", "notFoundNoTitle", "notFoundBadTitleType", "notFoundOtherPath"):
+        check(out[name]["status"] == 200 and out[name]["state"] == "error", f"{name}: a page that is not LinkedIn's not-found page changed the 200 answer: {out[name]}")
+    for name, status in (("notFound403", 403), ("notFound429", 429), ("notFound500", 500), ("notFoundDropped", 0), ("notFoundSignedOut401", 401)):
+        check(out[name]["status"] == status and out[name]["state"] == "error", f"{name}: a refusal, a rate limit, a server error or a dropped call was reported as 404: {out[name]}")
+    check(out["profileOnNotFoundPage"]["state"] == "ok" and out["profileOnNotFoundPage"]["status"] == 200 and out["profileOnNotFoundPage"]["resolvedIdentifier"] == "jane-doe",
+          f"a true 200 with a Profile changed because of the page title: {out['profileOnNotFoundPage']}")
+    check(out["retryEmptyNotFoundPageCalls"] == 2 and out["retryEmptyNotFoundPage"]["status"] == 404 and out["retryEmptyNotFoundPage"]["state"] == "error",
+          f"a retry that found no Profile on a not-found page was not reported as 404: {out['retryEmptyNotFoundPage']}")
+    check(out["exact"]["status"] == 200 and out["redirect"]["status"] == 200 and out["noProfile"]["status"] == 200 and out["noProfile"]["state"] == "error",
+          "a 200 with no Profile and no not-found page changed (a first failure the application counts, not a 404)")
     check(out["retryDroppedCalls"] == 2 and out["retryDropped"]["state"] == "error" and out["retryDropped"]["status"] == 404, "a dropped retry did not keep the first call's status")
-    check(out["retryAmbiguous"]["state"] == "error" and out["retryAmbiguous"]["status"] == 200, "a retry that answered several unrelated Profiles was accepted")
+    check(out["retryAmbiguous"]["state"] == "error" and out["retryAmbiguous"]["status"] == 404, "a retry that answered several unrelated Profiles was accepted, or replaced the first call's 404")
     check(out["retryOpaque"]["state"] == "ok" and out["retryOpaqueCalls"] == ["ACoAAB1x_y-Z", "the-new-vanity"] and out["retryOpaque"]["requestedIdentifier"] == "ACoAAB1x_y-Z"
           and out["retryOpaque"]["resolvedIdentifier"] == "the-new-vanity" and out["retryOpaque"]["memberUrn"] == "urn:li:fsd_profile:ACoAAB1x_y-Z", f"an opaque id was not resolved through the page's slug: {out['retryOpaque']}")
     check(out["retryOpaqueOtherCalls"] == 2 and out["retryOpaqueOther"]["state"] == "error" and out["retryOpaqueOther"]["memberUrn"] is None and out["retryOpaqueOther"]["entries"] == [],
@@ -213,7 +277,7 @@ def main() -> None:
         if isinstance(record, dict) and "integrity" in record:
             check(list(record)[-1] == "integrity" and record["integrity"] == {"algorithm": "fnv1a32", "digest": digest_of(record)}, f"{name}: not sealed correctly")
     check(digest_of({**out["redirect"], "memberUrn": "urn:li:fsd_profile:OTHER"}) != out["redirect"]["integrity"]["digest"], "the new fields are not inside the digest")
-    print("PASS: the connection-evidence script resolves a vanity, a redirected vanity or an opaque member id, retries once with the page's own slug after a redirect, reports errorStep, and never throws.")
+    print("PASS: the connection-evidence script resolves a vanity, a redirected vanity or an opaque member id, retries once with the page's own slug after a redirect, reports a gone profile as 404 or 410 (never replaced by a retry, also when LinkedIn's not-found page answers 200 with no profile), reports errorStep, and never throws.")
 
 
 if __name__ == "__main__":

@@ -88,12 +88,16 @@ n items, run the Repair routine", where n is `repairNeeded.total`.
 
 ## The follow-up queue
 
-Mosaico (server release 20261012d or later) also offers `outreach_get_follow_up_queue`: the same follow-up work as a small, paged,
+Mosaico (server release 20261013a or later) also offers `outreach_get_follow_up_queue`: the same follow-up work as a small, paged,
 ordered list, one item per Lead with its stage, its next call and a stop reason, and no conversations or full Lead records. A
 Codex run may read it with the `runId` of a `check_follow_ups` or `send_approved_follow_ups` run to see the order and the counts,
 and then work each item by the rules below; each item's `coveredByRun` says whether this run's intent may do it. Mosaico owns the
-order, so do not reorder it. The scheduled Follow-up routine (run intent `follow_up_pass`) needs the Claude plugin's approved
-browser scripts, so Codex does not run it: it is installed from Claude.
+order, so do not reorder it. The queue also carries the repairs Mosaico can decide for its own Leads (stages `fix-address` and
+`drop-declined`, worked first; a profile check joins `verify-connection` and a history mismatch joins `read-thread`; every item's
+`repairGroup` names the Repair queue group it stands in for) and `skippedThisRun`, the Leads this run already tried with an answer
+nothing in the run can change, which Mosaico leaves out of `items` and `next` and which are for the report only. The Repair routine
+now works only the backlog outside this queue. The scheduled Follow-up routine (run intent `follow_up_pass`) needs the Claude
+plugin's approved browser scripts, so Codex does not run it: it is installed from Claude.
 
 ## Check for new follow-ups
 
