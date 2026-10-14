@@ -18,7 +18,8 @@ CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 SKILL = "mosaico-methodology-conversion-run"
 CONVERT = "mosaico-methodology-convert"
-WORD_CAP = 1400
+# 0.9.21: raised from 1400 by 30 for `response_incomplete`, a refusal code with a plain sentence the application has carried since 2026-10-12.
+WORD_CAP = 1430
 
 claude_text = (CLAUDE / "skills" / SKILL / "SKILL.md").read_text(encoding="utf-8")
 codex_text = (CODEX / "skills" / SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -55,6 +56,7 @@ CODES = {
     "response_not_json": "Your answer was not one JSON object Mosaico could read. Send one JSON object and nothing else.",
     "response_cut_off": "Your answer stops part way. It was probably too long. Send the whole object again, shorter if you can.",
     "response_wrong_shape": "Your answer does not match the required shape. Fix the fields listed and send it again.",
+    "response_incomplete": "Your answer leaves out capabilities this part names. Add each one listed, using only what the document states, and send the whole object again.",
     "response_too_large": "Your answer is too large to store. Send a shorter one.",
     "too_many_attempts": "This request was answered wrongly three times, so Mosaico will try the part again or mark it failed. Ask for the next request.",
     "too_many_empty_requests": "Stop asking: there is nothing to answer right now. Read the status once and tell the person what it says.",

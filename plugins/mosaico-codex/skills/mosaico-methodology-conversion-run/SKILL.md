@@ -99,6 +99,7 @@ stop and tell the person; start nothing unless the status offers it.
 - `response_not_json`: Your answer was not one JSON object Mosaico could read. Send one JSON object and nothing else.
 - `response_cut_off`: Your answer stops part way. It was probably too long. Send the whole object again, shorter if you can.
 - `response_wrong_shape`: Your answer does not match the required shape. Fix the fields listed and send it again.
+- `response_incomplete`: Your answer leaves out capabilities this part names. Add each one listed, using only what the document states, and send the whole object again.
 - `response_too_large`: Your answer is too large to store. Send a shorter one.
 - `too_many_attempts`: This request was answered wrongly three times, so Mosaico will try the part again or mark it failed. Ask for the next request.
 - `too_many_empty_requests`: Stop asking: there is nothing to answer right now. Read the status once and tell the person what it says.
