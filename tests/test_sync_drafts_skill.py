@@ -14,6 +14,11 @@ carry their own "do not try a refused Lead again" rule (Mosaico skips a Lead it 
 They also pin the owner's limits (server release 20261014a): checks and drafts are for Leads placed on a later day, Mosaico hands out
 at most `checkLimit` checks and `draftLimit` drafts a run and counts them (`checksThisRun`, `draftsThisRun`), the skills point at those
 fields and state no number of their own, and the interactive opening question says that Send invitations is one run (send, check, draft).
+
+0.9.20 (server release 20261014b): a stuck send never stops the run. The skills record LinkedIn's email request as the delivery block
+`email-required` and never as `cannot-message`, treat the state `invite-already-pending` as no error, follow the answer's recommendation
+after a refused send and never try a Lead Mosaico skipped again, leave the missed-day moves to Mosaico and report `movedThisRun`, the
+skipped sends, the waiting Leads with their reasons, the email-required Leads and the earlier invitations from Mosaico's answers.
 """
 
 from __future__ import annotations
@@ -159,6 +164,34 @@ def main() -> None:
             check(needle in end, f"{package} End the run section lacks: {needle}")
         send = flat(section(raw, "Send approved invitations"))
         check("outreach_record_message" not in send, f"{package} Send approved invitations may write a draft")
+        # 0.9.20 (server release 20261014b): a stuck send never stops the run. Each case points at Mosaico's answer; the skills add no rule of their own.
+        for needle in (
+            # LinkedIn asks for the person's email: record email-required (never cannot-message, which drops the Lead), send nothing, then follow sendRun.next.
+            "If LinkedIn asks for the person's email address before it will connect, send nothing: call outreach_record_delivery_block with reason: email-required, never cannot-message (that drops the Lead). Mosaico keeps the Lead and puts it in To sort for the person. Then follow sendRun.next in the answer",
+            # A refused send follows the answer's recommendation; a Lead Mosaico skipped after two refusals is not tried again.
+            "After any refused send, follow the recommendation in the answer",
+            "A send Mosaico refuses twice for the same Lead in the run is skipped by Mosaico itself: the answer says so (the note lead-skipped-this-run)",
+            "Do not try that Lead again: go on with sendRun.next",
+            # An earlier invitation still pending is a state, not an error.
+            "invite-already-pending, it is not an error",
+            "Mosaico recorded it itself as the delivery block invite-pending",
+            "Nothing more to do for this Lead: follow sendRun.next",
+            # The answer to a send and to a recorded delivery block carries sendRun: no reread.
+            "carries sendRun and names the next step, so it needs no reread; reread the same day only when an answer says sendRun is unavailable",
+            # The report: Mosaico's moves, skips, waits, email requests and earlier invitations, from its answers.
+            "Take these from Mosaico's answers, not from memory",
+            "sendRun.movedThisRun in the end answer: each Lead with the day it moved from and the day it moved to; sendRun.movedCount is the full figure",
+            "the sends Mosaico skipped after two refusals (sendRun.skippedThisRun) and the Leads that waited (sendRun.waiting), each with its reason",
+            "the Leads recorded as email-required, which Mosaico kept for a person in To sort",
+            "the invitations answered invite-already-pending",
+        ):
+            check(needle in send, f"{package} Send approved invitations lacks: {needle}")
+        check("At the start of the run Mosaico itself moves the Leads left on a missed day to open days (sendRun.movedThisRun)" in both and "no-open-day" in both and "You do nothing for either" in both,
+              f"{package} Both section does not say that Mosaico moves the missed-day Leads itself")
+        # The model never records cannot-message for an email request, nor for a second send-not-confirmed (Mosaico skips that Lead itself), and never rereads after a send.
+        check(not re.search(r"reason:? cannot-message", text), f"{package} invite-run skill still tells the model to record cannot-message")
+        for gone in ("their answers carry no sendRun", "The answer to a send or a recorded delivery block does not"):
+            check(gone not in text, f"{package} invite-run skill still says a send answer carries no sendRun: {gone}")
         start = flat(raw[raw.index("## Start the run"):raw.index("## Source Leads\n")])
         check("Sourcing is always its own run; writing drafts and sending share one send_approved_invitations run" in start, f"{package} Start the run does not keep sourcing apart from drafting and sending")
         check("missing invitation drafts" in flat(raw.split("---", 2)[1]), f"{package} invite-run description does not name drafting")
@@ -180,7 +213,7 @@ def main() -> None:
         "draft_invitation_messages means write one draft with sentAt null for that Lead, as the \"Write missing invitation drafts\" section says, and never approve or send it",
         "end_run means end the run (see Step 4 below)",
         "The answer to a connection check or a draft carries sendRun with the next Lead and the one recommendedAction: do that, with no reread",
-        "The answer to a send or a recorded delivery block does not: reread the day",
+        "So does the answer to a send or a recorded delivery block. If an answer says sendRun is unavailable, reread the day",
         "Never count, order or remember what is left yourself, and never rebuild the list from draftsToWrite or any other read",
         "A Lead that needs a person, or that is left over once a limit is reached (reasons check-limit-reached and draft-limit-reached), is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
         # 0.9.19 (server release 20261014a): checks are for Leads placed on a later day and not checked yet; drafts for those checked and not connected; both within Mosaico's limits, counted by Mosaico.
@@ -201,6 +234,23 @@ def main() -> None:
         "the Leads Mosaico skipped after two refusals (sendRun.skippedThisRun, each with its step and code)",
     ):
         check(needle in sync, f"Send invitations routine lacks: {needle}")
+    # 0.9.20 (server release 20261014b): a stuck send never stops the run; the routine points at Mosaico's answer for each case.
+    for needle in (
+        "If LinkedIn asks for the person's email address before it will connect, send nothing: call outreach_record_delivery_block with reason email-required, never cannot-message (that drops the Lead); Mosaico keeps the Lead and puts it in To sort for the person. Then follow sendRun.next in the answer",
+        "After any refused send, follow the recommendation in the answer. A send Mosaico refuses twice for the same Lead in this run is skipped by Mosaico itself: the answer says so (the note lead-skipped-this-run), and then do not try that Lead again in this run and go on with sendRun.next",
+        "A send Mosaico refuses twice for the same Lead is skipped the same way (step send, waiting reason send-refused-twice-this-run)",
+        "If outreach_mark_message_sent answers the state invite-already-pending, it is not an error",
+        "Mosaico recorded it itself as invite-pending; there is nothing more to do for the Lead, so go on with sendRun.next",
+        "At the start of the run Mosaico itself moves the Leads left on a missed day to open days (sendRun.movedThisRun), and a Lead it finds no open day for waits with the reason no-open-day: you do nothing for either",
+        "After every send or recorded delivery block, follow sendRun.next in its answer, as Step 2 says",
+        "the Leads Mosaico moved off a missed day when the run started (sendRun.movedThisRun in the end answer, each Lead with the day it moved from and the day it moved to; sendRun.movedCount is the full figure)",
+        "the Leads that found no open day (waiting reason no-open-day)",
+        "the Leads recorded as email-required, which Mosaico kept for a person in To sort",
+        "invitations where Mosaico answered connected or invite pending, and those it answered invite-already-pending",
+    ):
+        check(needle in sync, f"Send invitations routine lacks: {needle}")
+    for gone in ("The answer to a send or a recorded delivery block does not", "After every send or recorded delivery block, reread the day", "with reason cannot-message"):
+        check(gone not in sync, f"Send invitations routine still holds the pre-0.9.20 wording: {gone}")
     # (c) the order is send, then check, then draft, in the routine's own words.
     check(sync.index("first the approved invitations to send") < sync.index("then the connections to check") < sync.index("then the missing invitation drafts for the person's own Leads"), "Send invitations routine does not order send, check, draft")
     for gone in ("at most 20", "Leads placed from today on", "sendRun.checkCap", "checkCap"):
@@ -254,7 +304,7 @@ def main() -> None:
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
+        check(json.loads(read(manifest))["version"] == "0.9.20", f"{manifest.name} is not at 0.9.20")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])
@@ -278,7 +328,7 @@ def main() -> None:
             registry_text = read(registry)
             check("draftsToWrite: draftsToWrite(" in registry_text and "SOURCING_WRITES_NO_DRAFTS" in registry_text, "the application registry does not return draftsToWrite or refuse sourcing drafts")
 
-    print("PASS: Source leads saves and places Leads only and treats sourcing-writes-no-drafts as expected; Sync data writes the missing invitation drafts from draftsToWrite for its own Leads and never approves or sends; the Sync data and Source leads texts are stamped 0.9.13; the Send invitations run follows Mosaico's ordered work list (send, check, draft) and its refused end.")
+    print("PASS: Source leads saves and places Leads only and treats sourcing-writes-no-drafts as expected; Sync data writes the missing invitation drafts from draftsToWrite for its own Leads and never approves or sends; the Sync data and Source leads texts are stamped 0.9.13; the Send invitations run follows Mosaico's ordered work list (send, check, draft) and its refused end, records an email request as email-required (never cannot-message), treats invite-already-pending as no error and reports the missed-day moves.")
 
 
 if __name__ == "__main__":

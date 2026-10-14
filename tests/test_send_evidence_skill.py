@@ -43,8 +43,11 @@ def main() -> None:
         "fresh `identityEvidence`",
         "`send-not-confirmed`",
         "Do not retype the note",
-        "Retry the send once",
-        "`outreach_record_delivery_block` with `reason: cannot-message`",
+        "retry the send once",
+        # 0.9.20: after a refused send the answer's recommendation is followed; Mosaico skips a Lead it refused twice (no cannot-message by the model).
+        "`retry_send_once`",
+        "After any refused send, follow the recommendation in the answer",
+        "`lead-skipped-this-run`",
         "`send-evidence-stale`",
         "`send-evidence-before-send`",
         "`send-evidence-malformed`",
@@ -54,6 +57,8 @@ def main() -> None:
         "sends confirmed from data separately from any marked by screen",
     ):
         check(needle in invite, f"Claude invite-run send section lacks: {needle}")
+    check("`outreach_record_delivery_block` with `reason: cannot-message`" not in invite,
+          "Claude invite-run still tells the model to record cannot-message after a refused send")
     check("Verify each invitation against LinkedIn rather than trusting the click" not in invite,
           "Claude invite-run still verifies a send against the screen")
     check("run the approved connection-evidence script again" not in invite, "Claude invite-run still confirms a send from the profile call")
