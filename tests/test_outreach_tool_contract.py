@@ -27,10 +27,15 @@ REGISTRY_FILES = (
 )
 REQUIRED_TOOLS = {"outreach_start_run"}
 # The reasons Mosaico gives a Lead in sendRun.waiting (0.9.19; the two limit reasons are server release 20261014a).
-SEND_RUN_REASONS = (
+SEND_RUN_REASONS_0919 = (
     "in-to-sort", "no-agent", "agent-missing", "no-profile-address", "profile-capture-failed",
     "check-limit-reached", "draft-limit-reached", "refused-twice-this-run",
 )
+# 0.9.20 (server release 20261014b, app PR 1938): a send refused twice for the same Lead, and a missed-day Lead with no open day.
+SEND_RUN_REASONS_NEW_0920 = ("send-refused-twice-this-run", "no-open-day")
+SEND_RUN_REASONS = SEND_RUN_REASONS_0919 + SEND_RUN_REASONS_NEW_0920
+# The delivery block reasons Mosaico accepts on outreach_record_delivery_block and records; email-required is new in 0.9.20.
+DELIVERY_BLOCK_REASONS = {"already-connected", "invite-pending", "cannot-message", "email-required"}
 
 
 # The names server release 20261013d gave the check limit; 20261014a renamed them. (colleague-check-cap-reached is the Source leads colleague check's own note.)
@@ -156,17 +161,22 @@ def main() -> None:
     }
     readme_text = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     readme_entry = readme_text[readme_text.index("### 0.9.19"):readme_text.index("### 0.9.18")].replace("`", "")
-    for where, text in {**named_texts, "README 0.9.19 entry": readme_entry}.items():
+    readme_entry_0920 = readme_text[readme_text.index("### 0.9.20"):readme_text.index("### 0.9.19")].replace("`", "")
+    for where, text in {**named_texts, "README 0.9.19 entry": readme_entry, "README 0.9.20 entry": readme_entry_0920}.items():
         for field in sorted(set(re.findall(r"\bsendRun\.(\w+)", text))):
             if field not in server_fields:
                 raise SystemExit(f"{where} names sendRun.{field}, which the application's SendRunWork does not have")
-    for where, text in named_texts.items():
-        for reason in sorted(set(re.findall(r"(?<![\w-])((?:check|draft)-(?:limit|cap)-reached)\b", text))):
+    for where, text in {**named_texts, "README 0.9.20 entry": readme_entry_0920}.items():
+        # Every waiting reason a skill or the 0.9.20 entry names must be one the application gives (0.9.20 adds send-refused-twice-this-run and no-open-day).
+        for reason in sorted(set(re.findall(r"(?<![\w-])((?:check|draft)-(?:limit|cap)-reached|(?:send-)?refused-twice-this-run|no-open-day)\b", text))):
             if reason not in server_reasons:
                 raise SystemExit(f"{where} names the waiting reason {reason}, which the application does not have")
-    for reason in sorted(server_reasons):
+    for reason in sorted(server_reasons & set(SEND_RUN_REASONS_0919)):
         if reason not in readme_entry:
             raise SystemExit(f"The README 0.9.19 entry does not name the waiting reason {reason}, which the application uses")
+    for reason in sorted(server_reasons):
+        if reason not in readme_entry_0920:
+            raise SystemExit(f"The README 0.9.20 entry does not name the waiting reason {reason}, which the application uses")
     for package in ("mosaico-claude", "mosaico-codex"):
         skill_text = (plugin_root / package / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
         for needle in ("sendRun.recommendedAction", "sendRun.next", "sendRun.skippedThisRun", "sendRun.waiting", "send-run-open", "sendRun.phase", "end_run",
@@ -178,6 +188,47 @@ def main() -> None:
                    "check-limit-reached", "draft-limit-reached", "next.verifyAction"):
         if needle not in claude_routine:
             raise SystemExit(f"The mosaico-claude invite-run skill does not name {needle}, which the application's send-run work list uses")
+    # 0.9.20: a stuck send never stops the run (server release 20261014b, app PR 1938). A send refused twice for the same Lead is skipped by
+    # Mosaico, an earlier invitation still pending is a state and not an error, LinkedIn's email request has its own delivery block reason that
+    # keeps the Lead, and Mosaico moves the Leads of a missed day itself. Everything the skills and the README entry name must exist in the application.
+    missed_text = (app / "features/outreach/server/outreach-send-run-missed-days.ts").read_text(encoding="utf-8")
+    proof_text = (app / "features/outreach/server/outreach-send-proof.ts").read_text(encoding="utf-8")
+    record_text = (app / "features/outreach/shared/outreach-record.ts").read_text(encoding="utf-8")
+    for needle in ("'send-refused-twice-this-run'", "'no-open-day'", "export type SendRunRefusedStep = 'check' | 'draft' | 'send'",
+                   "MARK_SENT_TOOL = 'outreach_mark_message_sent'", "readonly movedThisRun: readonly SendRunMoved[]", "readonly movedCount: number"):
+        if needle not in work_text:
+            raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.20 plugin needs server release 20261014b)")
+    moved_fields = type_members(missed_text, r"export interface SendRunMoved \{(.*?)\n\}", r"^\s+readonly (\w+)\??:")
+    if moved_fields != {"leadId", "name", "fromDay", "toDay"}:
+        raise SystemExit(f"The application's SendRunMoved fields are not the ones the 0.9.20 plugin reports (leadId, name, fromDay, toDay): {sorted(moved_fields)}")
+    for needle in ("INVITE_ALREADY_PENDING_STATE = 'invite-already-pending'", "invitationSentAt", "code: 'lead-skipped-this-run'",
+                   "Mosaico skipped this Lead after two refusals; go on with the next one.", "movedThisRun: result.work.movedThisRun", "movedCount: result.work.movedCount",
+                   "'invite-pending'", "OUTREACH_EMAIL_REQUIRED_CODE", "listOwnsRecommendation: true"):
+        if needle not in registry_text:
+            raise SystemExit(f"The application's MCP registry lacks {needle} (the 0.9.20 plugin needs server release 20261014b)")
+    if "OutreachEarlierInvitationPendingError" not in proof_text:
+        raise SystemExit("The application's send proof does not record an earlier invitation still pending (the 0.9.20 plugin needs server release 20261014b)")
+    block_reasons = type_members(record_text, r"OUTREACH_DELIVERY_BLOCK_REASONS = \[(.*?)\] as const", r"'([a-z-]+)'")
+    if block_reasons != DELIVERY_BLOCK_REASONS or "OUTREACH_EMAIL_REQUIRED_CODE = 'email-required'" not in record_text:
+        raise SystemExit(f"The application's delivery block reasons are not the ones the 0.9.20 plugin knows: {sorted(block_reasons)}")
+    for package in ("mosaico-claude", "mosaico-codex"):
+        skill_text = (plugin_root / package / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
+        for needle in ("email-required", "invite-already-pending", "lead-skipped-this-run", "send-refused-twice-this-run", "no-open-day",
+                       "sendRun.movedThisRun", "sendRun.movedCount", "sendRun.skippedThisRun"):
+            if needle not in skill_text:
+                raise SystemExit(f"The {package} invite-run skill does not name {needle}, which the application's stuck-send handling uses (server release 20261014b)")
+        # Every delivery block reason a skill tells the model to record is one the application accepts.
+        for reason in sorted(set(re.findall(r"outreach_record_delivery_block\s+with\s+reason:?\s+([a-z-]+)", skill_text))):
+            if reason not in block_reasons:
+                raise SystemExit(f"The {package} invite-run skill records the delivery block {reason}, which the application does not have")
+        # An email request is recorded as email-required, never as cannot-message (which drops the Lead).
+        email_sentences = [sentence for sentence in re.split(r"\.\s", " ".join(skill_text.split())) if "email address" in sentence.lower()]
+        if not email_sentences or any("email-required" not in sentence or "never cannot-message" not in sentence for sentence in email_sentences):
+            raise SystemExit(f"The {package} invite-run skill does not record LinkedIn's email request as email-required and never as cannot-message")
+    for needle in ("20261014b", "mosaicohr-com/mosaico#1938", "#1935", "#1936", "the plugin is published only after 20261014b is on production main-v2",
+                   "invite-already-pending", "email-required", "lead-skipped-this-run", "sendRun.movedThisRun", "sendRun.movedCount", "cannot-message"):
+        if needle not in " ".join(readme_entry_0920.split()):
+            raise SystemExit(f"The README 0.9.20 entry does not name {needle}")
     missing = codex - registered
     if missing:
         raise SystemExit(

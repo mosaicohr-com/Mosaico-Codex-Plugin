@@ -272,7 +272,10 @@ or every Agent without a free day) is not a failure: report "Every Agent is full
    one. If the capture gave Mosaico nothing it could use, do not send: leave the Lead unverified, list
    it as skipped and continue. Never call `outreach_record_delivery_block` with `already-connected` or
    `invite-pending`.
-4. Send through the authenticated LinkedIn browser.
+4. Send through the authenticated LinkedIn browser. If LinkedIn asks for the person's email address before it will
+   connect, send nothing: call `outreach_record_delivery_block` with `reason: email-required`, never `cannot-message`
+   (that drops the Lead). Mosaico keeps the Lead and puts it in To sort for the person. Then follow `sendRun.next` in
+   the answer.
 5. Verify each invitation against LinkedIn rather than trusting the click.
 6. Call `outreach_mark_message_sent` only after successful delivery verification, using the exact
    Lead and Message identities and the exact send time when LinkedIn exposes it, otherwise null.
@@ -280,14 +283,24 @@ or every Agent without a free day) is not a failure: report "Every Agent is full
    records the mark as a reading of the screen and answers `send-proof-missing`. Say so in the final
    report, with each Lead. A Claude run, which runs the sent-invitations script after the send, confirms a send from
    LinkedIn's data and is the one to send invitations. If Mosaico answers `send-not-confirmed` it did
-   not go out: do not retype it and do not mark it sent; call `outreach_record_delivery_block` with
-   `reason: cannot-message` and continue.
-7. Reread the same day after each send or recorded delivery block (their answers carry no `sendRun`); the answer to a
-   draft carries `sendRun` and names the next step, so it needs no reread. Continue until Mosaico says `end_run` or
-   reports a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
+   not go out: do not retype it and do not mark it sent. After any refused send, follow the recommendation in the
+   answer. A send Mosaico refuses twice for the same Lead in the run is skipped by Mosaico itself: the answer says so
+   (the note `lead-skipped-this-run`) and lists the Lead under `sendRun.skippedThisRun` (step `send`) and
+   `sendRun.waiting` (reason `send-refused-twice-this-run`). Do not try that Lead again: go on with `sendRun.next`.
+   If Mosaico answers the state `invite-already-pending`, it is not an error: LinkedIn's Sent invitations list shows an
+   earlier invitation to this person that is still pending, so this one did not go out, and Mosaico recorded it itself
+   as the delivery block `invite-pending`. Nothing more to do for this Lead: follow `sendRun.next`.
+7. The answer to a draft, a send or a recorded delivery block carries `sendRun` and names the next step, so it needs
+   no reread; reread the same day only when an answer says `sendRun` is unavailable. Continue until Mosaico says
+   `end_run` or reports a genuine blocker (Mosaico, sign-in or LinkedIn failure). One Lead that cannot be
    invited never stops the run.
 8. In the final report list recorded outcomes and Leads left unverified separately from sends and
-   blockers, each with its Lead and reason, and name the sends marked by screen.
+   blockers, each with its Lead and reason, and name the sends marked by screen. Take these from Mosaico's answers, not
+   from memory, and report them separately: the Leads Mosaico moved off a missed day when the run started
+   (`sendRun.movedThisRun` in the end answer: each Lead with the day it moved from and the day it moved to;
+   `sendRun.movedCount` is the full figure); the sends Mosaico skipped after two refusals (`sendRun.skippedThisRun`) and the Leads that waited
+   (`sendRun.waiting`), each with its reason; the Leads recorded as `email-required`, which Mosaico kept for a person
+   in To sort; and the invitations answered `invite-already-pending`.
 
 ## Capture connection evidence
 
@@ -314,9 +327,10 @@ Sourcing is never part of this: a Source leads run is its own run and its own sc
 A `send_approved_invitations` run is one ordered work list that Mosaico keeps (`workflowStatus.sendRun`). Mosaico sets the
 order, not you: sends come first, then connection checks, then drafts. Mosaico also sets how much one run does: checks and
 drafts are for Leads placed on a later day (after today), and it hands out at most `sendRun.checkLimit` checks and
-`sendRun.draftLimit` drafts in a run. Every read and every draft answer carries `next`
+`sendRun.draftLimit` drafts in a run. Every read and every draft, send and recorded delivery block answer carries `next`
 (the Lead and what to do with it), `remaining` and one `recommendedAction`: follow it, and never count or remember what
-is left yourself.
+is left yourself. At the start of the run Mosaico itself moves the Leads left on a missed day to open days
+(`sendRun.movedThisRun`); a Lead it finds no open day for waits with the reason `no-open-day`. You do nothing for either.
 
 1. Complete **Send approved invitations** first, only for messages that were already human-approved. Never
    approve a newly created draft automatically.

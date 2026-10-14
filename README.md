@@ -202,11 +202,54 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased
+### 0.9.20
 
-Skill-only change; no version bump here (the owner's release step). Needs the Mosaico server release 20261013c or later, which is
-already live (it carries `changes.nextTouchOn` on `outreach_update_lead` and its date refusals `date-invalid`, `date-not-future` and
-`date-too-far`).
+Requires the Mosaico server release 20261014b (carrying mosaicohr-com/mosaico#1938, "a stuck send never stops the run"; the release
+also carries mosaicohr-com/mosaico#1935 and #1936, already on stage), on top of release 20261014a (0.9.19, mosaicohr-com/mosaico#1933).
+Do not publish or install this plugin before that release is live on main-v2: the plugin is published only after 20261014b is on
+production main-v2. The Send invitations run of this release relies on what #1938 added: `sendRun` on the answers to
+`outreach_mark_message_sent` and `outreach_record_delivery_block` in a send run, `sendRun.movedThisRun` and `sendRun.movedCount`
+(on `outreach_get_day`, and on the accepted `outreach_end_run`), the waiting reasons `send-refused-twice-this-run` and `no-open-day`,
+the note `lead-skipped-this-run`, the state `invite-already-pending` (with `invitationSentAt`) on `outreach_mark_message_sent`, and
+the delivery block reason `email-required` on `outreach_record_delivery_block`.
+
+- **A send Mosaico refuses twice is skipped by Mosaico** (invite-run skill, both packages, "Send approved invitations" and the Claude
+  "Send invitations routine"). The answer to `outreach_mark_message_sent` now carries `sendRun`. After a refused send the skill follows
+  the answer's recommendation; once Mosaico has refused a send twice for the same Lead in the run it skips the Lead itself: the answer
+  carries the note `lead-skipped-this-run`, lists the Lead under `sendRun.skippedThisRun` (step `send`) and `sendRun.waiting` (reason
+  `send-refused-twice-this-run`), and its recommendation is the work list's. The skill does not try that Lead again and goes on with
+  `sendRun.next`. The skill no longer records `cannot-message` after a second `send-not-confirmed`: Mosaico skips the Lead instead of the
+  run dropping it.
+- **An earlier invitation still pending is not an error.** When LinkedIn's Sent invitations list shows an older invitation to the same
+  person still pending, `outreach_mark_message_sent` answers the state `invite-already-pending`; Mosaico itself recorded the invitation as
+  the delivery block `invite-pending` with LinkedIn's time for the earlier one (`invitationSentAt`). The skill reports it and goes on with
+  `sendRun.next`; it never records `invite-pending` itself.
+- **LinkedIn asks for the person's email: `email-required`.** The skill records `outreach_record_delivery_block` with the new reason
+  `email-required`, sends nothing and goes on with `sendRun.next`. Mosaico keeps the Lead (it stays active) and puts it in Outreach
+  To sort for the person. `cannot-message` still drops the Lead and is never used for an email request.
+- **Mosaico moves the Leads of a missed day.** When a Send invitations run is issued, Mosaico itself moves the Leads left on a past day
+  to open days; the run lists them in `sendRun.movedThisRun` (`leadId`, `name`, `fromDay`, `toDay`; `sendRun.movedCount` is the full
+  figure). A Lead with no open day waits with the reason `no-open-day`. The skill does nothing for either.
+- **The answer to a send and to a recorded delivery block carries `sendRun`.** In 0.9.19 the run reread the day after them; from this
+  release it follows `sendRun.next` and rereads only when an answer says `sendRun` is unavailable.
+- **The report** gives, from Mosaico's answers and not from memory, the Leads Mosaico moved (`sendRun.movedThisRun`, each with the day it
+  moved from and the day it moved to), the sends Mosaico skipped (`sendRun.skippedThisRun`) and the Leads that waited
+  (`sendRun.waiting`) with their reasons, the Leads recorded as `email-required`, and the invitations answered `invite-already-pending`.
+- **Codex.** The Codex invite-run skill carries the same wording for the cases it can reach. It still cannot confirm a send from
+  LinkedIn's data, so `invite-already-pending` is named there for completeness only.
+- **Unchanged from 0.9.19:** the ordered work list (send, check, draft), the limits Mosaico sets and counts (`checkLimit`, `draftLimit`),
+  the refused end (`send-run-open`) and the waiting reasons of that release (`in-to-sort`, `no-agent`, `agent-missing`,
+  `no-profile-address`, `profile-capture-failed`, `check-limit-reached`, `draft-limit-reached` and `refused-twice-this-run`).
+- **No schedule text changes.** The Send invitations text stays at 0.9.15: it names the "Send invitations routine" section of the
+  installed plugin, so the plugin update is what changes the run. Update the plugin on every machine that runs the Send invitations
+  schedule. The Follow-up (0.9.18), Withdraw stale invitations (0.9.15), Source leads (0.9.13) and Repair (0.9.6) texts are unchanged.
+- `tests/test_outreach_tool_contract.py` now also checks that every waiting reason, state, delivery block reason, note and `sendRun`
+  field this release names (`send-refused-twice-this-run`, `no-open-day`, `invite-already-pending`, `email-required`,
+  `lead-skipped-this-run`, `movedThisRun`, `movedCount`) exists in the application, and that the skills and this entry name them.
+
+Also shipped in 0.9.20 (mosaicohr-com/Mosaico-Codex-Plugin#49, merged to main as "Unreleased" before this version; skill-only, needs
+the Mosaico server release 20261013c or later, which is already live: it carries `changes.nextTouchOn` on `outreach_update_lead` and
+its date refusals `date-invalid`, `date-not-future` and `date-too-far`):
 
 - **The interactive Lead-management skill lists the next contact date.** In both packages, "Update existing Leads" now names
   `nextTouchOn` among the Lead fields a person can set, and a new paragraph "Next contact date" says what to do when the person asks

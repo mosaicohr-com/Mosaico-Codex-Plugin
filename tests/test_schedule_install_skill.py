@@ -445,8 +445,28 @@ def main() -> None:
     check(readme.index("### 0.9.19") < readme.index("### 0.9.18"), "README changelog lacks 0.9.19 above 0.9.18")
     check("from 0.9.19 it works the one ordered list Mosaico keeps: it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in flat_readme_top,
           "README current state does not describe the 0.9.19 Send invitations run")
+    # 0.9.20 changelog: a stuck send never stops the run (server release 20261014b, app PR 1938), paired with the release, no schedule change.
+    entry20 = " ".join(readme[readme.index("### 0.9.20") : readme.index("### 0.9.19")].split())
+    for needle in (
+        "Requires the Mosaico server release 20261014b", "mosaicohr-com/mosaico#1938", "mosaicohr-com/mosaico#1935 and #1936", "already on stage", "on top of release 20261014a",
+        "Do not publish or install this plugin before that release is live on main-v2", "the plugin is published only after 20261014b is on production main-v2",
+        "`sendRun` on the answers to `outreach_mark_message_sent` and `outreach_record_delivery_block`", "`sendRun.movedThisRun`", "`sendRun.movedCount`",
+        "`send-refused-twice-this-run`", "`no-open-day`", "`lead-skipped-this-run`", "`invite-already-pending`", "`invitationSentAt`", "`email-required`", "`cannot-message`",
+        "A send Mosaico refuses twice is skipped by Mosaico", "`sendRun.skippedThisRun` (step `send`)", "follows the answer's recommendation",
+        "no longer records `cannot-message` after a second `send-not-confirmed`",
+        "An earlier invitation still pending is not an error", "`invite-pending`", "it never records `invite-pending` itself",
+        "LinkedIn asks for the person's email", "sends nothing", "Mosaico keeps the Lead", "Outreach To sort", "`cannot-message` still drops the Lead and is never used for an email request",
+        "Mosaico moves the Leads of a missed day", "to open days", "`leadId`, `name`, `fromDay`, `toDay`", "The skill does nothing for either",
+        "carries `sendRun`", "rereads only when an answer says `sendRun` is unavailable",
+        "The report", "from Mosaico's answers and not from memory", "Codex", "Unchanged from 0.9.19", "`checkLimit`, `draftLimit`", "`send-run-open`",
+        "No schedule text changes", "stays at 0.9.15", "Update the plugin on every machine that runs the Send invitations schedule",
+    ):
+        check(needle.lower() in entry20.lower(), f"README 0.9.20 entry lacks: {needle}")
+    for gone in ("`checkCap`", "at most 20"):
+        check(gone.lower() not in entry20.lower(), f"README 0.9.20 entry holds old send-run wording: {gone}")
+    check(readme.index("### 0.9.20") < readme.index("### 0.9.19"), "README changelog lacks 0.9.20 above 0.9.19")
     # 0.9.19: no schedule text and no minimum-version stamp changes; the Send invitations text still names the routine section of the installed plugin.
-    check("(0.9.15 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19")
+    check("(0.9.15 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts) and "0.9.20" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19 or 0.9.20")
     claude_flat = " ".join(claude.split())
     check("it sends the invitations that are already approved, checks the connections of the Leads placed on later days that Mosaico hands out, then writes the missing invitation drafts for those found not connected; Mosaico sets how many checks and drafts one run gets (`checkLimit` and `draftLimit`)" in claude_flat
           and "the text below is unchanged because it names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order and limits")
@@ -601,7 +621,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.20", f"{manifest.name} is not at 0.9.20")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
