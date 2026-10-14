@@ -202,11 +202,12 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased
+### 0.9.20
 
-Skill-only change; no version bump here (the owner's release step). Needs the Mosaico server release 20261013c or later, which is
-already live (it carries `changes.nextTouchOn` on `outreach_update_lead` and its date refusals `date-invalid`, `date-not-future` and
-`date-too-far`).
+Skill-only change: no routine and no schedule text changes. No new server release. This plugin works with the production server from
+release 20261013c, which carries `changes.nextTouchOn` on `outreach_update_lead` and its date refusals `date-invalid`,
+`date-not-future` and `date-too-far`. Because it carries 0.9.19, it also needs release 20261014a (promotion
+mosaicohr-com/mosaico#1934, stage-v2 to main-v2, carrying #1933), which is live on production.
 
 - **The interactive Lead-management skill lists the next contact date.** In both packages, "Update existing Leads" now names
   `nextTouchOn` among the Lead fields a person can set, and a new paragraph "Next contact date" says what to do when the person asks

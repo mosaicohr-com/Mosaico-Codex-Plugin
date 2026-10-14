@@ -254,7 +254,7 @@ def main() -> None:
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.19", f"{manifest.name} is not at 0.9.19")
+        check(json.loads(read(manifest))["version"] == "0.9.20", f"{manifest.name} is not at 0.9.20")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])
