@@ -247,6 +247,22 @@ the delivery block reason `email-required` on `outreach_record_delivery_block`.
   field this release names (`send-refused-twice-this-run`, `no-open-day`, `invite-already-pending`, `email-required`,
   `lead-skipped-this-run`, `movedThisRun`, `movedCount`) exists in the application, and that the skills and this entry name them.
 
+Also shipped in 0.9.20 (mosaicohr-com/Mosaico-Codex-Plugin#49, merged to main as "Unreleased" before this version; skill-only, needs
+the Mosaico server release 20261013c or later, which is already live: it carries `changes.nextTouchOn` on `outreach_update_lead` and
+its date refusals `date-invalid`, `date-not-future` and `date-too-far`):
+
+- **The interactive Lead-management skill lists the next contact date.** In both packages, "Update existing Leads" now names
+  `nextTouchOn` among the Lead fields a person can set, and a new paragraph "Next contact date" says what to do when the person asks
+  to contact a Lead again later ("contact Zoe again in January"): the model proposes one day (YYYY-MM-DD) from the person's words, the
+  person confirms it, and only then `outreach_update_lead` is called with `changes.nextTouchOn`; `null` clears the booking. Mosaico
+  judges the day (today in the owner's time zone, the allowed range) and refuses it with `date-invalid`, `date-not-future` or
+  `date-too-far`; the skill then shows Mosaico's `earliestAllowed` and `latestAllowed`, asks the person for a day and calls again only
+  with a day the person confirms. It works out no date or range itself. A follow-up that is already written is dated with
+  `sendNotBefore` on a Message, which this skill never changes: it points the person to the Follow Up tab or the Follow-up routine.
+  This closes the "Not done" note of 0.9.18.
+- `tests/test_lead_management_skill.py` pins the wording in both packages and, with `--app-repo`, that a `manage_leads` run may call
+  `outreach_update_lead` with `nextTouchOn` in the application.
+
 ### 0.9.19
 
 Requires the Mosaico server release 20261014a (carrying mosaicohr-com/mosaico#1933, the send run follows the owner's limits: 100
@@ -1116,6 +1132,7 @@ python3 tests/test_schedule_install_skill.py
 python3 tests/test_follow_up_thread_skill.py
 python3 tests/test_run_guards_skill.py
 python3 tests/test_sync_drafts_skill.py
+python3 tests/test_lead_management_skill.py --app-repo ../mosaico-app
 python3 tests/test_methodology_conversion_run_skill.py --app-repo ../mosaico-app
 ```
 

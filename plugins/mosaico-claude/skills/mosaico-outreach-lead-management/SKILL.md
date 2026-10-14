@@ -40,7 +40,8 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 ## Update existing Leads
 
 1. Explain that the available Lead fields are name, company, job title, assigned Agent,
-   scheduled date, active or dropped status, LinkedIn profile URL and LinkedIn message URL.
+   scheduled date, active or dropped status, LinkedIn profile URL, LinkedIn message URL and next
+   contact date (`nextTouchOn`).
 2. Ask which fields to update.
 3. Read `outreach_get_leads` and `outreach_get_agents`, then show a complete Lead report before asking
    which Leads should receive the selected changes. Include every available Lead field and id.
@@ -49,6 +50,21 @@ under another owner, stop and show the person the owner, Lead and status. Re-sen
 5. Summarize the exact per-Lead patches and ask for confirmation immediately before calling
    `outreach_update_lead` once per selected Lead.
 6. Preserve every unmentioned field. Reread `outreach_get_leads` and report the saved results.
+
+**Next contact date.** When the person asks to contact a Lead again later ("contact Zoe again in
+January"), set `changes.nextTouchOn` through `outreach_update_lead`; Mosaico then holds the Lead's
+follow-up until that day. You propose one day, written YYYY-MM-DD, from the person's words (if they
+name only a period, say which day you propose), and write it only after the person confirms that day
+in step 5. `null` clears the booking, when the person asks to contact the Lead now or to cancel the
+request. Never work out today or the allowed days yourself: Mosaico judges the day against its own
+today in the owner's time zone. If it refuses the day, nothing is saved: the answer is blocked with
+one code, `date-invalid`, `date-not-future` or `date-too-far`. Show the person the `earliestAllowed`
+and `latestAllowed` days Mosaico returns and ask for a day; call again only with a day the person
+confirms.
+
+This skill never dates a follow-up that is already written: that is `sendNotBefore` on a Message, and
+this skill never changes Messages. Point the person to the Follow Up tab ("Follow up on or after") or
+to the Follow-up routine instead.
 
 ## Load a new Lead
 
