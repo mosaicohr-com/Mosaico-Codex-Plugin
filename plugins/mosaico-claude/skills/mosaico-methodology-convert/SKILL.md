@@ -48,8 +48,18 @@ pastes such a document and asks what Mosaico would make of it.
    on your own initiative, and only for what the person agrees to retry.
 5. `set_conversion_level_positions`: ask the person which level first, and send their answer, not yours.
 6. `discard_conversion_components`: only for items the person named.
-7. `start_conversion_in_app`, `review_analysis` and approval are steps in the Mosaico app. Tell the person and
-   stop. Approving the conversion is theirs.
+7. `start_conversion_in_app` and `review_analysis` are steps in the Mosaico app. Tell the person and stop.
+   Approving the conversion is theirs. When the status offers `approve_conversion` (tool
+   `approve_methodology_conversion`), it installs the draft's Flows, Domains, Positions and Capabilities into
+   the organisation and nothing undoes it. Call it only when the person has reviewed the draft and asks you
+   to install it: first with the `projectId` (the preview names the project and what will be installed),
+   then again with the same `projectId`, `mode: "execute"` and the token. The host asks the person once, so
+   do not ask again in the chat. Mosaico refuses while any item still needs input, while the analysis is
+   still running or partial, and for a conversion already approved: show its sentence and stop.
+   Approving needs the organisation's Mosaico subscription with AI allowance left, like every change made
+   through the connector. Without a subscription nothing can be changed through the connector: Mosaico
+   refuses in its own words and nothing is approved. Say so plainly, and tell the person they can approve
+   the conversion themselves with the Install button in the Mosaico web app.
 8. If the answer says the document was stored but the conversion did not start, do not import it again: read
    the status and follow its `recommendedAction`.
 
@@ -64,5 +74,6 @@ them to review in Mosaico.
 - Never reconstruct or infer workflow state, or retry on your own.
 - Never import text the person did not give, or send the document twice.
 - Never pick a level or discard an item without the person's choice.
+- Never approve a conversion the person did not ask you to install.
 - Never give a tool code without its plain-English meaning (Mosaico provides it).
 - Never promise cost beyond "this uses your AI allowance".

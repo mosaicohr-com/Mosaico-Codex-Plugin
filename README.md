@@ -49,7 +49,9 @@ Always use the production connector. A connector whose address contains `amplify
 Claude keeps a copy of the connector's tool list. After Mosaico deploys a change to a tool, that copy can
 go stale: a tool argument may be refused as unknown, or a new tool may be missing. When that happens,
 disconnect and reconnect the Mosaico connector in Claude's connectors, or restart Claude, then run again.
-Nothing in the plugin needs updating for this.
+Nothing in the plugin needs updating for this. A new tool, such as `get_acting_status`, appears in Claude only
+after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
+`mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
 ## Outreach workflows
 
@@ -201,6 +203,66 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.21
+
+Requires the Mosaico server release 20261015a (promotion mosaicohr-com/mosaico#1947, stage-v2 to main-v2; main-v2 merge commit
+bebbbbe06; production build 334 green on 2026-10-15), which is live. The release carries mosaicohr-com/mosaico#1937 (every action
+taken while acting is recorded with both identities), #1940 and #1941 (a reseller operator's own Claude connector can act as a
+member of a customer organisation, started in the web console, with the tools `get_acting_status` and `stop_acting`) and #1942
+(the console tells Claude connections apart, `ping` clears the ended notice, and approving a Methodology conversion through Claude
+needs a subscription and allowance). The catalogue, install and people tools named below were already live on main-v2 before this
+release; this version teaches the skills to use them. Skills only: the plugin bundles no Mosaico server, address or token.
+
+- **Connector acting** (the `mosaico` skill, both packages). A reseller operator can make their own Claude connector act as a
+  member of a customer organisation for 30 minutes. Only the operator's click in the Mosaico web console starts it; no tool does, so
+  the skill never tries. `get_acting_status` (no arguments, always callable) returns `phase` (`not-acting`, `acting` or `ended`), the
+  `operator`, `connector.reference` (the short reference the web console lists beside each connected Claude), the `member`, the
+  `customer`, `endsAt` and `secondsRemaining`, `blockers`, `allowedActions` and one `recommendedAction`; the skill does what
+  `recommendedAction` says. `stop_acting` (no arguments, no confirmation, always works) ends the session so the next call runs as the
+  person in their own organisation. While acting, every call runs as the member and every result ends with a line that says who; the
+  skill tells the person who they are acting as before it changes anything and in its final report.
+- **An Outreach run stops while the connector is acting** (invite-run, follow-up-run, repair-run, the Outreach overview, Agent
+  management and Lead management, both packages). Mosaico refuses every Outreach and incident call while acting with the sentence
+  "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session
+  first." The routine stops, reports that sentence word for word with the step it reached, and does not try again, work round it or end
+  the session itself. The model sees only the sentence: Mosaico records the codes `CONNECTOR_ACTING_OPERATOR_ONLY`,
+  `CONNECTOR_ACTING_UNCLASSIFIED`, `CONNECTOR_ACTING_ENDED` and `CONNECTOR_ACTING_UNAVAILABLE` on its audit trail, so the skills match
+  the sentence and never a code.
+- **After acting ends, repeat the call once** (the same sections). When the session ends by itself or in the web console, Mosaico
+  refuses the next call once with "Your session acting as <member> in <customer> ended at <time> UTC. This call did not run. Repeat it;
+  it will run as you in <organisation>." Repeat that same call once, with the same arguments; it then runs as the person in their own
+  organisation and the run goes on. If Mosaico says it could not confirm whether the connector is still acting, the skill reads
+  `get_acting_status` (or ends the session with `stop_acting` if the person asks).
+- **Changes need a subscription** (the `mosaico` skill and the convert skill). A change made through the connector needs an active
+  subscription with AI allowance left (a few tools that only stop or carry on a run Mosaico already started, and the two acting tools,
+  are exempt); without a subscription Claude cannot change anything. The skills quote Mosaico's three
+  sentences (no subscription, no remaining allowance, another call settling the allowance) and tell the person plainly that nothing was
+  changed. `approve_methodology_conversion` is no longer allowance-exempt (mosaicohr-com/mosaico#1942): the convert skill (both
+  packages) says that approving is still the person's decision, that Claude calls it only after the person has reviewed the draft and
+  asks for the install (preview, then execute), and that without a subscription Mosaico refuses it, nothing is approved, and the person
+  can approve the conversion with the Install button in the Mosaico web app. The conversion-run skill still never approves.
+- **A refusal code the conversion-run skill was missing.** Mosaico has refused an incomplete domain answer with `response_incomplete`
+  since 2026-10-12. The conversion-run skill (both packages) now lists it with Mosaico's sentence, "Your answer leaves out capabilities
+  this part names. Add each one listed, using only what the document states, and send the whole object again." The lint test caught the
+  gap against the live server commit; its word cap for that skill moves from 1400 to 1430 for the 26 added words.
+- **The reseller catalogue and a customer's examples** (the `mosaico` skill). `publish_approved_component_example` publishes one
+  approved component by reference (`projectId`, `componentKind`, `componentKey`, `visibility`, private by default).
+  `get_approved_components_for_customer` and `set_approved_component_availability` read and switch a private domain for one customer; a
+  flow cannot be switched this way (`flow_not_switchable`: publish it, then enable the published example with
+  `advance_private_reseller_example_delivery`) and neither can a capability (`capability_not_switchable`). For the person's own
+  organisation, `list_example_catalogue` reads what the Examples tabs show, and `install_flow_example`, `install_domain_example`,
+  `install_capability_example` and `install_approved_domain_example` install only the example the person names; the skill says what a
+  second install does.
+- **People setup** (the `mosaico` skill). `list_teams`, `create_team`, `batch_assign_positions`, `assign_person_to_flow` and
+  `set_person_task_due_date`, with the warning that removing a person from a flow deletes the work they recorded there.
+- **A missing tool.** The `mosaico` skill (Claude) and the Follow-up skill (Claude) tell the person that Claude keeps its old tool list
+  until the Mosaico connector is disconnected and reconnected in Claude's connector settings. The Codex skills keep their shorter
+  wording.
+- **No schedule text changes.** The saved schedule texts name the installed skills and their routine sections, so updating the plugin
+  is what changes a run. Their minimum versions are unchanged.
+- `tests/test_connector_acting_skill.py` pins the wording in both packages and, with `--app-repo`, that the sentences, tools, arguments
+  and the allowance rule are the ones the application has at the release commit. The version pins in the other tests move to 0.9.21.
 
 ### 0.9.20
 
@@ -1134,6 +1196,7 @@ python3 tests/test_run_guards_skill.py
 python3 tests/test_sync_drafts_skill.py
 python3 tests/test_lead_management_skill.py --app-repo ../mosaico-app
 python3 tests/test_methodology_conversion_run_skill.py --app-repo ../mosaico-app
+python3 tests/test_connector_acting_skill.py --app-repo ../mosaico-app
 ```
 
 ## License

@@ -8,6 +8,21 @@ description: Run, resume, or inspect a Mosaico Outreach day through the connecte
 Mosaico is the workflow authority and system of record. The model operates the workflow; it does not
 reconstruct workflow state from conversation memory, draft lists, batch history or browser state.
 
+## While the connector is acting as a member
+
+Outreach runs only as the person themselves and never inside a customer. If an Outreach call is refused with
+"Outreach and incident tools are not available while your connector is acting as a member of another
+organisation. End the session first.", the connector is acting as a member of a customer's organisation. Stop
+there. Report that sentence word for word, the step you reached and anything done that Mosaico did not
+record. Do not try the call again, do not use another tool or the browser to get round it, and do not end the
+session yourself: ending it is the person's choice, in the Mosaico web console or by asking you. A scheduled
+run reports and stops the same way.
+
+If a call is refused with a sentence that begins "Your session acting as" and says "This call did not run.
+Repeat it", the acting session ended while you worked. Mosaico refuses the next call once to tell you. Repeat
+that same call once, with the same arguments. It then runs as the person in their own organisation, and the
+run goes on.
+
 ## Start or resume
 
 1. Resolve the person's explicit intent and calendar date and preserve that date throughout the run.
