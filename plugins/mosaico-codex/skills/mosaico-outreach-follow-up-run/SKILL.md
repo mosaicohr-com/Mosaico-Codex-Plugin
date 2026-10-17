@@ -26,10 +26,11 @@ record. Do not try the call again, do not use another tool or the browser to get
 session yourself: ending it is the person's choice, in the Mosaico web console or by asking you. A scheduled
 run reports and stops the same way.
 
-If a call is refused with a sentence that begins "Your session acting as" and says "This call did not run.
-Repeat it", the acting session ended while you worked. Mosaico refuses the next call once to tell you. Repeat
-that same call once, with the same arguments. It then runs as the person in their own organisation, and the
-run goes on.
+If a call is refused with a sentence that begins "Your session as" and says "so the task stopped", the person
+ended the acting session while you worked. Stop. Do not repeat the call and do not carry on as yourself.
+Report that sentence word for word, the step you reached and anything done that Mosaico did not record. Do
+not continue as the operator until the person gives a new instruction. A scheduled run reports and stops the
+same way.
 
 ## Start the run
 
