@@ -1,10 +1,11 @@
 {
   "name": "mosaico",
-  "version": "0.9.22",
+  "version": "1.0.0",
   "description": "Manage Mosaico through the person's own production Mosaico connector.",
   "author": {
     "name": "Mosaico Limited",
     "email": "support@mosaico.one"
   },
+  "icon": "./assets/mosaico-logo.png",
   "homepage": "https://app.mosaico.one"
 }

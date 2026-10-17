@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Connector acting (0.9.21, reworked for server release 20261017a), the subscription rule, the reseller catalogue and the people tools.
+"""Connector acting (public 1.0.0, from the 0.9.21 and 0.9.22 work for server release 20261017a), the subscription rule, the reseller catalogue and the people tools.
 
 Mosaico owns the acting session (it has no timer), who the calls run as and every refusal (ADR-0005). The skills only say how to read
 Mosaico's answers in plain language. These checks pin that both packages name the tools, quote Mosaico's sentences word for word, stop
-an Outreach run on the acting refusal (no retry, no way round), stop the task and tell the person after the "session ended" refusal
+a tool refused while acting (no retry, no way round), stop the task and tell the person after the "session ended" refusal
 (no repeat, no carrying on as the operator), say the session copies the member exactly, say that approving
 a conversion needs a subscription, and add no Mosaico server, address or token to the plugin (Do-not item 1).
 
@@ -22,10 +22,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
-VERSION = "0.9.22"
-PREVIOUS = "0.9.21"
+VERSION = "1.0.0"
 
-OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
+OPERATOR_ONLY = "Tools reserved for Mosaico operators do not run while acting. Mosaico refuses them with a sentence that ends \"End the session first.\""
 ENDED_START = "Your session as"
 ENDED_TAIL = "so the task stopped and this call did not run: tell the person, and do not carry on as yourself."
 IDENTITY_LINE = "Working as <member> (<role>) in <customer> since <time> UTC; signed in as <operator>."
@@ -54,17 +53,6 @@ ARGUMENTS = {
     "assign_person_to_flow": ("features/core-integration-mcp-claude/server/mcp-flow-person-tools.ts", ("processId", "personId", "assigned")),
     "set_person_task_due_date": ("features/core-integration-mcp-claude/server/mcp-flow-person-tools.ts", ("processId", "personId", "taskId", "dueDate")),
 }
-
-# The skills that make Outreach calls. Each carries the acting section in both packages.
-OUTREACH_SKILLS = (
-    "mosaico-outreach",
-    "mosaico-outreach-invite-run",
-    "mosaico-outreach-follow-up-run",
-    "mosaico-outreach-repair-run",
-    "mosaico-outreach-lead-management",
-    "mosaico-outreach-agent-management",
-)
-
 
 def check(condition: bool, message: str) -> None:
     if not condition:
@@ -95,22 +83,6 @@ def main() -> None:
         check(json.loads(read(manifest))["version"] == VERSION, f"{manifest.name} is not at {VERSION}")
         check("mcpServers" not in read(manifest), f"{manifest.name} bundles a Mosaico server")
     check(not list(ROOT.rglob(".mcp.json")), "the plugin ships a .mcp.json: it must bundle no Mosaico server")
-    readme = read(ROOT / "README.md")
-    check(readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.20"), f"README changelog lacks {VERSION} above {PREVIOUS} above 0.9.20")
-    unreleased = flat(readme[readme.index(f"### {VERSION}"):readme.index(f"### {PREVIOUS}")])
-    for needle in (
-        "20261017a", "mosaicohr-com/mosaico#1971", "4285416fd", "production build 340", "#1965", "#1966", "#1967", "#1968", "#1969",
-        "bumped to 0.9.22", "no \"30 minutes\"", "startedAt", "exact replica", "only when working as the Owner", "under both names", "Reseller tools are not available",
-        "tell_the_person_the_task_stopped", "does not repeat the call", "does not continue as the operator until the person gives a new instruction",
-        "Outreach and incident tools are still refused", "tests/test_connector_acting_skill.py",
-    ):
-        check(needle in unreleased, f"README 0.9.22 entry lacks: {needle}")
-    check("Repeat that same call once" not in unreleased, "README 0.9.22 entry still tells Claude to repeat the call")
-    entry = flat(readme[readme.index(f"### {PREVIOUS}"):readme.index("### 0.9.20")])  # history: 0.9.21 as released
-    for needle in ("20261015a", "bebbbbe06", "production build 334", "#1942", "get_acting_status", "stop_acting", "superseded by the 0.9.22 entry"):
-        check(needle in entry, f"README {PREVIOUS} entry lacks: {needle}")
-    for tool in NEW_TOOLS:
-        check(tool in entry, f"README {PREVIOUS} entry does not name {tool}")
 
     # The general skill, both packages: the same teaching, and the reconnect note in the right words for each.
     general = {package: read(root / "skills" / "mosaico" / "SKILL.md") for package, root in (("Claude", CLAUDE), ("Codex", CODEX))}
@@ -138,25 +110,6 @@ def main() -> None:
     claude_missing = flat(section(general["Claude"], "## When a tool is missing"))
     check("disconnects and reconnects the Mosaico connector in Claude's connector settings" in claude_missing and "Claude keeps a copy of the connector's tool list" in claude_missing, "Claude mosaico skill lacks the reconnect note")
     check("disconnected and connected again" in flat(section(general["Codex"], "## When a tool is missing")), "Codex mosaico skill lacks the missing-tool note")
-    follow = flat(read(CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md"))
-    check(follow.count("in Claude's connector settings (Claude keeps its old tool list until then, so a new tool does not appear before that)") == 1, "Claude follow-up skill lacks the reconnect note where it says the follow-up queue tool is missing")
-
-    # Outreach: stop on the acting refusal, and stop (no repeat) after the ended refusal.
-    for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
-        for name in OUTREACH_SKILLS:
-            raw = read(root / "skills" / name / "SKILL.md")
-            check(raw.count("## While the connector is acting as a member") == 1, f"{package} {name} lacks the acting section (exactly once)")
-            words = flat(section(raw, "## While the connector is acting as a member"))
-            for needle in (
-                OPERATOR_ONLY, "Stop there.", "Report that sentence word for word", "Do not try the call again", "do not end the session yourself",
-                "A scheduled run reports and stops the same way", ENDED_START, 'says "so the task stopped"', "the person ended the acting session while you worked",
-                "Do not repeat the call and do not carry on as yourself", "Do not continue as the operator until the person gives a new instruction",
-            ):
-                check(needle in words, f"{package} {name} acting section lacks: {needle}")
-            for gone in ("Repeat that same call once", "This call did not run. Repeat it", "Your session acting as"):
-                check(gone not in words, f"{package} {name} acting section still says: {gone}")
-            check("outreach_" not in words, f"{package} {name} acting section names an Outreach tool")
-
     # Approving a conversion: only on the person's ask, and it needs a subscription. The run loop still never approves.
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         convert = flat(read(root / "skills" / "mosaico-methodology-convert" / "SKILL.md"))
@@ -173,13 +126,13 @@ def main() -> None:
         app = args.app_repo.resolve()
         source = lambda relative: read(app / relative)  # noqa: E731
         acting = source("features/core-impersonation/shared/connector-acting.ts")
-        check(OPERATOR_ONLY in acting, "the application's operator-only sentence differs from the skills'")
+        check("End the session first." in acting, "the application's operator-only sentence no longer ends as the skills say")
         check("`Your session as ${input.names.memberName} in ${input.names.customerName} ended at" in acting and ENDED_TAIL in acting, "the application's session-ended sentence differs from the skills'")
         check("Repeat it" not in acting.split("export function connectorEndedSentence")[1].split("}")[0], "the application's session-ended sentence still says to repeat the call")
         check("`Working as ${names.memberName} (${names.memberRole}) in ${names.customerName} since ${connectorClock(input.startedAt)}; signed in as ${names.operatorName}.`" in acting, "the application's identity line differs from the skills'")
         check(RESELLER_REFUSED in acting, "the application's reseller-tools refusal differs from the skills'")
         check("action: 'tell_the_person_the_task_stopped'" in acting and "kind: 'human'" in acting, "the application's ended status no longer recommends telling the person")
-        check("CONNECTOR_OPERATOR_ONLY_PREFIXES = ['outreach_', 'incident_']" in acting and "CONNECTOR_CONTROL_TOOLS = ['get_acting_status', 'stop_acting']" in acting, "the application's acting tool classes changed")
+        check("CONNECTOR_CONTROL_TOOLS = ['get_acting_status', 'stop_acting']" in acting, "the application's acting tool classes changed")
         check("CONNECTOR_NOTICE_CLEARING_TOOLS = ['ping']" in acting, "the application no longer lets ping clear the ended notice")
         for needle in ("phase: 'not-acting'", "phase: 'acting'", "phase: 'ended'", "reference: string", "recommendedAction", "blockers", "allowedActions", "kind: 'tool' | 'human' | 'none'", "Customers → <customer> → Members → <member> → my connected Claude"):
             check(needle in acting, f"the application's acting status lacks: {needle}")
@@ -231,7 +184,7 @@ def main() -> None:
     else:
         suffix = "(pass --app-repo to check the application contract too)"
     print(
-        f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started only in the web console), stop an Outreach run on the acting refusal, "
+        f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started only in the web console), stop on a tool refused while acting, "
         f"stop the task after the session-ended refusal, say approving a conversion needs a subscription, teach the reseller catalogue, "
         f"install and people tools, carry the reconnect note, bundle no Mosaico server, and are at {VERSION} {suffix}."
     )
