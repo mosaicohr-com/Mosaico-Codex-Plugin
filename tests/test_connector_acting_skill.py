@@ -22,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
-VERSION = "0.9.21"
+VERSION = "0.9.22"
+PREVIOUS = "0.9.21"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
 ENDED_START = "Your session as"
@@ -95,21 +96,21 @@ def main() -> None:
         check("mcpServers" not in read(manifest), f"{manifest.name} bundles a Mosaico server")
     check(not list(ROOT.rglob(".mcp.json")), "the plugin ships a .mcp.json: it must bundle no Mosaico server")
     readme = read(ROOT / "README.md")
-    check(readme.index("### Unreleased") < readme.index(f"### {VERSION}") < readme.index("### 0.9.20"), f"README changelog lacks Unreleased above {VERSION} above 0.9.20")
-    unreleased = flat(readme[readme.index("### Unreleased"):readme.index(f"### {VERSION}")])
+    check(readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.20"), f"README changelog lacks {VERSION} above {PREVIOUS} above 0.9.20")
+    unreleased = flat(readme[readme.index(f"### {VERSION}"):readme.index(f"### {PREVIOUS}")])
     for needle in (
         "20261017a", "mosaicohr-com/mosaico#1971", "4285416fd", "production build 340", "#1965", "#1966", "#1967", "#1968", "#1969",
-        "not bumped", "no \"30 minutes\"", "startedAt", "exact replica", "only when working as the Owner", "under both names", "Reseller tools are not available",
+        "bumped to 0.9.22", "no \"30 minutes\"", "startedAt", "exact replica", "only when working as the Owner", "under both names", "Reseller tools are not available",
         "tell_the_person_the_task_stopped", "does not repeat the call", "does not continue as the operator until the person gives a new instruction",
         "Outreach and incident tools are still refused", "tests/test_connector_acting_skill.py",
     ):
-        check(needle in unreleased, f"README Unreleased entry lacks: {needle}")
-    check("Repeat that same call once" not in unreleased, "README Unreleased entry still tells Claude to repeat the call")
-    entry = flat(readme[readme.index(f"### {VERSION}"):readme.index("### 0.9.20")])  # history: 0.9.21 as released
-    for needle in ("20261015a", "bebbbbe06", "production build 334", "#1942", "get_acting_status", "stop_acting", "superseded by the Unreleased entry"):
-        check(needle in entry, f"README {VERSION} entry lacks: {needle}")
+        check(needle in unreleased, f"README 0.9.22 entry lacks: {needle}")
+    check("Repeat that same call once" not in unreleased, "README 0.9.22 entry still tells Claude to repeat the call")
+    entry = flat(readme[readme.index(f"### {PREVIOUS}"):readme.index("### 0.9.20")])  # history: 0.9.21 as released
+    for needle in ("20261015a", "bebbbbe06", "production build 334", "#1942", "get_acting_status", "stop_acting", "superseded by the 0.9.22 entry"):
+        check(needle in entry, f"README {PREVIOUS} entry lacks: {needle}")
     for tool in NEW_TOOLS:
-        check(tool in entry, f"README {VERSION} entry does not name {tool}")
+        check(tool in entry, f"README {PREVIOUS} entry does not name {tool}")
 
     # The general skill, both packages: the same teaching, and the reconnect note in the right words for each.
     general = {package: read(root / "skills" / "mosaico" / "SKILL.md") for package, root in (("Claude", CLAUDE), ("Codex", CODEX))}
