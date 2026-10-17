@@ -176,7 +176,7 @@ def main() -> None:
         check(SKILL not in text.split("---\n", 2)[2], f"{package} skill names itself in the body")
 
         # Tool names: backticked or not, nothing but the allowed six.
-        names = set(re.findall(r"\b(?:[a-z]+_)*methodology(?:_[a-z]+)+\b|\b(?:mosaico|outreach)_[a-z_]+\b", text))
+        names = set(re.findall(r"\b(?:[a-z]+_)*methodology(?:_[a-z]+)+\b|\bmosaico_[a-z_]+\b", text))
         check(names <= TOOLS, f"{package} skill names tools outside the allowed set: {sorted(names - TOOLS)}")
         check(TOOLS <= names, f"{package} skill does not name {sorted(TOOLS - names)}")
         # Every backticked snake_case word must be a known tool, action, stop, reason, decline or code.

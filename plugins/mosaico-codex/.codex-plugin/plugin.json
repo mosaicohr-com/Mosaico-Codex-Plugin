@@ -1,6 +1,6 @@
 {
   "name": "mosaico",
-  "version": "0.9.22",
+  "version": "1.0.0",
   "description": "Manage Mosaico through the person's own production Mosaico connector.",
   "author": {
     "name": "Mosaico Limited",
@@ -10,19 +10,18 @@
   "homepage": "https://app.mosaico.one",
   "repository": "https://github.com/mosaicohr-com/Mosaico-Codex-Plugin",
   "license": "Proprietary",
-  "keywords": ["mosaico", "people", "flows", "domains", "outreach"],
+  "keywords": ["mosaico", "people", "flows", "domains"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Mosaico",
     "shortDescription": "Manage your Mosaico organization.",
-    "longDescription": "Use Mosaico's server-owned tools to manage flows, domains, capabilities, members, analytics, support and Outreach.",
+    "longDescription": "Use Mosaico's server-owned tools to manage flows, domains, capabilities, members, analytics and support.",
     "developerName": "Mosaico Limited",
     "category": "Productivity",
     "capabilities": ["Read", "Write", "Interactive"],
     "websiteURL": "https://app.mosaico.one",
     "defaultPrompt": [
       "Show me what needs attention in Mosaico.",
-      "Run my Mosaico Outreach day.",
       "Review my organization's capability gaps."
     ],
     "brandColor": "#7C3AED"
