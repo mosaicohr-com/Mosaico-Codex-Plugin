@@ -36,31 +36,40 @@ Do not try another tool to make the same change.
 ## Acting as a member of a customer
 
 A reseller operator can make their own Claude connector act as a member of one of their customer
-organisations, for 30 minutes. Only the operator's own click in the Mosaico web console starts it
+organisations. There is no timer: the session ends only when the person ends it or signs out. Only the operator's own click in the Mosaico web console starts it
 (Customers, the customer, Members, the member, then "my connected Claude"). No tool starts it, so never
 try to start it or offer to: if the person wants it, tell them where to click.
 
 While it lasts, every call runs as that member in that customer, with that member's role and the
-customer's rules. Every result ends with one line that says who, for example "Acting as <member> (<role>)
-in <customer> until <time> UTC; signed in as <operator>." Tell the person who they are acting as before you
-change anything in the customer and in your final report. Do not assume the session is still on; ask Mosaico.
+customer's rules. Working as a member copies that member's permissions exactly and adds nothing: billing is
+reachable only when working as the Owner, and Mosaico refuses the reseller tools while you work as a member.
+Progress in the member's name is allowed as the member could do it, and Mosaico logs it under both names.
+Every result ends with one line that says who, for example "Working as <member> (<role>) in <customer> since
+<time> UTC; signed in as <operator>." Tell the person who they are working as before you change anything in
+the customer and in your final report. Do not assume the session is still on; ask Mosaico.
 
 - `get_acting_status` takes no arguments and always works. It returns `phase` (`not-acting`, `acting` or
   `ended`), the `operator`, `connector.reference` (the short reference the web console lists beside each
   connected Claude, so the person can tell several apart), while acting the `member`, the `customer`,
-  `endsAt` and `secondsRemaining`, and `blockers`, `allowedActions` and one `recommendedAction`. Do what
-  `recommendedAction` says. A `human` action is a step for the person. Reading it after a session ended
-  also spares you the one-time refusal described below.
+  `startedAt`, and `blockers`, `allowedActions` and one `recommendedAction`. Do what `recommendedAction`
+  says. A `human` action is a step for the person. For an ended session its one recommended action is
+  `tell_the_person_the_task_stopped`: tell the person and wait. Reading it after a session ended also clears
+  the one-time refusal described below.
 - `stop_acting` takes no arguments, needs no confirmation and always works. It ends the session now, and
   the next call runs as the person in their own organisation. Call it when the person asks to stop acting
   or to leave the customer, never to get round a refusal.
 - Outreach and incident tools do not run while acting. Mosaico says: "Outreach and incident tools are not
   available while your connector is acting as a member of another organisation. End the session first."
   Report that sentence and stop. Do not end the session yourself to get past it.
-- When the session ends by itself (its 30 minutes, or an end in the web console), Mosaico refuses the next
-  call once. The sentence begins "Your session acting as" and says "This call did not run. Repeat it; it
-  will run as you in" the person's own organisation. Repeat that same call once, with the same arguments,
-  then carry on.
+- Mosaico refuses the reseller tools while you work as a member: "Reseller tools are not available while your
+  connector is working as a member of a customer, because the member is not a reseller. End the session
+  first." Report that sentence; do not end the session yourself to get past it.
+- When the person ends the session (End in the web console, or sign-out), Mosaico refuses the next call once.
+  The sentence begins "Your session as" and ends "so the task stopped and this call did not run: tell the
+  person, and do not carry on as yourself." Do not repeat the call and do not carry on the task. Tell the
+  person that the session as <member> ended and the task stopped, then wait for their new instruction. Do not
+  continue as the operator until they give one. `ping`, `get_acting_status` and `stop_acting` still run and
+  clear the refusal.
 - If Mosaico says it could not confirm whether the connector is still acting, call `get_acting_status`, or
   `stop_acting` if the person wants to go back to their own organisation.
 

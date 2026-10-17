@@ -204,6 +204,34 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### Unreleased
+
+Requires the Mosaico server release 20261017a (promotion mosaicohr-com/mosaico#1971, stage-v2 to main-v2; main-v2 merge commit
+4285416fd; production build 340), which is live. The release carries mosaicohr-com/mosaico#1965 (no timer, no start limit, no
+reason), #1966 (ending a session stops the task), #1967 (a plain sentence in the audit log), #1968 (an exact replica of the member)
+and #1969 (a live sessions list in the reseller console). The version is not bumped here: it is bumped and tagged after the
+production build is green. Skills only: the plugin bundles no Mosaico server, address or token. This entry supersedes the
+"Connector acting" and "After acting ends" bullets of 0.9.21 below.
+
+- **Connector acting has no timer** (the `mosaico` skill, both packages). A session as a member ends only when the person ends it
+  (End in the web console) or signs out; there is no "30 minutes", and `get_acting_status` no longer returns `endsAt` or
+  `secondsRemaining` (it returns `startedAt`). Every result ends with "Working as <member> (<role>) in <customer> since <time> UTC;
+  signed in as <operator>."
+- **An exact replica of the member.** Working as a member copies that member's permissions exactly and adds nothing. Billing is
+  reachable only when working as the Owner. Progress in the member's name is allowed as the member could do it, and Mosaico logs it
+  under both names. Mosaico refuses the reseller tools while working as a member: "Reseller tools are not available while your
+  connector is working as a member of a customer, because the member is not a reseller. End the session first."
+- **When the session ended, the task stops** (the `mosaico` skill and the six Outreach skills, both packages). This replaces "repeat
+  the call once". Mosaico refuses the next call once with a sentence that begins "Your session as" and ends "so the task stopped and
+  this call did not run: tell the person, and do not carry on as yourself." Claude stops, tells the person exactly that, does not
+  repeat the call and does not continue as the operator until the person gives a new instruction. `ping`, `get_acting_status` and
+  `stop_acting` still run and clear the refusal; for an ended session the one recommended action is
+  `tell_the_person_the_task_stopped`.
+- **Kept:** Outreach and incident tools are still refused while acting; the connector refresh note; approving a conversion needs a
+  subscription.
+- `tests/test_connector_acting_skill.py` pins the new wording in both packages and, with `--app-repo`, that the sentences are the
+  ones the application has at main-v2 4285416fd.
+
 ### 0.9.21
 
 Requires the Mosaico server release 20261015a (promotion mosaicohr-com/mosaico#1947, stage-v2 to main-v2; main-v2 merge commit
@@ -215,7 +243,7 @@ needs a subscription and allowance). The catalogue, install and people tools nam
 release; this version teaches the skills to use them. Skills only: the plugin bundles no Mosaico server, address or token.
 
 - **Connector acting** (the `mosaico` skill, both packages). A reseller operator can make their own Claude connector act as a
-  member of a customer organisation for 30 minutes. Only the operator's click in the Mosaico web console starts it; no tool does, so
+  member of a customer organisation for 30 minutes (no timer since server release 20261017a; see Unreleased). Only the operator's click in the Mosaico web console starts it; no tool does, so
   the skill never tries. `get_acting_status` (no arguments, always callable) returns `phase` (`not-acting`, `acting` or `ended`), the
   `operator`, `connector.reference` (the short reference the web console lists beside each connected Claude), the `member`, the
   `customer`, `endsAt` and `secondsRemaining`, `blockers`, `allowedActions` and one `recommendedAction`; the skill does what
@@ -229,7 +257,7 @@ release; this version teaches the skills to use them. Skills only: the plugin bu
   the session itself. The model sees only the sentence: Mosaico records the codes `CONNECTOR_ACTING_OPERATOR_ONLY`,
   `CONNECTOR_ACTING_UNCLASSIFIED`, `CONNECTOR_ACTING_ENDED` and `CONNECTOR_ACTING_UNAVAILABLE` on its audit trail, so the skills match
   the sentence and never a code.
-- **After acting ends, repeat the call once** (the same sections). When the session ends by itself or in the web console, Mosaico
+- **After acting ends, repeat the call once** (the same sections; superseded by the Unreleased entry above: the task now stops). When the session ends by itself or in the web console, Mosaico
   refuses the next call once with "Your session acting as <member> in <customer> ended at <time> UTC. This call did not run. Repeat it;
   it will run as you in <organisation>." Repeat that same call once, with the same arguments; it then runs as the person in their own
   organisation and the run goes on. If Mosaico says it could not confirm whether the connector is still acting, the skill reads
