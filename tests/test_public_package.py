@@ -48,6 +48,17 @@ def main() -> None:
     prompts = json.loads((CODEX / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))["interface"]["defaultPrompt"]
     check(len(prompts) == 2, f"the Codex plugin has {len(prompts)} default prompts, not 2")
 
+    for package in (CLAUDE, CODEX):
+        svg = package / "assets" / "mosaico-logo.svg"
+        png = package / "assets" / "mosaico-logo.png"
+        check(svg.is_file() and "<rect" not in svg.read_text(encoding="utf-8").split("<path", 1)[0], f"{package.name} lacks the transparent logo svg")
+        header = png.read_bytes()[:26]
+        check(header[:8] == b"\x89PNG\r\n\x1a\n" and header[16:24] == b"\x00\x00\x02\x00\x00\x00\x02\x00" and header[25] == 6, f"{png.relative_to(ROOT)} is not a 512x512 RGBA png")
+    claude = json.loads((CLAUDE / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    codex = json.loads((CODEX / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))["interface"]
+    check(claude["icon"] == "./assets/mosaico-logo.png", "the Claude manifest has no icon")
+    check(codex["composerIcon"] == codex["logo"] == "./assets/mosaico-logo.png", "the Codex manifest has no composerIcon and logo")
+
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 1.0.0" in readme and "first customer release" in readme, "README does not say 1.0.0 is the first customer release")
     print("PASS: both packages carry exactly the three public skills, no browser scripts, hooks or internal wording, and are at 1.0.0 as the first customer release.")

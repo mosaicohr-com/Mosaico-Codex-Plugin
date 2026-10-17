@@ -24,6 +24,8 @@
       "Show me what needs attention in Mosaico.",
       "Review my organization's capability gaps."
     ],
+    "composerIcon": "./assets/mosaico-logo.png",
+    "logo": "./assets/mosaico-logo.png",
     "brandColor": "#7C3AED"
   }
 }

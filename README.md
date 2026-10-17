@@ -65,8 +65,9 @@ Three skills, in both the Claude Code and the Codex package:
 ### 1.0.0
 
 The first customer release. The plugin is now the public Mosaico plugin only: the `mosaico`,
-`mosaico-methodology-convert` and `mosaico-methodology-conversion-run` skills in both packages, a Mosaico
-logo (`assets/mosaico-logo.svg`) and nothing else. It needs Mosaico server release 20261017a or later. Skills
+`mosaico-methodology-convert` and `mosaico-methodology-conversion-run` skills in both packages, the Mosaico
+logo (`assets/mosaico-logo.svg`, plus a 512x512 transparent `assets/mosaico-logo.png` that the manifests point at) and
+nothing else. It needs Mosaico server release 20261017a or later. Skills
 only: the plugin bundles no Mosaico server, address or token. Versions before 1.0.0 were internal and are not
 supported for customers.
 

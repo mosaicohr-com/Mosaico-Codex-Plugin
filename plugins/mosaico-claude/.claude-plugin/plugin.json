@@ -6,5 +6,6 @@
     "name": "Mosaico Limited",
     "email": "support@mosaico.one"
   },
+  "icon": "./assets/mosaico-logo.png",
   "homepage": "https://app.mosaico.one"
 }
