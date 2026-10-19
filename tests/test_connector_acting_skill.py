@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Connector acting (0.9.21, reworked for server release 20261017a), the subscription rule, the reseller catalogue and the people tools.
+"""Connector acting (0.9.21, reworked for server release 20261017a), the subscription rule, the people tools and, from 0.9.23, install_methodology_component.
 
 Mosaico owns the acting session (it has no timer), who the calls run as and every refusal (ADR-0005). The skills only say how to read
 Mosaico's answers in plain language. These checks pin that both packages name the tools, quote Mosaico's sentences word for word, stop
 an Outreach run on the acting refusal (no retry, no way round), stop the task and tell the person after the "session ended" refusal
-(no repeat, no carrying on as the operator), say the session copies the member exactly, say that approving
-a conversion needs a subscription, and add no Mosaico server, address or token to the plugin (Do-not item 1).
+(no repeat, no carrying on as the operator), say the session copies the member exactly, say that installing
+a Methodology component needs a subscription (no approve, no publish, no catalogue: server release 20261019d), and add no Mosaico server, address or token to the plugin (Do-not item 1).
 
 Pass --app-repo (or set MOSAICO_APP_REPO) to also check the application at the live server commit: every tool is registered, every
-sentence and argument is the one the application uses, and approve_methodology_conversion is no longer allowance-exempt.
+sentence and argument is the one the application uses, and install_methodology_component is registered while the 13 retired catalogue and approval tools are not.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
-VERSION = "0.9.22"
-PREVIOUS = "0.9.21"
+VERSION = "0.9.23"
+PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
 ENDED_START = "Your session as"
@@ -36,19 +36,21 @@ ALLOWANCE_BUSY = "Another tool call is settling this organization’s AI allowan
 
 ACTING_TOOLS = ("get_acting_status", "stop_acting")
 PEOPLE_TOOLS = ("list_teams", "create_team", "batch_assign_positions", "assign_person_to_flow", "set_person_task_due_date")
-RESELLER_TOOLS = ("publish_approved_component_example", "get_approved_components_for_customer", "set_approved_component_availability")
-INSTALL_TOOLS = ("list_example_catalogue", "install_flow_example", "install_domain_example", "install_capability_example", "install_approved_domain_example")
+RESELLER_TOOLS: tuple[str, ...] = ()  # none left: the install tool is allowed while acting, for the member's own organisation only
+INSTALL_TOOLS = ("install_methodology_component",)
+# Retired by server release 20261019d (mosaicohr-com/mosaico#2013): no skill, test or current README section may name them.
+REMOVED_TOOLS = (
+    "approve_methodology_conversion", "publish_approved_component_example", "publish_private_reseller_example", "get_private_reseller_catalogue",
+    "get_private_reseller_example_delivery", "advance_private_reseller_example_delivery", "get_approved_components_for_customer",
+    "set_approved_component_availability", "install_approved_domain_example", "list_example_catalogue", "install_flow_example",
+    "install_domain_example", "install_capability_example",
+)
+REMOVED_ACTIONS = ("approve_conversion", "publish_component_example")
 NEW_TOOLS = ACTING_TOOLS + PEOPLE_TOOLS + RESELLER_TOOLS + INSTALL_TOOLS
 
 # Each tool the general skill teaches, with the arguments it names: the application file that declares them.
 ARGUMENTS = {
-    "publish_approved_component_example": ("features/reseller/shared/approved-component-publication.ts", ("projectId", "componentKind", "componentKey", "visibility")),
-    "get_approved_components_for_customer": ("features/reseller/shared/approved-component-availability.ts", ("targetOrganizationId",)),
-    "set_approved_component_availability": ("features/reseller/shared/approved-component-availability.ts", ("targetOrganizationId", "projectId", "componentKind", "componentKey", "available")),
-    "install_flow_example": ("features/flows/shared/flow-example-install.ts", ("exampleId",)),
-    "install_domain_example": ("features/domains/shared/domain-example-install.ts", ("setId", "careerName", "positionIds")),
-    "install_capability_example": ("features/domains/shared/domain-example-install.ts", ("exampleId",)),
-    "install_approved_domain_example": ("features/domains/shared/domain-example-install.ts", ("componentKey", "projectId")),
+    "install_methodology_component": ("features/methodology/server/methodology-mcp-install-tool.ts", ("projectId", "componentKind", "componentKey", "targetOrganizationId")),
     "create_team": ("features/core-integration-mcp-claude/server/mcp-team-tools.ts", ("name", "description")),
     "batch_assign_positions": ("features/core-integration-mcp-claude/server/mcp-position-assignment-tool.ts", ("assignments", "personId", "positionId")),
     "assign_person_to_flow": ("features/core-integration-mcp-claude/server/mcp-flow-person-tools.ts", ("processId", "personId", "assigned")),
@@ -96,26 +98,31 @@ def main() -> None:
         check("mcpServers" not in read(manifest), f"{manifest.name} bundles a Mosaico server")
     check(not list(ROOT.rglob(".mcp.json")), "the plugin ships a .mcp.json: it must bundle no Mosaico server")
     readme = read(ROOT / "README.md")
-    check(readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.20"), f"README changelog lacks {VERSION} above {PREVIOUS} above 0.9.20")
+    check(readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.21") < readme.index("### 0.9.20"), f"README changelog lacks {VERSION} above {PREVIOUS} above 0.9.21 above 0.9.20")
     unreleased = flat(readme[readme.index(f"### {VERSION}"):readme.index(f"### {PREVIOUS}")])
     for needle in (
-        "20261017a", "mosaicohr-com/mosaico#1971", "4285416fd", "production build 340", "#1965", "#1966", "#1967", "#1968", "#1969",
-        "bumped to 0.9.22", "no \"30 minutes\"", "startedAt", "exact replica", "only when working as the Owner", "under both names", "Reseller tools are not available",
-        "tell_the_person_the_task_stopped", "does not repeat the call", "does not continue as the operator until the person gives a new instruction",
-        "Outreach and incident tools are still refused", "tests/test_connector_acting_skill.py",
-    ):
-        check(needle in unreleased, f"README 0.9.22 entry lacks: {needle}")
-    check("Repeat that same call once" not in unreleased, "README 0.9.22 entry still tells Claude to repeat the call")
-    entry = flat(readme[readme.index(f"### {PREVIOUS}"):readme.index("### 0.9.20")])  # history: 0.9.21 as released
-    for needle in ("20261015a", "bebbbbe06", "production build 334", "#1942", "get_acting_status", "stop_acting", "superseded by the 0.9.22 entry"):
+        "20261019d", "build 349", "#2011", "#2013", "install_methodology_component", "projectId", "componentKind", "componentKey", "targetOrganizationId",
+        "confirmationToken", "no Approve", "no Publish", "Private or Public", "Examples tab", "get_methodology_project_status", "install_component",
+        "Removed tools", "tests/test_connector_acting_skill.py",
+    ) + REMOVED_TOOLS + REMOVED_ACTIONS:
+        check(needle in unreleased, f"README {VERSION} entry lacks: {needle}")
+    entry = flat(readme[readme.index(f"### {PREVIOUS}"):readme.index("### 0.9.21")])  # history: 0.9.22 as released
+    for needle in ("20261017a", "4285416fd", "production build 340", "#1965", "#1966", "#1967", "#1968", "#1969", "get_acting_status", "tell_the_person_the_task_stopped"):
         check(needle in entry, f"README {PREVIOUS} entry lacks: {needle}")
-    for tool in NEW_TOOLS:
-        check(tool in entry, f"README {PREVIOUS} entry does not name {tool}")
+    older = flat(readme[readme.index("### 0.9.21"):readme.index("### 0.9.20")])
+    for needle in ("20261015a", "bebbbbe06", "production build 334", "#1942", "get_acting_status", "stop_acting", "superseded by the 0.9.22 entry", "superseded by 0.9.23"):
+        check(needle in older, f"README 0.9.21 entry lacks: {needle}")
+    for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
+        for path in sorted(root.rglob("*")):
+            if path.is_file() and path.suffix in (".md", ".json", ".js", ".py"):
+                text = read(path)
+                for tool in REMOVED_TOOLS + REMOVED_ACTIONS:
+                    check(tool not in text, f"{package} package file {path.relative_to(ROOT)} still names the retired {tool}")
 
     # The general skill, both packages: the same teaching, and the reconnect note in the right words for each.
     general = {package: read(root / "skills" / "mosaico" / "SKILL.md") for package, root in (("Claude", CLAUDE), ("Codex", CODEX))}
     for package, text in general.items():
-        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process", "advance_private_reseller_example_delivery", "list_conversion_components"):
+        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process"):
             check(f"`{tool}`" in text, f"{package} mosaico skill does not name {tool}")
         words = flat(text)
         for needle in (
@@ -125,8 +132,13 @@ def main() -> None:
             "Do not repeat the call and do not carry on the task", "then wait for their new instruction", "Do not continue as the operator until they give one",
             "tell_the_person_the_task_stopped", "Only the operator's own click in the Mosaico web console starts it", "No tool starts it",
             "connector.reference", "recommendedAction", "phase (not-acting, acting or ended)", "needs no confirmation and always works",
-            "Without a subscription I cannot change anything", "flow_not_switchable", "capability_not_switchable",
-            "Installing a flow or an approved domain again creates another copy",
+            "Without a subscription I cannot change anything",
+            "no approve step, no publish step, no Private or Public setting", "no Examples tab or example library",
+            "projectId, componentKind (flow or domain), componentKey and targetOrganizationId", "mode: \"execute\" and the confirmationToken",
+            "replaces the earlier copy in place when nobody has progress on it", "Mosaico makes a new copy and keeps the old one",
+            "component_not_published", "analysis_not_complete", "not_compilable", "tenant_access_denied", "subscription_required",
+            "only target allowed is that member's organisation", "state (draft or published)", "installs (organizationId, organizationName, installedAt, by, changedSinceInstall)",
+            "fix_warnings", "install_component",
             "Removing a person deletes the work they have recorded on the flow",
         ):
             check(needle in words, f"{package} mosaico skill lacks: {needle}")
@@ -157,17 +169,18 @@ def main() -> None:
                 check(gone not in words, f"{package} {name} acting section still says: {gone}")
             check("outreach_" not in words, f"{package} {name} acting section names an Outreach tool")
 
-    # Approving a conversion: only on the person's ask, and it needs a subscription. The run loop still never approves.
+    # Installing a component: only on the person's ask, and it needs a subscription. There is no approve step. The run loop still never installs.
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         convert = flat(read(root / "skills" / "mosaico-methodology-convert" / "SKILL.md"))
         for needle in (
-            "approve_methodology_conversion", "approve_conversion", "Call it only when the person has reviewed the draft and asks you to install it",
+            "install_methodology_component", "install_component", "Call it only when the person asks you to install it", "There is no approve step and no publish step",
+            "projectId, componentKind (flow or domain), componentKey and targetOrganizationId", 'mode: "execute" and the confirmationToken', "component_not_published",
             "Without a subscription nothing can be changed through the connector", "Install button in the Mosaico web app",
-            "Never approve a conversion the person did not ask you to install.",
+            "Never install a component the person did not ask you to install.",
         ):
             check(needle in convert, f"{package} convert skill lacks: {needle}")
         run = flat(read(root / "skills" / "mosaico-methodology-conversion-run" / "SKILL.md"))
-        check("Never approve or install anything." in run and "approve_methodology_conversion" not in run, f"{package} conversion-run skill no longer leaves approval to the person")
+        check("Never approve or install anything." in run and "install_methodology_component" not in run, f"{package} conversion-run skill no longer leaves installing to the person")
 
     if args.app_repo is not None:
         app = args.app_repo.resolve()
@@ -191,10 +204,10 @@ def main() -> None:
             check(sentence in invocation, f"the application's allowance refusal differs: {sentence}")
         exempt = re.search(r"MCP_ALLOWANCE_EXEMPT_TOOLS = new Set\(\[(.*?)\]\)", invocation, re.S)
         check(exempt is not None, "cannot read MCP_ALLOWANCE_EXEMPT_TOOLS")
-        check("approve_methodology_conversion" not in exempt.group(1), "approve_methodology_conversion is allowance-exempt again: the convert skill says it needs a subscription")
+        check("install_methodology_component" not in exempt.group(1), "install_methodology_component is allowance-exempt: the skills say it needs a subscription")
         check("get_acting_status" in exempt.group(1) and "stop_acting" in exempt.group(1), "the acting tools are no longer exempt from the allowance")
-        check("Like every change made through Claude, it needs an active subscription" in source("features/methodology/server/methodology-mcp-tools.ts"), "the application's approve tool no longer says it needs a subscription")
-        check("approve_conversion: 'approve_methodology_conversion'" in source("features/methodology/shared/methodology-action-tools.ts"), "the application's approve_conversion action no longer names approve_methodology_conversion")
+        check("install_component: 'install_methodology_component'" in source("features/methodology/shared/methodology-action-tools.ts"), "the application's install_component action no longer names install_methodology_component")
+        check("approve_conversion" not in source("features/methodology/shared/methodology-action-tools.ts"), "the application still has the approve_conversion action")
 
         member_list = re.search(r"CONNECTOR_ACTING_MEMBER_TOOLS = \[(.*?)\] as const", source("features/core-integration-mcp-claude/server/mcp-connector-acting-tools.ts"), re.S)
         check(member_list is not None, "cannot read CONNECTOR_ACTING_MEMBER_TOOLS")
@@ -209,8 +222,10 @@ def main() -> None:
             text = path.read_text(encoding="utf-8")
             registered |= {m.group(1) for m in re.finditer(r"(?:\bname|\btoolName):\s*'([a-z_]+)'", text)}
             registered |= {m.group(1) for m in re.finditer(r"_TOOL\s*=\s*'([a-z_]+)'", text)}
-        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process", "advance_private_reseller_example_delivery", "list_conversion_components"):
+        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process", "list_conversion_components"):
             check(tool in registered, f"the application does not register {tool}")
+        for tool in REMOVED_TOOLS:
+            check(tool not in registered, f"the application still registers the retired {tool}")
         for tool in NEW_TOOLS:
             if tool in RESELLER_TOOLS:
                 check(tool in reseller_only and tool not in member_tools, f"the application no longer refuses {tool} while the connector works as a member")
@@ -220,20 +235,14 @@ def main() -> None:
             declared = source(relative)
             for name in names:
                 check(name in declared, f"the application's {tool} has no argument {name} in {relative}")
-        availability = source("features/reseller/shared/approved-component-availability.ts")
-        for code in ("flow_not_switchable", "capability_not_switchable"):
-            check(f"{code}:" in availability, f"the application has no refusal {code}")
-        catalogue = source("features/core-integration-mcp-claude/server/mcp-example-catalogue-tool.ts")
-        for name in ("resellerLink", "flowExamples", "domainSets", "capabilityExamples", "approvedExamples", "allowedActions", "recommendedAction"):
-            check(name in catalogue, f"the application's example catalogue read has no {name}")
-        check("a flow cannot be switched on" in source("features/core-integration-mcp-claude/server/mcp-approved-component-availability-tool.ts"), "the application no longer says a flow cannot be switched")
+        check("component_not_published" in source("features/methodology/shared/methodology-component-install.ts") or "component_not_published" in source("features/methodology/server/methodology-mcp-install-tool.ts"), "the application has no refusal component_not_published")
         suffix = "against the application at " + str(app)
     else:
         suffix = "(pass --app-repo to check the application contract too)"
     print(
         f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started only in the web console), stop an Outreach run on the acting refusal, "
-        f"stop the task after the session-ended refusal, say approving a conversion needs a subscription, teach the reseller catalogue, "
-        f"install and people tools, carry the reconnect note, bundle no Mosaico server, and are at {VERSION} {suffix}."
+        f"stop the task after the session-ended refusal, say installing a component needs a subscription, teach install_methodology_component, "
+        f"the people tools, carry the reconnect note, bundle no Mosaico server, and are at {VERSION} {suffix}."
     )
 
 

@@ -240,7 +240,7 @@ def main() -> None:
         check(needle in checklist(claude) and needle in checklist(codex), f"the outcome checklist lacks: {needle}")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.22", f"{manifest.name} is not at 0.9.22")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("### 0.7.0" in readme and readme.index("### 0.9.0") < readme.index("### 0.8.7") < readme.index("### 0.8.6") < readme.index("### 0.8.5") < readme.index("### 0.8.4") < readme.index("### 0.8.3") < readme.index("### 0.8.2") < readme.index("### 0.8.1") < readme.index("### 0.8.0") < readme.index("### 0.7.1") < readme.index("### 0.7.0") < readme.index("### 0.6.1"), "README changelog lacks 0.8.6 above 0.8.5 above 0.8.4 above 0.8.3 above 0.8.2 above 0.8.1 above 0.8.0, 0.7.1, 0.7.0 and 0.6.1")
     check("linkedin-thread-messages.js" in readme, "README does not describe the thread script")

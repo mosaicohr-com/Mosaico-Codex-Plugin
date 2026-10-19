@@ -229,7 +229,7 @@ def main() -> None:
             "`modelRequests.nextClaimableAt`",
             "Claims cannot be taken over",
             "Only when the status says `complete`, say three short plain lines",
-            "review and approve it in the Mosaico app",
+            "review it in the Mosaico app",
             "Never approve or install anything.",
             "Never give a code without Mosaico's sentence",
         ):

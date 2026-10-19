@@ -49,17 +49,21 @@ pastes such a document and asks what Mosaico would make of it.
 5. `set_conversion_level_positions`: ask the person which level first, and send their answer, not yours.
 6. `discard_conversion_components`: only for items the person named.
 7. `start_conversion_in_app` and `review_analysis` are steps in the Mosaico app. Tell the person and stop.
-   Approving the conversion is theirs. When the status offers `approve_conversion` (tool
-   `approve_methodology_conversion`), it installs the draft's Flows, Domains, Positions and Capabilities into
-   the organisation and nothing undoes it. Call it only when the person has reviewed the draft and asks you
-   to install it: first with the `projectId` (the preview names the project and what will be installed),
-   then again with the same `projectId`, `mode: "execute"` and the token. The host asks the person once, so
-   do not ask again in the chat. Mosaico refuses while any item still needs input, while the analysis is
-   still running or partial, and for a conversion already approved: show its sentence and stop.
-   Approving needs the organisation's Mosaico subscription with AI allowance left, like every change made
+   Installing is the person's decision. There is no approve step and no publish step: a converted Flow or
+   Domain is published when it has no warnings, and the status shows each one under `components` with its
+   `state` (`draft` or `published`) and `warnings`. For a draft, fix the warnings first (read them with
+   `list_conversion_components`; change text only as the person asks). When the status offers `install_component`
+   (tool `install_methodology_component`), it installs a copy of that one component into an organisation. Call it
+   only when the person asks you to install it, with `projectId`, `componentKind` (`flow` or `domain`),
+   `componentKey` and `targetOrganizationId` (their own organisation, or a customer of their reseller) exactly as
+   the status gives them: first for the preview, which says whether it makes a new copy or replaces the earlier
+   one, then again with the same arguments, `mode: "execute"` and the `confirmationToken`. The host asks the
+   person once, so do not ask again in the chat. Mosaico refuses a draft (`component_not_published`) and an
+   unfinished analysis: show its sentence and stop.
+   Installing needs the organisation's Mosaico subscription with AI allowance left, like every change made
    through the connector. Without a subscription nothing can be changed through the connector: Mosaico
-   refuses in its own words and nothing is approved. Say so plainly, and tell the person they can approve
-   the conversion themselves with the Install button in the Mosaico web app.
+   refuses in its own words and nothing is installed. Say so plainly, and tell the person they can install the
+   component themselves with the Install button in the Mosaico web app.
 8. If the answer says the document was stored but the conversion did not start, do not import it again: read
    the status and follow its `recommendedAction`.
 
@@ -74,6 +78,6 @@ them to review in Mosaico.
 - Never reconstruct or infer workflow state, or retry on your own.
 - Never import text the person did not give, or send the document twice.
 - Never pick a level or discard an item without the person's choice.
-- Never approve a conversion the person did not ask you to install.
+- Never install a component the person did not ask you to install.
 - Never give a tool code without its plain-English meaning (Mosaico provides it).
 - Never promise cost beyond "this uses your AI allowance".
