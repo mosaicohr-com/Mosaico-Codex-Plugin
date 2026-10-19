@@ -204,6 +204,45 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### 0.9.23
+
+Needs the Mosaico server release 20261019d (production build 349, live since 2026-10-19). The release carries
+mosaicohr-com/mosaico#2011 and #2013 ("Install only"): the connector's catalogue, approval and example tools are gone and one
+tool replaces them. Do not publish or install this plugin before that release is live on main-v2. Skills only: the plugin bundles
+no Mosaico server, address or token. This entry supersedes the 0.9.21 bullets on approving a conversion and on the reseller
+catalogue and a customer's examples.
+
+- **Added tool: `install_methodology_component`** (the `mosaico` skill and the convert skill, both packages). It installs a copy of
+  one published Flow or Domain of a conversion into one organisation, as the Install button does. Arguments: `projectId`,
+  `componentKind` (`flow` or `domain`), `componentKey` and `targetOrganizationId` (the person's own organisation, or a customer of
+  their reseller). It previews first, then installs when called again with `mode: "execute"` and the `confirmationToken`; the host asks
+  the person once. A second install into the same organisation replaces the earlier copy in place when nobody has progress on it,
+  and otherwise makes a new copy and keeps the old one; the preview says which. Only an Owner or Admin can install, and it needs a
+  subscription. Mosaico refuses with a code and one sentence (`component_not_published` with its warning count,
+  `analysis_not_complete`, `not_compilable`, `tenant_access_denied`, `subscription_required`). While Claude works as a member of a
+  customer, only that member's organisation may be the target.
+- **Project status carries the components.** `get_methodology_project_status` now lists, for every component, its `state`
+  (`draft` or `published`), its `warnings` count, its `installs` (`organizationId`, `organizationName`, `installedAt`, `by`,
+  `changedSinceInstall`), `allowedActions` and one `recommendedAction` (`fix_warnings`, `install_component`, `none`,
+  `finish_analysis` or `resolve_in_app`). The status action `install_component` replaces `approve_conversion` and
+  `publish_component_example`.
+- **The flow is now convert, fix warnings, install.** The convert skill (both packages) no longer approves or publishes anything:
+  a component with no warnings is published, and Claude installs it only when the person asks. The conversion-run skill still never
+  installs, and now tells the person to review the draft in the Mosaico app.
+- **No more catalogue.** There is no Approve, no Publish, no Private or Public setting, no hide or show for one customer, no
+  per-customer availability, no customer Examples tab and no seeded library. Customers see what the reseller installed; a customer
+  installs its own published components from the Methodology components tab.
+- **Removed tools (13):** `approve_methodology_conversion`, `publish_approved_component_example`, `publish_private_reseller_example`,
+  `get_private_reseller_catalogue`, `get_private_reseller_example_delivery`, `advance_private_reseller_example_delivery`,
+  `get_approved_components_for_customer`, `set_approved_component_availability`, `install_approved_domain_example`,
+  `list_example_catalogue`, `install_flow_example`, `install_domain_example` and `install_capability_example`. The status actions
+  `approve_conversion` and `publish_component_example` are gone too. No skill names any of them.
+- A missing tool: Claude keeps its old tool list until the Mosaico connector is disconnected and reconnected in Claude's connector
+  settings, so `install_methodology_component` appears only after that.
+- `tests/test_connector_acting_skill.py` pins the new wording in both packages, that no packaged file names a removed tool and,
+  with `--app-repo`, that the application registers the new tool with these arguments and none of the removed ones. The version pins
+  in the other tests move to 0.9.23.
+
 ### 0.9.22
 
 Needs the Mosaico server release 20261017a (promotion mosaicohr-com/mosaico#1971, stage-v2 to main-v2; main-v2 merge commit
@@ -262,7 +301,7 @@ release; this version teaches the skills to use them. Skills only: the plugin bu
   it will run as you in <organisation>." Repeat that same call once, with the same arguments; it then runs as the person in their own
   organisation and the run goes on. If Mosaico says it could not confirm whether the connector is still acting, the skill reads
   `get_acting_status` (or ends the session with `stop_acting` if the person asks).
-- **Changes need a subscription** (the `mosaico` skill and the convert skill). A change made through the connector needs an active
+- **Changes need a subscription** (the `mosaico` skill and the convert skill; the approval part is superseded by 0.9.23: `install_methodology_component` replaces approving). A change made through the connector needs an active
   subscription with AI allowance left (a few tools that only stop or carry on a run Mosaico already started, and the two acting tools,
   are exempt); without a subscription Claude cannot change anything. The skills quote Mosaico's three
   sentences (no subscription, no remaining allowance, another call settling the allowance) and tell the person plainly that nothing was
@@ -274,7 +313,7 @@ release; this version teaches the skills to use them. Skills only: the plugin bu
   since 2026-10-12. The conversion-run skill (both packages) now lists it with Mosaico's sentence, "Your answer leaves out capabilities
   this part names. Add each one listed, using only what the document states, and send the whole object again." The lint test caught the
   gap against the live server commit; its word cap for that skill moves from 1400 to 1430 for the 26 added words.
-- **The reseller catalogue and a customer's examples** (the `mosaico` skill). `publish_approved_component_example` publishes one
+- **The reseller catalogue and a customer's examples** (the `mosaico` skill; superseded by 0.9.23: these tools were removed). `publish_approved_component_example` publishes one
   approved component by reference (`projectId`, `componentKind`, `componentKey`, `visibility`, private by default).
   `get_approved_components_for_customer` and `set_approved_component_availability` read and switch a private domain for one customer; a
   flow cannot be switched this way (`flow_not_switchable`: publish it, then enable the published example with

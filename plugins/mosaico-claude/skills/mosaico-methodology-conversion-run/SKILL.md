@@ -81,7 +81,7 @@ taken over: never ask for that and never reuse an old claim id.
 ## Finish
 
 Only when the status says `complete`, say three short plain lines: what Mosaico finished (its counts), what
-needs the person's input, and that they should review and approve it in the Mosaico app. Never approve or
+needs the person's input, and that they should review it in the Mosaico app. Never approve or
 install anything.
 
 ## What Mosaico says when it refuses
