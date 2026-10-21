@@ -96,7 +96,8 @@ def main() -> None:
         check("environmentName" in installer and "a run on anything but production stops" in installer, f"{package} schedule-install skill lacks the environment rule")
         # 0.9.13: Source leads writes no drafts and Sync data writes them, so the Sync data text, both Claude lane texts and the Codex
         # Source leads text are stamped 0.9.13; the Claude Repair text keeps 0.9.6 and nothing is stamped 0.9.12 any more.
-        check("0.9.13 or later" in installer and "0.9.12 or later" not in installer and "0.9.9 or later" not in installer and "0.9.10 or later" not in installer, f"{package} schedule-install lacks the 0.9.13 stamp")
+        want = "0.9.24 or later" if package == "Claude" else "0.9.13 or later"  # 0.9.24: the Claude routine texts move; the Codex Source leads text stays at 0.9.13
+        check(want in installer and "0.9.12 or later" not in installer and "0.9.9 or later" not in installer and "0.9.10 or later" not in installer, f"{package} schedule-install lacks the {want} stamp")
 
     # The Follow-up, Send invitations, Withdraw stale invitations and Repair routines end their runs through outreach_end_run and report the environment.
     for name, marker, stop_text in (
@@ -118,7 +119,7 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
+        check(json.loads(read(manifest))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])

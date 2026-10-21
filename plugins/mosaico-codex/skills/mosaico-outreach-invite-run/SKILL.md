@@ -204,6 +204,34 @@ Since plugin 0.9.11 a Claude run can save a colleague's Lead as verified not con
 Codex never records connection evidence for a colleague's Lead; only her own run verifies it, and her invitation is
 not sent before that (`own-evidence-required`).
 
+## Rewrite returned invitation drafts
+
+When an Agent's checklist or instructions change, Mosaico returns the unsent drafts that rested on the old ones to Draft
+(reasons `checklist-changed` or `instructions-changed`; a draft that was never approved and whose stored review no longer holds
+counts too). Those drafts are rewrite work, and Mosaico orders it: in a Send invitations run it is the step after the sends
+and before the connection checks (`workflowStatus.sendRun`, phase and step `rewrite`, recommended action
+`rewrite_returned_invitation_draft`). It covers every scheduled day, today included.
+
+1. `sendRun.rewrites` lists up to 50 items, each with `leadId`, `name`, `messageId`, `kind`, `day`, `agentId`, `agentName`,
+   `body` (the draft as it stands), `reason`, `basis`, `returnedAt` and `recommendedCall`. `sendRun.next.rewrite` is the one to
+   work now; `sendRun.remaining.rewrite` and `sendRun.rewriteCount` say how many are left. Work `next`, in the order Mosaico
+   gives, and never rebuild the list from other reads.
+2. Call `outreach_get_agents` with no arguments once per run and use the Agent whose id is the item's `agentId`.
+3. Rewrite the `body` to that Agent's current `messageInstructions` and enabled `messagingChecklist`, from the Lead's stored
+   profile. The item's `body` shows what must change; do not keep wording the Agent's rules now forbid.
+4. Record it with `recommendedCall`: `outreach_record_message` with the existing `messageId` and the arguments it gives, plus
+   the new `body`, a `checklistReview` with one pass or fail result for every enabled rule of the Agent's checklist, and the
+   `runId`. Mosaico replaces the body, keeps the kind, the day and any booked day, clears the returned flag and leaves the
+   status Draft; it never creates a second unsent draft. If Mosaico rejects the review, correct the body as its guidance says
+   and send it once more.
+5. Never approve, send or mark sent a rewritten draft. Mosaico's answer for one Lead is final: a refusal is recorded and
+   Mosaico names the next item; a Lead whose rewrite it refused twice is skipped (`sendRun.skippedThisRun`).
+6. Rewrites share the run's draft limit (`sendRun.draftLimit`) with new drafts and go first. What is left over once the limit
+   is reached waits with the reason `rewrite-limit-reached`; a later run rewrites it. Mosaico counts them itself
+   (`sendRun.rewritesThisRun`).
+7. In the final report give the drafts rewritten (the count, and each with its Lead name and day) and the Leads that waited
+   with `rewrite-limit-reached`, from Mosaico's answers and not from memory.
+
 ## Write missing invitation drafts
 
 Writing an invitation draft is the Lead owner's work, done in the Send invitations routine for the person's own Leads only.
@@ -341,7 +369,7 @@ script either; read LinkedIn's Me page as above:
 Sourcing is never part of this: a Source leads run is its own run and its own schedule.
 
 A `send_approved_invitations` run is one ordered work list that Mosaico keeps (`workflowStatus.sendRun`). Mosaico sets the
-order, not you: sends come first, then connection checks, then drafts. Mosaico also sets how much one run does: checks and
+order, not you: sends come first, then rewrites of returned drafts, then connection checks, then drafts. Mosaico also sets how much one run does: checks and
 drafts are for Leads placed on a later day (after today), and it hands out at most `sendRun.checkLimit` checks and
 `sendRun.draftLimit` drafts in a run. Every read and every draft, send and recorded delivery block answer carries `next`
 (the Lead and what to do with it), `remaining` and one `recommendedAction`: follow it, and never count or remember what
@@ -350,13 +378,14 @@ is left yourself. At the start of the run Mosaico itself moves the Leads left on
 
 1. Complete **Send approved invitations** first, only for messages that were already human-approved. Never
    approve a newly created draft automatically.
-2. Then the connection checks Mosaico hands out. Codex cannot do them (see **Capture connection evidence**): when
+2. Then complete **Rewrite returned invitation drafts**, for the drafts Mosaico names. Never approve a rewritten draft.
+3. Then the connection checks Mosaico hands out. Codex cannot do them (see **Capture connection evidence**): when
    `sendRun.recommendedAction` is `verify_connection`, stop there, do not ask to end the run as complete (Mosaico
    refuses that while the list is not empty) and report that the checks, and the drafts behind them, are left for a
    Claude Send invitations run.
-3. Then complete **Write missing invitation drafts**, for the Leads Mosaico names.
+4. Then complete **Write missing invitation drafts**, for the Leads Mosaico names.
 
-Do not write a draft before Mosaico offers it: it recommends none while a send or a check is left. A person who chose only
+Do not write a draft before Mosaico offers it: it recommends none while a send, a rewrite or a check is left. A person who chose only
 sending or only drafting still gets this one list in this order.
 
 For every scope, Mosaico is the workflow authority for stored state, target completion, ownership,

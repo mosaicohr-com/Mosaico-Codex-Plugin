@@ -93,9 +93,10 @@ Use this when a Source leads automation is already installed and only its standi
 
 ## Keep it apart from the daily schedules
 
-The schedules must not overlap. If the person has the Claude daily schedules, place every Source leads
-time at least 60 minutes before or after each of their times. The default times are 1:00 PM, 1:30 PM and 2:00 PM, which leaves
-8:00 AM, 10:00 AM, 12:00 PM, 4:00 PM and 6:00 PM. Say in the readback that you did this.
+The schedules must not overlap. If the person has the Claude schedules, place every Source leads
+time at least 30 minutes before or after each of their times. The Claude defaults are 6:00 AM (Send invitations), 6:45 PM and
+10:45 PM (Follow-up) and 11:30 PM (Withdraw stale invitations), which leaves every hour from 8:00 AM to 4:00 PM, and 6:00 PM
+works too (45 minutes before the first Follow-up). Say in the readback that you did this.
 
 ## Install
 

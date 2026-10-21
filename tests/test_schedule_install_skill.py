@@ -52,9 +52,9 @@ STALE_DIRS = ("~/.codex/skills/", "~/.claude/skills/")
 
 MIN_VERSION = "0.9.6"
 SOURCE_MIN_VERSION = "0.9.13"  # Codex's single Source leads text: 0.9.13 writes no drafts (0.9.9 added Leads per run)
-LANE_MIN_VERSION = "0.9.13"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
-SYNC_MIN_VERSION = "0.9.15"  # Claude's Send invitations and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
-FOLLOW_MIN_VERSION = "0.9.18"  # Claude's Follow-up text: 0.9.16 started a follow_up_pass run and works outreach_get_follow_up_queue; 0.9.17 works its repair stages, skippedThisRun and linkedDuplicate; 0.9.18 books a later touch and leaves booked work alone
+LANE_MIN_VERSION = "0.9.24"  # Claude's two Source leads lane texts (0.9.12 added the `sourcing scope` line; 0.9.13 writes no drafts)
+SYNC_MIN_VERSION = "0.9.24"  # Claude's Send invitations and Withdraw stale invitations texts: 0.9.15 splits the old Sync data routine into them
+FOLLOW_MIN_VERSION = "0.9.24"  # Claude's Follow-up text: 0.9.16 started a follow_up_pass run and works outreach_get_follow_up_queue; 0.9.17 works its repair stages, skippedThisRun and linkedDuplicate; 0.9.18 books a later touch and leaves booked work alone
 CONNECTOR_RULE = (
     "Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. "
     "The plugin ships no Mosaico server of its own. "
@@ -123,7 +123,7 @@ def main() -> None:
     check("## Set up a second person" in readme, "README is missing the Set up a second person section")
     for rule in ALLOW_RULES:
         check(rule in readme, f"README does not name the allow rule {rule}")
-    check("60 minutes" in claude, "Claude skill does not keep the schedules 60 minutes apart")
+    check("30 minutes" in claude and "90 minutes" in claude, "Claude skill does not keep the schedules 30 minutes apart (90 between the sourcing lanes)")
 
     # Thin routines (0.9.6): each saved schedule text holds only the standing answers and names the installed plugin's skill and routine
     # section; the procedure lives in the run skills. The texts are short, name the skill, the section and the version stamp, carry the
@@ -131,11 +131,11 @@ def main() -> None:
     THIN_CAP = 200
     claude_texts = re.findall(r"```text\n(.*?)\n```", claude, re.S)
     codex_texts = re.findall(r"```text\n(.*?)\n```", SKILLS["Codex"], re.S)
-    check(len(claude_texts) == 6, f"Claude skill must hold exactly six schedule texts (Send invitations, Follow-up, Withdraw stale invitations, Source leads own, Source leads colleagues, Repair), found {len(claude_texts)}")
+    check(len(claude_texts) == 7, f"Claude skill must hold exactly seven schedule texts (Send invitations, Follow-up, Withdraw stale invitations, Source leads own, Source leads colleagues, Routines report, Repair), found {len(claude_texts)}")
     for title in LANE_TITLES:
         check(title in claude, f"Claude skill is missing the Source leads lane title: {title}")
     check(len(codex_texts) == 1, f"Codex skill must hold exactly one schedule text, found {len(codex_texts)}")
-    sync_text, follow_text, withdraw_text, source_text, colleagues_text, repair_text = claude_texts
+    sync_text, follow_text, withdraw_text, source_text, colleagues_text, report_text, repair_text = claude_texts
     codex_text = codex_texts[0]
     THIN = (
         ("Claude Send invitations", sync_text, "mosaico:mosaico-outreach-invite-run", "Send invitations routine", ("<timezone>", "<public identifier>"), "built-in browser pane"),
@@ -157,10 +157,21 @@ def main() -> None:
             check(placeholder in text, f"{label} text lacks the placeholder {placeholder}")
         check(f"is older than {min_version} or has no \"{section_name}\" section, stop and report that the plugin needs updating" in text, f"{label} text lacks the version stamp stop")
         check("Report as the skill says." in text, f"{label} text does not hand the report to the skill")
+        # 0.9.24: every Claude routine text except Repair carries the board line as its own paragraph, and nothing else about the board.
+        if label.startswith("Claude") and label != "Claude Repair":
+            check("\n\nroutines board: <board url>\n" in text, f"{label} text lacks the `routines board:` paragraph")
+            check(text.count("routines board:") == 1 and "ArtifactData" not in text and "runs" not in text.split("routines board:")[1].split("\n")[0], f"{label} text holds more than the board line")
+        else:
+            check("routines board:" not in text, f"{label} text carries a board line")
         check(browser in text, f"{label} text lacks the browser line ({browser})")
         check("A LinkedIn warning or captcha stops the run, which then reports." in text, f"{label} text lacks the LinkedIn warning guard")
         for procedure in ("Step 1", "Step 2", "Step 3", "outreach_start_run", "outreach_get_", "outreach_record", "identityEvidence", "// mosaico run", "browser/linkedin-", "file-reading tool"):
             check(procedure not in text, f"{label} text holds procedure ({procedure}); it belongs in the skill's routine section")
+    # 0.9.24: the Routines report text: thin, no browser, no Mosaico connector, board line, stamp.
+    check(len(report_text.split()) <= THIN_CAP and "mosaico:mosaico-outreach-follow-up-run" in report_text and 'Follow that skill\'s "Routines report routine" section exactly' in report_text
+          and "(0.9.24 or later)" in report_text and 'is older than 0.9.24 or has no "Routines report routine" section, stop and report that the plugin needs updating' in report_text
+          and "routines board: <board url>" in report_text and "<timezone>" in report_text and "public identifier" not in report_text and "outreach_" not in report_text and "Report as the skill says." in report_text,
+          "the Routines report text is not the thin text")
     for label, text in (("Claude Source leads (own)", source_text), ("Claude Source leads (colleagues)", colleagues_text), ("Codex Source leads", codex_text)):
         check("<quota map>" not in text and "quota" not in text.lower() and "who receives" not in text.lower(), f"{label} thin text still carries a quota standing answer")
     check("Proceed without asking which days or which scope" in sync_text and "Proceed without asking which days or which scope" in source_text and "Proceed without asking which scope" in repair_text, "A thin text does not say to proceed without asking")
@@ -180,19 +191,17 @@ def main() -> None:
         flat_installer = " ".join(text.split())
         check("**Version stamp.**" in text and f"({MIN_VERSION}, the first release with the routine sections)" in flat_installer and "stops and reports that the plugin needs updating" in flat_installer, f"{package} skill lacks the version stamp rule")
         if package == "Claude":
-            check("The Source leads texts need 0.9.13 (0.9.12 added the `sourcing scope` line" in flat_installer and "The Send invitations and Withdraw stale invitations texts need 0.9.15" in flat_installer and "named in the plugin's changelog for 0.9.15" in flat_installer and "A saved Sync data text is retired" in flat_installer, "Claude skill does not state the Source leads 0.9.13 and the 0.9.15 minimum versions")
-            check("The Follow-up text needs 0.9.18" in flat_installer and "`follow_up_pass`" in flat_installer and "`outreach_get_follow_up_queue`" in flat_installer and "named in the plugin's changelog for 0.9.18" in flat_installer
-                  and "`fix-address`" in flat_installer and "`drop-declined`" in flat_installer and "`skippedThisRun`" in flat_installer and "`linkedDuplicate`" in flat_installer
-                  and "`sendNotBefore` on a follow-up draft, `nextTouchOn` on a Lead" in flat_installer and "`wait_for_scheduled_day`" in flat_installer
-                  and "a 0.9.17 plugin works the repairs the queue carries" in flat_installer and "knows no dates and would draft at once for a Lead who asked for January" in flat_installer
-                  and "The Send invitations and Withdraw stale invitations texts stay at 0.9.15" in flat_installer, "Claude skill does not state the Follow-up 0.9.18 minimum version")
+            check("From 0.9.24 it is 0.9.24 for the Send invitations, Follow-up, Withdraw stale invitations, Source leads (both lanes) and Routines report texts" in flat_installer
+                  and "the Mosaico release that ships PRs 2053, 2057 and 2058" in flat_installer and "the first release with the \"Routines report routine\" section" in flat_installer
+                  and "0.9.13 stopped Source leads writing drafts and added the `sourcing scope` line" in flat_installer and "0.9.15 split the old Sync data routine" in flat_installer
+                  and "0.9.18 added dated follow-ups to Follow-up" in flat_installer and "The Repair text stays at 0.9.6" in flat_installer, "Claude skill does not state the 0.9.24 stamp and the history behind it")
             update_flat = flat_installer[flat_installer.index("### Update the standing answers in place") :]
-            check("a Follow-up schedule saved at 0.9.15, 0.9.16 or 0.9.17" in update_flat and "becomes the 0.9.18 Follow-up text" in update_flat and 'A saved Follow-up text that says "0.9.15 or later", "0.9.16 or later" or "0.9.17 or later"' in flat_installer and "replace it in place with the 0.9.18 Follow-up text" in flat_installer
-                  and "its stamp moved to 0.9.18" in flat_installer and "to move a saved Follow-up text from the 0.9.15, 0.9.16 or 0.9.17 stamp to the 0.9.18 stamp" in flat_installer,
-                  "Claude skill does not move a saved 0.9.15, 0.9.16 or 0.9.17 Follow-up text to the 0.9.18 stamp in place")
+            check("a saved routine text with an earlier stamp" in update_flat and "becomes the 0.9.24 text with the same saved answers, cron, name and enabled state, and the board line" in update_flat
+                  and "replace it in place with the 0.9.24 text of its routine" in flat_installer and "its stamp moved to 0.9.24" in flat_installer and "a paused one stays paused" in flat_installer,
+                  "Claude skill does not move earlier-stamped texts to 0.9.24 in place")
             follow_start = flat_installer.index("**Mosaico Outreach — Follow-up**")
             follow_prose = flat_installer[follow_start : flat_installer.index("```text", follow_start)]
-            check("From 0.9.18 it books a later touch when a conversation asks to be picked up later" in follow_prose and "leaves work booked for a later day alone until its day" in follow_prose
+            check("From 0.9.24 it also rewrites the follow-up drafts an Agent change returned to Draft (stage `rewrite-draft`" in follow_prose and "From 0.9.18 it books a later touch when a conversation asks to be picked up later" in follow_prose and "leaves work booked for a later day alone until its day" in follow_prose
                   and "reports the bookings it made, changed or cleared" in follow_prose, "Claude installer's Follow-up description does not say what 0.9.18 adds")
         else:
             check("The Source leads text needs 0.9.13, the first release where a Source leads run finds, saves and places Leads only and writes no invitation drafts" in flat_installer, f"{package} skill does not state the Source leads minimum version 0.9.13")
@@ -205,7 +214,7 @@ def main() -> None:
         check("**Update the standing answers in place** below" in flat_installer and "Update the Source leads quota in place" not in flat_installer, f"{package} installer points at the old sub-section name")
         check("a text in the older long form is replaced by the thin text" in flat_installer, f"{package} Install step 4 does not replace a long-form text with the thin text")
         check("saved text is the thin text" in flat_installer, f"{package} Install readback does not confirm the thin text")
-    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.13" and SYNC_MIN_VERSION == "0.9.15" and FOLLOW_MIN_VERSION == "0.9.18", "a version stamp changed: update it in the installer, here and in the README together")
+    check(MIN_VERSION == "0.9.6" and SOURCE_MIN_VERSION == "0.9.13" and LANE_MIN_VERSION == "0.9.24" and SYNC_MIN_VERSION == "0.9.24" and FOLLOW_MIN_VERSION == "0.9.24", "a version stamp changed: update it in the installer, here and in the README together")
 
     # The procedure that used to live in the schedule texts now lives in the run skills' named routine sections.
     follow_claude = (CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8")
@@ -308,8 +317,8 @@ def main() -> None:
         "Never call `outreach_link_duplicate_leads`; this intent may not", "It may not save Leads, link duplicate Leads or withdraw invitations",
     ):
         check(needle in queue, f"the follow-up queue section lacks: {needle}")
-    stage_order = [queue.index(f"{n}. `{stage}`") for n, stage in ((1, "fix-address"), (2, "drop-declined"), (3, "verify-connection"), (4, "read-thread"), (5, "send-approved"), (6, "draft"), (7, "held"))]
-    check(stage_order == sorted(stage_order), "the follow-up queue section does not list the stages in Mosaico's order (fix-address, drop-declined, verify-connection, read-thread, send-approved, draft, held)")
+    stage_order = [queue.index(f"{n}. `{stage}`") for n, stage in ((1, "fix-address"), (2, "drop-declined"), (3, "verify-connection"), (4, "read-thread"), (5, "send-approved"), (6, "rewrite-draft"), (7, "draft"), (8, "held"))]
+    check(stage_order == sorted(stage_order), "the follow-up queue section does not list the stages in Mosaico's order (fix-address, drop-declined, verify-connection, read-thread, send-approved, rewrite-draft, draft, held)")
     # 0.9.18: the routine books a later touch (a day Mosaico validates), leaves booked work alone and reports it.
     flat_steps = " ".join(step2.split())
     for needle in (
@@ -465,11 +474,11 @@ def main() -> None:
     for gone in ("`checkCap`", "at most 20"):
         check(gone.lower() not in entry20.lower(), f"README 0.9.20 entry holds old send-run wording: {gone}")
     check(readme.index("### 0.9.20") < readme.index("### 0.9.19"), "README changelog lacks 0.9.20 above 0.9.19")
-    # 0.9.19: no schedule text and no minimum-version stamp changes; the Send invitations text still names the routine section of the installed plugin.
-    check("(0.9.15 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts) and "0.9.20" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19 or 0.9.20")
+    # 0.9.19 and 0.9.20 changed no schedule text; 0.9.24 moved the Send invitations stamp to 0.9.24 (the routine section is still named, and no text names 0.9.19 or 0.9.20).
+    check("(0.9.24 or later)" in claude_texts[0] and 'Follow that skill\'s "Send invitations routine" section exactly' in claude_texts[0] and "0.9.19" not in "\n".join(claude_texts) and "0.9.20" not in "\n".join(claude_texts), "a schedule text changed for 0.9.19 or 0.9.20")
     claude_flat = " ".join(claude.split())
-    check("it sends the invitations that are already approved, checks the connections of the Leads placed on later days that Mosaico hands out, then writes the missing invitation drafts for those found not connected; Mosaico sets how many checks and drafts one run gets (`checkLimit` and `draftLimit`)" in claude_flat
-          and "the text below is unchanged because it names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order and limits")
+    check("it sends the invitations that are already approved, rewrites the invitation drafts an Agent change returned to Draft (from 0.9.24; the application orders them after the sends, on every scheduled day), checks the connections of the Leads placed on later days that Mosaico hands out, then writes the missing invitation drafts for those found not connected; Mosaico sets how many checks and drafts one run gets (`checkLimit` and `draftLimit`; rewrites share the draft limit and go first)" in claude_flat
+          and "The text below names the routine section of the installed plugin" in claude_flat, "Claude installer does not describe the 0.9.19 Send invitations order and limits")
     check("at most 20" not in claude_flat.split("**Mosaico Outreach — Send invitations**")[1].split("```text")[0], "Claude installer still states the old 20-check limit")
     codex_flat = " ".join(SKILLS["Codex"].split())
     check("it sends the approved invitations, checks the connections Mosaico hands out, then writes the missing invitation drafts" in codex_flat, "Codex installer does not describe the Send invitations order")
@@ -508,10 +517,10 @@ def main() -> None:
         check("If the installed plugin has no browser folder, stop and report that the plugin needs updating." in text, f"{name} routine lacks the no-browser-folder stop")
     check(READ_SENTENCE not in SKILLS["Codex"] and READ_SENTENCE not in codex_source, "Codex has the browser-script reading sentence, but the Codex package ships no browser scripts")
     check("Repair never sends" in claude, "Claude skill does not say Repair never sends")
-    check("60 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from the daily schedules and Source leads")
+    check("30 minutes from the Repair time" in claude, "Claude skill does not keep Repair apart from the daily schedules and Source leads")
     check("0 10 * * 0" in claude.split("## Install")[1], "Install readback does not confirm the Repair cron")
     check("Her Repair schedule works only her own backlog and never sends" in second_person(claude), "Second-person section does not install her Repair schedule")
-    check("Source leads and Repair are not installed" in claude, "Single-task fallback does not mention Repair")
+    check("Source leads, Routines report and Repair are not installed" in claude, "Single-task fallback does not mention Repair")
     # Each routine is its own section: none borrows another's steps.
     check("outreach_get_repair_queue" not in source and "outreach_get_repair_queue" not in sync and "outreach_get_repair_queue" not in send and "outreach_get_repair_queue" not in withdraw, "a Follow-up, Send invitations or Source leads routine reads the repair queue")
 
@@ -621,7 +630,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
