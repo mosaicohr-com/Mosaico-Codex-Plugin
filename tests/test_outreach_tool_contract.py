@@ -33,7 +33,9 @@ SEND_RUN_REASONS_0919 = (
 )
 # 0.9.20 (server release 20261014b, app PR 1938): a send refused twice for the same Lead, and a missed-day Lead with no open day.
 SEND_RUN_REASONS_NEW_0920 = ("send-refused-twice-this-run", "no-open-day")
-SEND_RUN_REASONS = SEND_RUN_REASONS_0919 + SEND_RUN_REASONS_NEW_0920
+# 0.9.24 (the Mosaico release that ships PRs 2053, 2057 and 2058): returned invitation drafts are rewrite work and share the draft limit.
+SEND_RUN_REASONS_NEW_0924 = ("rewrite-limit-reached",)
+SEND_RUN_REASONS = SEND_RUN_REASONS_0919 + SEND_RUN_REASONS_NEW_0920 + SEND_RUN_REASONS_NEW_0924
 # The delivery block reasons Mosaico accepts on outreach_record_delivery_block and records; email-required is new in 0.9.20.
 DELIVERY_BLOCK_REASONS = {"already-connected", "invite-pending", "cannot-message", "email-required"}
 
@@ -127,7 +129,7 @@ def main() -> None:
     run_end_text = (app / "features/outreach/server/outreach-run-end.ts").read_text(encoding="utf-8")
     for needle in (
         "OUTREACH_SEND_RUN_CHECK_LIMIT = 100", "OUTREACH_SEND_RUN_DRAFT_LIMIT = 100", "OUTREACH_SEND_RUN_REFUSED_LIMIT = 2", "OUTREACH_SEND_RUN_OPEN_CODE = 'send-run-open'",
-        "['send', 'check', 'draft', 'done']", "recommendedAction", "allowedActions", "remaining", "waitingCount",
+        "['send', 'rewrite', 'check', 'draft', 'done']", "recommendedAction", "allowedActions", "remaining", "waitingCount",
         "checksThisRun", "checkLimit", "checksLeft", "draftsThisRun", "draftLimit", "draftsLeft",
         "skippedThisRun", "skippedCount", "verifyBeforeSend", "'end_run'", "work-list-empty", "scriptIdentifier", "verifyAction", "messageId",
         *(f"'{reason}'" for reason in SEND_RUN_REASONS),
@@ -168,13 +170,13 @@ def main() -> None:
                 raise SystemExit(f"{where} names sendRun.{field}, which the application's SendRunWork does not have")
     for where, text in {**named_texts, "README 0.9.20 entry": readme_entry_0920}.items():
         # Every waiting reason a skill or the 0.9.20 entry names must be one the application gives (0.9.20 adds send-refused-twice-this-run and no-open-day).
-        for reason in sorted(set(re.findall(r"(?<![\w-])((?:check|draft)-(?:limit|cap)-reached|(?:send-)?refused-twice-this-run|no-open-day)\b", text))):
+        for reason in sorted(set(re.findall(r"(?<![\w-])((?:check|draft|rewrite)-(?:limit|cap)-reached|(?:send-)?refused-twice-this-run|no-open-day)\b", text))):
             if reason not in server_reasons:
                 raise SystemExit(f"{where} names the waiting reason {reason}, which the application does not have")
     for reason in sorted(server_reasons & set(SEND_RUN_REASONS_0919)):
         if reason not in readme_entry:
             raise SystemExit(f"The README 0.9.19 entry does not name the waiting reason {reason}, which the application uses")
-    for reason in sorted(server_reasons):
+    for reason in sorted(server_reasons - set(SEND_RUN_REASONS_NEW_0924)):
         if reason not in readme_entry_0920:
             raise SystemExit(f"The README 0.9.20 entry does not name the waiting reason {reason}, which the application uses")
     for package in ("mosaico-claude", "mosaico-codex"):
@@ -194,7 +196,7 @@ def main() -> None:
     missed_text = (app / "features/outreach/server/outreach-send-run-missed-days.ts").read_text(encoding="utf-8")
     proof_text = (app / "features/outreach/server/outreach-send-proof.ts").read_text(encoding="utf-8")
     record_text = (app / "features/outreach/shared/outreach-record.ts").read_text(encoding="utf-8")
-    for needle in ("'send-refused-twice-this-run'", "'no-open-day'", "export type SendRunRefusedStep = 'check' | 'draft' | 'send'",
+    for needle in ("'send-refused-twice-this-run'", "'no-open-day'", "export type SendRunRefusedStep = 'check' | 'draft' | 'rewrite' | 'send'",
                    "MARK_SENT_TOOL = 'outreach_mark_message_sent'", "readonly movedThisRun: readonly SendRunMoved[]", "readonly movedCount: number"):
         if needle not in work_text:
             raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.20 plugin needs server release 20261014b)")
@@ -229,6 +231,33 @@ def main() -> None:
                    "invite-already-pending", "email-required", "lead-skipped-this-run", "sendRun.movedThisRun", "sendRun.movedCount", "cannot-message"):
         if needle not in " ".join(readme_entry_0920.split()):
             raise SystemExit(f"The README 0.9.20 entry does not name {needle}")
+    # 0.9.24 (the Mosaico release that ships PRs 2053, 2057 and 2058; not yet promoted): a draft an Agent change returned to Draft is rewrite work.
+    # The Send invitations work list has a rewrite phase and step, the Follow-up queue a rewrite-draft stage; both exist in the application and the skills name them.
+    for needle in ("'rewrite_returned_invitation_draft'", "export const SEND_RUN_PHASES = ['send', 'rewrite', 'check', 'draft', 'done']", "readonly rewrites: readonly SendRunRewrite[]",
+                   "readonly rewriteCount: number", "readonly rewritesThisRun: number", "'rewrite-limit-reached'", "readonly recommendedCall: OutreachRewriteCall"):
+        if needle not in work_text:
+            raise SystemExit(f"The application's send-run work list lacks {needle} (the 0.9.24 plugin needs the release that ships PRs 2053, 2057 and 2058)")
+    rewrite_fields = type_members(work_text, r"export interface SendRunRewrite \{(.*?)\n\}", r"^\s+readonly (\w+)\??:")
+    if not {"leadId", "name", "messageId", "kind", "day", "agentId", "agentName", "body", "reason", "basis", "returnedAt", "recommendedCall"} <= rewrite_fields:
+        raise SystemExit(f"The application's SendRunRewrite fields are not the ones the 0.9.24 plugin reads: {sorted(rewrite_fields)}")
+    for needle in ("'rewrite-draft'", "rewrite_follow_up_draft", "readonly rewriteDraft: OutreachFollowUpRewriteDraft | null", "readonly rewrite: number"):
+        if needle not in queue_text:
+            raise SystemExit(f"The application's follow-up queue lacks {needle} (the 0.9.24 plugin needs the release that ships PRs 2053, 2057 and 2058)")
+    rewrite_draft_fields = type_members(queue_text, r"export interface OutreachFollowUpRewriteDraft \{(.*?)\n\}", r"^\s+readonly (\w+)\??:")
+    if not {"messageId", "kind", "body", "reason", "basis", "returnedAt", "sendNotBefore"} <= rewrite_draft_fields:
+        raise SystemExit(f"The application's OutreachFollowUpRewriteDraft fields are not the ones the 0.9.24 plugin reads: {sorted(rewrite_draft_fields)}")
+    for package in ("mosaico-claude", "mosaico-codex"):
+        invite = (plugin_root / package / "skills" / "mosaico-outreach-invite-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
+        follow = (plugin_root / package / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md").read_text(encoding="utf-8").replace("`", "")
+        for needle in ("rewrite_returned_invitation_draft", "sendRun.rewrites", "sendRun.rewriteCount", "sendRun.rewritesThisRun", "rewrite-limit-reached", "recommendedCall", "existing messageId"):
+            if needle not in invite:
+                raise SystemExit(f"The {package} invite-run skill does not name {needle}, which the application's rewrite step uses")
+        for needle in ("rewrite-draft", "rewrite_follow_up_draft", "readConversationCall", "counts.rewrite"):
+            if needle not in follow:
+                raise SystemExit(f"The {package} follow-up-run skill does not name {needle}, which the application's rewrite-draft stage uses")
+    for field in sorted(set(re.findall(r"\bsendRun\.(\w+)", " ".join(named_texts.values())))):
+        if field not in server_fields:
+            raise SystemExit(f"A skill names sendRun.{field}, which the application's SendRunWork does not have")
     missing = codex - registered
     if missing:
         raise SystemExit(

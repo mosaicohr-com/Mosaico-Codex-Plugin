@@ -116,7 +116,11 @@ now works only the backlog outside this queue. Dated follow-ups (server release 
 (the booked day that governs the Lead's follow-up, null when none) and `scheduledReason` (`scheduled`, `scheduled-due`,
 `next-touch-scheduled`, `next-touch-due` or null), judged by Mosaico against its own today. Work booked for a later day sits last in
 stage `held` with `nextStep` `wait_for_scheduled_day`: it is not due, needs no person and is never worked, and `counts.scheduled`
-counts it for the report (a queue left with only that stops with `queue-empty`). See **Book a later touch**. The scheduled Follow-up
+counts it for the report (a queue left with only that stops with `queue-empty`). See **Book a later touch**. Stage `rewrite-draft`
+(`nextStep` `rewrite_follow_up_draft`, between `send-approved` and `draft`, counted in `counts.rewrite`) is an unsent follow-up draft an Agent change
+returned to Draft: read its thread first (`readConversationCall`), then rewrite it in place with the item's `recommendedCall`
+(`outreach_record_message` with the existing `messageId`), from the Agent's current instructions and checklist, without repeating
+the invitation's words, and never approve it. The scheduled Follow-up
 routine (run intent `follow_up_pass`) needs the Claude plugin's approved browser scripts, so Codex does not run it: it is installed
 from Claude.
 

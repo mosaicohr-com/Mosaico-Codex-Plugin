@@ -22,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
-VERSION = "0.9.23"
+VERSION = "0.9.23"  # the README entry these checks read (install_methodology_component)
+CURRENT = "0.9.24"  # the manifests
 PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
@@ -94,11 +95,11 @@ def main() -> None:
 
     # Version, changelog and Do-not item 1: the plugin carries skills only.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == VERSION, f"{manifest.name} is not at {VERSION}")
+        check(json.loads(read(manifest))["version"] == CURRENT, f"{manifest.name} is not at {CURRENT}")
         check("mcpServers" not in read(manifest), f"{manifest.name} bundles a Mosaico server")
     check(not list(ROOT.rglob(".mcp.json")), "the plugin ships a .mcp.json: it must bundle no Mosaico server")
     readme = read(ROOT / "README.md")
-    check(readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.21") < readme.index("### 0.9.20"), f"README changelog lacks {VERSION} above {PREVIOUS} above 0.9.21 above 0.9.20")
+    check(readme.index(f"### {CURRENT}") < readme.index(f"### {VERSION}") < readme.index(f"### {PREVIOUS}") < readme.index("### 0.9.21") < readme.index("### 0.9.20"), f"README changelog lacks {CURRENT} above {VERSION} above {PREVIOUS} above 0.9.21 above 0.9.20")
     unreleased = flat(readme[readme.index(f"### {VERSION}"):readme.index(f"### {PREVIOUS}")])
     for needle in (
         "20261019d", "build 349", "#2011", "#2013", "install_methodology_component", "projectId", "componentKind", "componentKey", "targetOrganizationId",
@@ -242,7 +243,7 @@ def main() -> None:
     print(
         f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started only in the web console), stop an Outreach run on the acting refusal, "
         f"stop the task after the session-ended refusal, say installing a component needs a subscription, teach install_methodology_component, "
-        f"the people tools, carry the reconnect note, bundle no Mosaico server, and are at {VERSION} {suffix}."
+        f"the people tools, carry the reconnect note, bundle no Mosaico server, and are at {CURRENT} {suffix}."
     )
 
 

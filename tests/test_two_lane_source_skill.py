@@ -19,9 +19,13 @@ CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 
 OLD_OWN_CRON = "0 0,2,4,6,8,12,14,16,18,20,22 * * *"  # 0.9.12 to 0.9.14, kept for the changelog entry
-OWN_CRON = "0 0,2,4,6,8,12,16,18,20,22 * * *"  # 0.9.15: 14:00 is now the Withdraw stale invitations time
-COLLEAGUES_CRON = "0 1,3,5,7,9,11,15,17,19,21,23 * * *"
-DAILY_MINUTES = (13 * 60, 13 * 60 + 30, 14 * 60)  # Send invitations, Follow-up, Withdraw stale invitations
+OLD_OWN_CRON_0915 = "0 0,2,4,6,8,12,16,18,20,22 * * *"  # 0.9.15 to 0.9.23
+OWN_CRON = "0 0,3 * * *"  # 0.9.24: overnight, 90 minutes from the colleagues lane
+OLD_COLLEAGUES_CRON = "0 1,3,5,7,9,11,15,17,19,21,23 * * *"  # 0.9.12 to 0.9.23, kept for the changelog entry
+COLLEAGUES_CRON = "30 1,4 * * *"
+# 0.9.24 daily times: Send invitations 6:00, Follow-up 18:45 and 22:45, Withdraw stale invitations 23:30 (the Routines report, 6:45 and 23:45, uses no browser).
+DAILY_MINUTES = (6 * 60, 18 * 60 + 45, 22 * 60 + 45, 23 * 60 + 30)
+REPAIR_MINUTE = 10 * 60  # Sunday
 REPAIR_HOUR = 10  # Sunday
 
 
@@ -38,16 +42,12 @@ def flat(text: str) -> str:
     return " ".join(text.replace("`", "").split())
 
 
-def hours_of(cron: str) -> list[int]:
+def times_of(cron: str) -> list[int]:
+    """The minutes of the day a cron with one fixed minute and an explicit hour list starts on."""
     fields = cron.split()
-    check(len(fields) == 5 and fields[0] == "0" and fields[2:] == ["*", "*", "*"], f"cron is not a plain hour list: {cron}")
+    check(len(fields) == 5 and re.fullmatch(r"\d{1,2}", fields[0]) is not None and fields[2:] == ["*", "*", "*"], f"cron is not a plain hour list: {cron}")
     check(re.fullmatch(r"\d{1,2}(,\d{1,2})*", fields[1]) is not None, f"cron hours are not an explicit list: {cron}")
-    return [int(hour) for hour in fields[1].split(",")]
-
-
-def gap_minutes(a: int, b: int) -> int:
-    """Minutes between two on-the-hour times on a 24-hour clock that wraps at midnight."""
-    return minutes_apart(a * 60, b * 60)
+    return [int(hour) * 60 + int(fields[0]) for hour in fields[1].split(",")]
 
 
 def minutes_apart(a: int, b: int) -> int:
@@ -62,36 +62,35 @@ def main() -> None:
 
     # 1. Two Source leads tasks: identical texts but for the scope line; both stamped 0.9.13 (0.9.13: Source leads writes no drafts).
     texts = re.findall(r"```text\n(.*?)\n```", installer_raw, re.S)
-    check(len(texts) == 6, f"installer must hold six schedule texts, found {len(texts)}")
-    _, _, _, own_text, colleagues_text, _ = texts
+    check(len(texts) == 7, f"installer must hold seven schedule texts, found {len(texts)}")
+    _, _, _, own_text, colleagues_text, _, _ = texts
     for scope, text in (("own", own_text), ("colleagues", colleagues_text)):
         check(f"sourcing scope: {scope};" in text, f"the {scope} lane text lacks the line 'sourcing scope: {scope}'")
-        check("(0.9.13 or later)" in text and "is older than 0.9.13 or has no \"Source leads routine\" section" in text, f"the {scope} lane text is not stamped 0.9.13")
+        check("(0.9.24 or later)" in text and "is older than 0.9.24 or has no \"Source leads routine\" section" in text, f"the {scope} lane text is not stamped 0.9.24")
         check("Follow that skill's \"Source leads routine\" section exactly" in text, f"the {scope} lane text does not name its routine section")
         check("Proceed without asking which days or which scope" in text, f"the {scope} lane text may ask which scope")
         check(len(text.split()) <= 200, f"the {scope} lane text is not thin")
         for procedure in ("Step 1", "outreach_", "// mosaico run", "quota", "day:"):
             check(procedure not in text, f"the {scope} lane text holds procedure or a number: {procedure}")
     check(own_text.replace("sourcing scope: own;", "sourcing scope: colleagues;") == colleagues_text, "the two lane texts differ in more than the scope line")
-    check(all("sourcing scope" not in " ".join(texts[i].split()) for i in (0, 1, 2, 5)), "a daily or Repair text carries a scope line")
-    check("(0.9.15 or later)" in texts[0] and "(0.9.18 or later)" in texts[1] and "(0.9.15 or later)" in texts[2] and "(0.9.6 or later)" in texts[5], "a daily stamp is not 0.9.15 (Follow-up 0.9.18) or the Repair stamp changed")
+    check(all("sourcing scope" not in " ".join(texts[i].split()) for i in (0, 1, 2, 5, 6)), "a daily or Repair text carries a scope line")
+    check(all("(0.9.24 or later)" in texts[i] for i in (0, 1, 2, 5)) and "(0.9.6 or later)" in texts[6], "a routine stamp is not 0.9.24 or the Repair stamp changed")
     check("Mosaico Outreach — Source leads (own)" in installer and "Mosaico Outreach — Source leads (colleagues)" in installer, "installer lacks the two lane task titles")
     check("sourcing scope" not in codex_installer, "the Codex installer text carries a scope line although it installs one whole-plan task")
 
-    # 2. The crons are explicit hour lists that never overlap each other, the three daily times or Sunday Repair (10:00).
+    # 2. The crons are explicit hour lists. Every browser start is at least 30 minutes from every other, the lanes are 90 minutes apart, and Sunday Repair is clear.
     check(f"`{OWN_CRON}`" in installer_raw and f"`{COLLEAGUES_CRON}`" in installer_raw, "installer lacks the two exact lane crons")
-    own, colleagues = hours_of(OWN_CRON), hours_of(COLLEAGUES_CRON)
-    check(own == [0, 2, 4, 6, 8, 12, 16, 18, 20, 22] and colleagues == [1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23], "the lane hour lists changed")
-    check(not set(own) & set(colleagues), "the two lanes share an hour")
-    check(len(own) + len(colleagues) == 21, "the lanes do not make 21 runs a day")
-    for hour in own + colleagues:
-        for daily in DAILY_MINUTES:
-            check(minutes_apart(hour * 60, daily) >= 60, f"{hour}:00 is closer than 60 minutes to a daily schedule at minute {daily}")
-        check(gap_minutes(hour, REPAIR_HOUR) >= 60 and hour != REPAIR_HOUR, f"{hour}:00 is closer than 60 minutes to Sunday Repair")
-    for a in own:
-        for b in colleagues:
-            check(gap_minutes(a, b) >= 60, f"{a}:00 and {b}:00 are closer than 60 minutes across the lanes")
-    for needle in ("at least 60 minutes from every time of the other lane, from each of the three daily times (Send invitations, Follow-up and Withdraw stale invitations), and on the day Repair runs from the Repair time", "`0 13 * * *`", "`30 13 * * *`", "`0 14 * * *`", "`0 10 * * 0`"):
+    own, colleagues = times_of(OWN_CRON), times_of(COLLEAGUES_CRON)
+    check(own == [0, 180] and colleagues == [90, 270], "the lane times changed")
+    check(len(own) + len(colleagues) == 4, "the lanes do not make four runs a day")
+    starts = [("own", m) for m in own] + [("colleagues", m) for m in colleagues] + [("daily", m) for m in DAILY_MINUTES]
+    for index, (name_a, a) in enumerate(starts):
+        for name_b, b in starts[index + 1:]:
+            floor = 90 if {name_a, name_b} == {"own", "colleagues"} else 30
+            check(minutes_apart(a, b) >= floor, f"{name_a} {a // 60}:{a % 60:02d} and {name_b} {b // 60}:{b % 60:02d} are closer than {floor} minutes")
+    for name, minute in starts:
+        check(minutes_apart(minute, REPAIR_MINUTE) >= 30, f"{name} {minute // 60}:{minute % 60:02d} is closer than 30 minutes to Sunday Repair")
+    for needle in ("at least 30 minutes from every other start of these, and the two Source leads lanes sit 90 minutes apart", "`0 6 * * *`", "`45 18,22 * * *`", "`30 23 * * *`", "`45 6,23 * * *`", "`0 10 * * 0`"):
         check(needle in installer, f"installer's spacing rule lacks: {needle}")
 
     # 3. The installer matches by routine and scope, replaces a scope-less task in place, keeps 'no Source leads task', reads both lanes back.
@@ -184,14 +183,14 @@ def main() -> None:
 
     # 6. Versions and the changelog entry that names the server release.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
+        check(json.loads(read(manifest))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.12") < readme.index("### 0.9.11"), "README changelog lacks 0.9.12 above 0.9.11")
     entry = flat(readme[readme.index("### 0.9.12"):readme.index("### 0.9.11")])
     for needle in (
         "equires Mosaico server release 20261008e (PR #1831) or later; install only after that release is live on main-v2",
         "sourcingScope", "workNow", "workNow.agentId", "outreach_get_run at least every 10 minutes", "sourcing-run-busy", "sourcing-scope-empty", "sourcing_scope_invalid",
-        "abandoned is gone", "sourcing-run-open", "run_ended", "unavailableAgents", OLD_OWN_CRON, COLLEAGUES_CRON, "scope-less Source leads task is updated in place into the own lane",
+        "abandoned is gone", "sourcing-run-open", "run_ended", "unavailableAgents", OLD_OWN_CRON, OLD_COLLEAGUES_CRON, "scope-less Source leads task is updated in place into the own lane",
         "Mosaico lane", "Candidates skipped as held by another owner: N",
     ):
         check(needle in entry, f"README 0.9.12 entry lacks: {needle}")

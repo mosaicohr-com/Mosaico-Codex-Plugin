@@ -91,7 +91,9 @@ def check_0911(claude_text: str, codex_text: str) -> None:
     for package in (CLAUDE, CODEX):
         installer = flat((package / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md").read_text(encoding="utf-8"))
         # 0.9.13: the Sync data text, both Claude lane texts and the Codex Source leads text move to 0.9.13 (drafts move from Source leads to Sync data).
-        check("0.9.13 or later" in installer and "0.9.9 or later" not in installer and "0.9.12 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install lacks the 0.9.13 stamp")
+        # 0.9.24: the Claude routine texts move to 0.9.24; the Codex Source leads text stays at 0.9.13.
+        want = "0.9.24 or later" if package == CLAUDE else "0.9.13 or later"
+        check(want in installer and "0.9.9 or later" not in installer and "0.9.12 or later" not in installer and "0.9.11 or later" not in installer, f"{package.name} schedule-install lacks the {want} stamp")
     # README: the changelog entry, the script description and the colleague-check paragraph.
     readme_raw = (ROOT / "README.md").read_text(encoding="utf-8")
     check(readme_raw.index("### 0.9.11") < readme_raw.index("### 0.9.10"), "README changelog lacks 0.9.11 above 0.9.10")
@@ -153,7 +155,7 @@ def main() -> None:
     check_0911(claude_text, codex_text)
     # Manifests and the README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
     readme = flat((ROOT / "README.md").read_text(encoding="utf-8"))
     check("### 0.9.5" in readme and "### 0.9.4" in readme and SCRIPT in readme and "holds the six approved capture scripts" in readme and "already connected to the colleague" in readme, "the README lacks the 0.9.4 entry or the script's description")
     print("PASS: the invite-run skills run the colleague check before a colleague save, pass its output unchanged, handle every Mosaico answer, and never treat 'not found' as 'not connected'; Codex says it cannot run it.")

@@ -53,6 +53,16 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
+## Current state (0.9.24)
+
+Plugin 0.9.24 (not yet tagged or published; it waits for the Mosaico release that ships PRs 2053, 2057 and 2058, not yet promoted):
+the Send invitations and Follow-up routines rewrite the drafts an Agent change returned to Draft, every routine records its run on the
+person's Routines Board, and the installer ships the board page and new default times built around an evening review of drafts
+(7:00 to 10:30 PM): Source leads (own) `0 0,3 * * *`, Source leads (colleagues) `30 1,4 * * *`, Send invitations `0 6 * * *`, Follow-up
+`45 18,22 * * *`, Withdraw stale invitations `30 23 * * *` (installed paused until tested), Routines report `45 6,23 * * *`, Repair
+Sunday 10:00 AM. The older description of the schedules below stays as history; the changelog entry for 0.9.24 and the schedule
+installer skill are authoritative for times.
+
 ## Outreach workflows
 
 The provider packages include dedicated invitation, follow-up and schedule-installation skills.
@@ -157,7 +167,7 @@ A colleague sets up her own schedules on her own Mac:
 5. Register her LinkedIn profile in Mosaico Outreach, Agent tab, "LinkedIn profile". The installer checks
    it with `outreach_start_run` (intent `inspect_day`); if Mosaico answers
    `linkedin_identity_not_registered`, register the profile there, or have an Owner do it, and check again.
-6. Run the schedule installer. It installs her Send invitations, Follow-up and Withdraw stale invitations schedules (and retires an older Sync data task), and Source leads only if she sources
+6. Run the schedule installer. It installs her Send invitations, Follow-up, Withdraw stale invitations and Routines report schedules and her own Routines Board (and retires an older Sync data task), and Source leads only if she sources
    Leads herself. Her Source leads schedule needs no quota: she sets Leads per day and Leads per run on her Agent
    in Outreach (Agent tab) and may name a colleague as "Sourced by".
 
@@ -203,6 +213,51 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.24
+
+Needs the Mosaico release that ships PRs 2053, 2057 and 2058; not yet promoted. Do not tag, publish or install this plugin before that
+release is live on main-v2. Skills and one page asset only: the plugin bundles no Mosaico server, address or token.
+
+- **Rewrite work.** A draft returned to Draft by an Agent change (reasons `checklist-changed` or `instructions-changed`, or a draft
+  never approved whose stored review no longer holds) is rewrite work, ordered by the application. The Send invitations work list has a
+  new phase and step `rewrite`, after send and before check, with the action `rewrite_returned_invitation_draft`; `sendRun.rewrites`
+  (up to 50 items: `leadId`, `name`, `messageId`, `kind`, `day`, `agentId`, `agentName`, `body`, `reason`, `basis`, `returnedAt`,
+  `recommendedCall`), `sendRun.next.rewrite`, `sendRun.remaining.rewrite`, `sendRun.rewriteCount` and `sendRun.rewritesThisRun`. Rewrites
+  share the 100-draft limit with new drafts and go first; what is left waits with the reason `rewrite-limit-reached`. The step covers every
+  scheduled day. The routine rewrites the body to the Agent's current instructions and checklist and records it with the existing
+  `messageId`; it never approves. The Follow-up queue has a new stage `rewrite-draft` (`nextStep` `rewrite_follow_up_draft`) between
+  `send-approved` and `draft`, with `rewriteDraft`, a `recommendedCall` that names the `messageId`, a `readConversationCall` and
+  `counts.rewrite`: the routine reads that thread first (the invitation actually sent is in it), then writes the first message without
+  repeating the invitation's words, per the Agent's rules, and records it with the existing `messageId`. `outreach_record_message` with an
+  existing `messageId` replaces the body, keeps the kind, the day and `sendNotBefore`, clears the returned flag and leaves the status
+  Draft; the checklist review still applies and a second unsent draft is impossible. Reports name the rewritten drafts (count, names,
+  days) and any `rewrite-limit-reached` wait. Both packages carry the invitation side; the follow-up side is in the Claude routine and
+  the Codex queue notes.
+- **Routines Board.** Every routine section (Source leads, Send invitations, Follow-up, Withdraw stale invitations) ends with the step
+  "Record the run on the Routines Board". If the schedule text carries the line `routines board: https://claude.ai/artifact/<id>`, the run
+  loads `ArtifactData` (ToolSearch `select:ArtifactData`) and writes one batch with that url: a `runs` document (id = the run's `runId`;
+  `routine`, `startedAt`, `endedAt`, `outcome`, `headline`, `counts`, `notes`, `reportText`), `actions` documents for what the person
+  must do (`act-<slug>-<yyyymmdd>`), `issues` documents for defects and blockers (`iss-<slug>`, `firstSeenAt` kept) and `meta/board`
+  (`lastUpdatedAt`, `lastUpdatedBy`, any `states` kept). Existing documents are read first and written with their version. With no board
+  line the step is skipped silently; a failed write is one line in the report and never blocks it.
+- **Routines report.** A new thin task "Mosaico Outreach — Routines report" (`45 6,23 * * *`) with a new section "Routines report
+  routine" in the follow-up-run skill reads each routine's latest scheduled run and writes the board the same way. It is the fallback
+  when a routine could not write. It uses no browser and no Mosaico connector.
+- **Installer.** It publishes the page `plugins/mosaico-claude/assets/routines-board.html` (Claude package only; the Codex package does
+  not get it) once per person with the Artifact tool (title "Outreach Routines Board", icon `dashboard`, the `db` capability with
+  everyone reading and only Editors and the Owner writing, and `user`), reuses the address found on an existing task otherwise, appends
+  the line `routines board: <url>` to every routine's thin text (its own paragraph) and reads it back. The thin texts move to the
+  0.9.24 stamp. The installer asks once for the person's review window (default 7:00 to 10:30 PM) and shifts the two Follow-up times when
+  it differs.
+- **New default times, every day.** Follow-up `45 18,22 * * *` (6:45 PM and 10:45 PM), Withdraw stale invitations `30 23 * * *`
+  (11:30 PM, installed paused until the person has tested it), Source leads (own) `0 0,3 * * *`, Source leads (colleagues)
+  `30 1,4 * * *`, Send invitations `0 6 * * *`, Routines report `45 6,23 * * *`, Repair unchanged. Why: the person reviews and approves
+  drafts between 7:00 and 10:30 PM; the 6:45 PM Follow-up drafts for that review; the 10:45 PM one sends what was approved; Send
+  invitations sends in the morning and drafts the coming days. The spacing rule is now: no two LinkedIn starts closer than 30 minutes, and
+  90 minutes between the two sourcing lanes.
+- Tests: `tests/test_schedule_install_skill.py` and `tests/test_rewrite_board_skill.py` (new) cover the texts, sections, times, board line,
+  installer behaviour and version stamp; `tests/test_outreach_tool_contract.py` reads the rewrite fields from the application source.
 
 ### 0.9.23
 

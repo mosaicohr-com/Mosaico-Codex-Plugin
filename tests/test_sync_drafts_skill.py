@@ -134,9 +134,9 @@ def main() -> None:
         both = flat(section(raw, "Both"))
         # 0.9.19: Mosaico orders a send run's list: sends, then checks, then drafts. The model never drafts first.
         check("Never approve a newly created draft automatically" in both and "Sourcing is never part of this" in both, f"{package} Both section does not send approved only and keep sourcing out")
-        check("sends come first, then connection checks, then drafts" in both and "Mosaico sets the order, not you" in both, f"{package} Both section does not say Mosaico orders send, check, draft")
+        check("sends come first, then rewrites of returned drafts, then connection checks, then drafts" in both and "Mosaico sets the order, not you" in both, f"{package} Both section does not say Mosaico orders send, check, draft")
         check("Complete **Write missing invitation drafts** first" not in both and both.index("Complete **Send approved invitations** first") < both.index("complete **Write missing invitation drafts**"), f"{package} Both section still drafts first")
-        check("Do not write a draft before Mosaico offers it: it recommends none while a send or a check is left" in both, f"{package} Both section does not hold the draft back until Mosaico offers it")
+        check("Do not write a draft before Mosaico offers it: it recommends none while a send, a rewrite or a check is left" in both, f"{package} Both section does not hold the draft back until Mosaico offers it")
         check("Mosaico also sets how much one run does: checks and drafts are for Leads placed on a later day (after today), and it hands out at most sendRun.checkLimit checks and sendRun.draftLimit drafts in a run" in both,
               f"{package} Both section does not point at Mosaico's check and draft limits")
         # 0.9.19 (server release 20261014a): the skills carry no limit of their own and no old wording of the first draft of this release.
@@ -203,7 +203,7 @@ def main() -> None:
     sync = flat(section(invite_claude, "Send invitations routine"))
     for needle in (
         "It never approves a draft, and it does nothing else: no follow-ups, no messages, no withdrawals, no sourcing",
-        "One run works one ordered list that Mosaico keeps for the person's own Leads: it sends the invitations that are already approved, then checks the connections Mosaico hands out, then writes the missing invitation drafts",
+        "One run works one ordered list that Mosaico keeps for the person's own Leads: it sends the invitations that are already approved, then rewrites the drafts an Agent change returned to Draft, then checks the connections Mosaico hands out, then writes the missing invitation drafts",
         'the scope is invitations for today with the actions "write missing invitation drafts" and "send approved invitations"',
         # (a) the run follows the application's recommended action; it never counts, orders or rebuilds the list.
         "Call outreach_get_day for today with intent send_approved_invitations and the runId",
@@ -215,7 +215,7 @@ def main() -> None:
         "The answer to a connection check or a draft carries sendRun with the next Lead and the one recommendedAction: do that, with no reread",
         "So does the answer to a send or a recorded delivery block. If an answer says sendRun is unavailable, reread the day",
         "Never count, order or remember what is left yourself, and never rebuild the list from draftsToWrite or any other read",
-        "A Lead that needs a person, or that is left over once a limit is reached (reasons check-limit-reached and draft-limit-reached), is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
+        "A Lead that needs a person, or that is left over once a limit is reached (reasons check-limit-reached, draft-limit-reached and rewrite-limit-reached), is listed under sendRun.waiting with a reason, and a Lead whose check or draft Mosaico refused twice in this run is skipped and listed under sendRun.skippedThisRun: leave both alone, they never hold the end of the run",
         # 0.9.19 (server release 20261014a): checks are for Leads placed on a later day and not checked yet; drafts for those checked and not connected; both within Mosaico's limits, counted by Mosaico.
         "first the approved invitations to send (a Lead holding one is checked first, and that check never counts toward a limit)",
         "then the connections to check (every Lead placed on a later day, after today, whose connection is not checked yet, soonest day first)",
@@ -230,7 +230,7 @@ def main() -> None:
         "using Mosaico's counts from its answers, not memory",
         "invitation drafts written (sendRun.draftsThisRun), each with its Lead",
         "connection checks made (sendRun.checksThisRun) and what Mosaico answered",
-        "the Leads that waited (sendRun.waiting in the end answer, each with its reason: a person is needed, or check-limit-reached, or draft-limit-reached)",
+        "the Leads that waited (sendRun.waiting in the end answer, each with its reason: a person is needed, or check-limit-reached, or draft-limit-reached, or rewrite-limit-reached)",
         "the Leads Mosaico skipped after two refusals (sendRun.skippedThisRun, each with its step and code)",
     ):
         check(needle in sync, f"Send invitations routine lacks: {needle}")
@@ -277,9 +277,9 @@ def main() -> None:
     # 5. The installer: the Sync data and Source leads texts carry the 0.9.13 stamp, Repair keeps 0.9.6, nothing says 0.9.12 any more.
     installer_raw = read(CLAUDE / "skills" / "mosaico-outreach-schedule-install" / "SKILL.md")
     texts = re.findall(r"```text\n(.*?)\n```", installer_raw, re.S)
-    check(len(texts) == 6, f"Claude installer must hold six schedule texts, found {len(texts)}")
-    sync_text, follow_text, withdraw_text, own_text, colleagues_text, repair_text = texts
-    for label, text, section_name, stamp in (("Send invitations", sync_text, "Send invitations routine", "0.9.15"), ("Follow-up", follow_text, "Follow-up routine", "0.9.18"), ("Withdraw stale invitations", withdraw_text, "Withdraw stale invitations routine", "0.9.15"), ("Source leads (own)", own_text, "Source leads routine", "0.9.13"), ("Source leads (colleagues)", colleagues_text, "Source leads routine", "0.9.13")):
+    check(len(texts) == 7, f"Claude installer must hold seven schedule texts, found {len(texts)}")  # 0.9.24 adds the Routines report text
+    sync_text, follow_text, withdraw_text, own_text, colleagues_text, report_text, repair_text = texts
+    for label, text, section_name, stamp in (("Send invitations", sync_text, "Send invitations routine", "0.9.24"), ("Follow-up", follow_text, "Follow-up routine", "0.9.24"), ("Withdraw stale invitations", withdraw_text, "Withdraw stale invitations routine", "0.9.24"), ("Source leads (own)", own_text, "Source leads routine", "0.9.24"), ("Source leads (colleagues)", colleagues_text, "Source leads routine", "0.9.24"), ("Routines report", report_text, "Routines report routine", "0.9.24")):
         check(f"({stamp} or later)" in text and f'is older than {stamp} or has no "{section_name}" section' in text, f"the {label} text is not stamped {stamp}")
         check("0.9.12" not in text, f"the {label} text still names 0.9.12")
         check(len(text.split()) <= 200, f"the {label} text is not thin")
@@ -304,7 +304,7 @@ def main() -> None:
 
     # 7. Versions and the changelog entry that holds the release gate.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.23", f"{manifest.name} is not at 0.9.23")
+        check(json.loads(read(manifest))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.13") < readme.index("### 0.9.12"), "README changelog lacks 0.9.13 above 0.9.12")
     entry = flat(readme[readme.index("### 0.9.13"):readme.index("### 0.9.12")])

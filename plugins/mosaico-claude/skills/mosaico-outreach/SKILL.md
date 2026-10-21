@@ -29,11 +29,12 @@ all-dates follow-up actions:
   runs: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
   declines nobody applied. Up to the cap Mosaico sets for one run. Never approve or send.
 - **Install the Outreach schedules** — Idempotently create the local-time schedules: Send invitations
-  (once a day, 1:00 PM by default), Follow-up (once a day, 1:30 PM) and Withdraw stale invitations (once a day,
-  2:00 PM), which replace the older single Sync data schedule and retire it, Source leads in two lanes (own, on the
-  even hours, and colleagues, on the odd hours, each at least 60 minutes from the other lane, from the three daily
-  times and from Repair) and Repair (once a week, Sunday 10:00 AM by default, also on demand). Only Send
-  invitations and Follow-up send; Withdraw stale invitations only withdraws what Mosaico lists.
+  (6:00 AM every day by default), Follow-up (twice a day, 6:45 PM and 10:45 PM, around the person's evening review of
+  drafts) and Withdraw stale invitations (11:30 PM, installed paused until the person has tested it), which replace the
+  older single Sync data schedule and retire it, Source leads in two lanes (own at 12:00 AM and 3:00 AM, colleagues at
+  1:30 AM and 4:30 AM, 90 minutes apart), a Routines report task (6:45 AM and 11:45 PM) and Repair (once a week, Sunday
+  10:00 AM by default, also on demand). It also publishes the person's Routines Board once. Only Send invitations and
+  Follow-up send; Withdraw stale invitations only withdraws what Mosaico lists.
 
 Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
 `/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
