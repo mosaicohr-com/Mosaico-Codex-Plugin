@@ -690,7 +690,7 @@ run. It may not save Leads, link duplicate Leads or withdraw invitations: Mosaic
 5. `send-approved` (`send_approved_follow_up`): send `approvedMessage.body` exactly as approved with **Send one approved
    follow-up** below, then mark it sent with the call in `recommendedCall`.
 6. `rewrite-draft` (`nextStep` `rewrite_follow_up_draft`): an unsent follow-up draft that an Agent change returned to Draft
-   (reasons `checklist-changed` or `instructions-changed`, or a draft never approved whose stored review no longer holds). It comes
+   (reasons `checklist-changed`, `instructions-changed` or `person-requested`, or a draft never approved whose stored review no longer holds). It comes
    between `send-approved` and `draft`, before any new draft. The item carries `rewriteDraft` (`messageId`, `kind`, `body`, `reason`,
    `basis`, `returnedAt`, `sendNotBefore`), a `recommendedCall` that names the existing `messageId`, and a `readConversationCall`.
    Make `readConversationCall` first, the thread deposit as in stage 4, so the rewrite rests on the thread as it stands: the

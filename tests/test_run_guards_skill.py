@@ -119,7 +119,7 @@ def main() -> None:
 
     # Versions and README.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.24", f"{manifest.name} is not at 0.9.24")
+        check(json.loads(read(manifest))["version"] == "0.9.25", f"{manifest.name} is not at 0.9.25")
     readme = read(ROOT / "README.md")
     check(readme.index("### 0.9.10") < readme.index("### 0.9.9"), "README changelog lacks 0.9.10 above 0.9.9")
     entry = flat(readme[readme.index("### 0.9.10"):readme.index("### 0.9.9")])

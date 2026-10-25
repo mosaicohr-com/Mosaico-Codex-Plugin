@@ -40,7 +40,7 @@ def section(text: str, name: str) -> str:
 def main() -> None:
     # Version, README entry and the page asset.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == VERSION, f"{manifest.name} is not at {VERSION}")
+        check(json.loads(read(manifest))["version"] == "0.9.25", f"{manifest.name} is not at 0.9.25")
     readme = read(ROOT / "README.md")
     check(readme.index(f"### {VERSION}") < readme.index("### 0.9.23"), f"README changelog lacks {VERSION} above 0.9.23")
     entry = flat(readme[readme.index(f"### {VERSION}"):readme.index("### 0.9.23")])
@@ -66,7 +66,7 @@ def main() -> None:
     check(rewrite["Claude"] == rewrite["Codex"], "the two packages hold different Rewrite returned invitation drafts sections")
     flat_rewrite = flat(rewrite["Claude"])
     for needle in (
-        "checklist-changed or instructions-changed", "rewrite_returned_invitation_draft", "every scheduled day", "sendRun.rewrites lists up to 50 items", "leadId, name, messageId, kind, day, agentId, agentName, body (the draft as it stands), reason, basis, returnedAt and recommendedCall",
+        "checklist-changed, instructions-changed or person-requested", "rewrite_returned_invitation_draft", "every scheduled day", "sendRun.rewrites lists up to 50 items", "leadId, name, messageId, kind, day, agentId, agentName, body (the draft as it stands), reason, basis, returnedAt and recommendedCall",
         "sendRun.next.rewrite", "sendRun.remaining.rewrite", "sendRun.rewriteCount", "outreach_record_message with the existing messageId", "checklistReview", "runId", "keeps the kind, the day and any booked day",
         "never creates a second unsent draft", "Never approve, send or mark sent a rewritten draft", "share the run's draft limit", "go first", "rewrite-limit-reached", "sendRun.rewritesThisRun",
         "the drafts rewritten (the count, and each with its Lead name and day)",
