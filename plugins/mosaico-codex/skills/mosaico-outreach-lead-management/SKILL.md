@@ -100,8 +100,8 @@ to the Follow-up routine instead.
 When the person gives a CSV, a sheet or a list of Leads they already sourced and names the Agent, load them with
 `outreach_load_leads`. No run is needed: do not call `outreach_start_run` for this.
 
-1. Read `outreach_get_agents` and confirm the Agent the person named. Mosaico takes the owner from the Agent; pass
-   `ownerUserId` only if the person names the owner to check against.
+1. Read `outreach_get_agents` and confirm the Agent the person named. Mosaico takes the owner from the Agent. Do not pass
+   `ownerUserId`.
 2. Read the file and map its columns to `name`, `linkedInProfileUrl`, `company`, `jobTitle` and `notes`. Show the person
    the mapping and the number of rows, and ask for confirmation before the first call. Leave a field out when the file
    has no column for it.
