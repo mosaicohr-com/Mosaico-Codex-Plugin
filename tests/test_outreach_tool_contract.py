@@ -20,6 +20,8 @@ REGISTRY_FILES = (
     "features/outreach/server/outreach-mcp-registry.ts",
     "features/outreach/server/outreach-transfer-tool.ts",
     "features/outreach/server/outreach-transfer-batch-tool.ts",
+    # The bulk load tool registers itself in its own file (0.9.25, server release 20261026a).
+    "features/outreach/server/outreach-lead-load.ts",
     # The connection-evidence tool's name is a shared constant, not a literal in the registry.
     "features/outreach/shared/outreach-connection-evidence.ts",
     # The follow-up queue read's name is the exported constant OUTREACH_FOLLOW_UP_QUEUE_TOOL (0.9.16).
