@@ -68,6 +68,11 @@ def main() -> None:
             # The existing promise stays.
             "Never update, delete, classify, approve or send Messages",
             "intent: manage_leads",
+            # 0.9.25: loading already-sourced Leads and asking for a new draft.
+            "outreach_load_leads", "No run is needed", "pages of at most 200 rows", "Mosaico chooses the days", "duplicate-own", "duplicate-in-batch", "held-by-other-owner",
+            "invalid-row", "invalid-url", "agent-days-full", "agent-not-sourceable", "write-failed", "load_more", "review_skipped",
+            "Never send a rejected row again with changed data without asking the person first",
+            "outreach_request_redraft", "person-requested", "never rewrites in place",
         ):
             check(needle in text, f"{package} lead-management skill lacks: {needle}")
         for code in DATE_CODES:

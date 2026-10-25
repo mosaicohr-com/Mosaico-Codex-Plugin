@@ -5,9 +5,10 @@ description: Review, update, or create owned Mosaico Outreach Lead records witho
 
 # Manage Mosaico Outreach Leads
 
-At the start of every run, ask whether the person wants to update existing Leads or load a new Lead.
+At the start of every run, ask whether the person wants to update existing Leads, load a new Lead, load a file of already-sourced Leads or ask for a new draft.
 This skill manages Lead records only. Never update, delete, classify, approve or send Messages, and
-never update Agent definitions.
+never update Agent definitions. The one exception is asking for a new draft (`outreach_request_redraft`), which
+only returns a Message to Draft.
 
 ## While the connector is acting as a member
 
@@ -93,6 +94,39 @@ to the Follow-up routine instead.
 4. After saving, do not load or edit Messages in this skill. Ask whether the person wants to load the
    visible conversation now. If yes, invoke `$mosaico:mosaico-outreach-follow-up-run` and let that
    skill deposit the conversation and prepare any follow-up draft.
+
+## Load already-sourced Leads from a file
+
+When the person gives a CSV, a sheet or a list of Leads they already sourced and names the Agent, load them with
+`outreach_load_leads`. No run is needed: do not call `outreach_start_run` for this.
+
+1. Read `outreach_get_agents` and confirm the Agent the person named. Mosaico takes the owner from the Agent.
+   Do not pass `ownerUserId`.
+2. Read the file and map its columns to `name`, `linkedInProfileUrl`, `company`, `jobTitle` and `notes`. Show the person
+   the mapping and the number of rows, and ask for confirmation before the first call. Leave a field out when the file
+   has no column for it.
+3. Send pages of at most 200 rows. Mosaico checks every row itself (a name; a full personal LinkedIn profile address,
+   `linkedin.com/in/`; field lengths): do not add rules of your own, do not drop or fix rows, and do not choose days.
+   Mosaico chooses the days. `notes` are accepted but not stored, and Mosaico says so.
+4. After each page, report what Mosaico returned, row by row and in its own words, with the totals:
+   - placed, with the day Mosaico gave each row;
+   - skipped: `duplicate-own`, `duplicate-in-batch` or `held-by-other-owner` (with who holds it). A skipped row is not a failure;
+   - rejected: `invalid-row`, `invalid-url`, `agent-days-full`, `agent-not-sourceable` or `write-failed`.
+5. Follow `nextAction`. `load_more`: send the next page. `review_skipped`: stop and show the person the skipped and
+   rejected rows. `none`: stop and report the totals. Sending a page again is safe: rows already placed come back as
+   `duplicate-own`.
+6. Never send a rejected row again with changed data without asking the person first. Show the row, the reason and the
+   change you would make, and send it again only after the person says yes.
+
+## Ask for a new draft of a Lead's Message
+
+When the person asks for a Lead's draft to be rewritten, call `outreach_request_redraft` with `leadId`, and with `messageId`
+when they name one Message. Without `messageId` it covers every unsent outbound Message the Lead holds. Tell the person
+what Mosaico does: the Message goes back to Draft with the reason `person-requested` (an approved one loses its approval),
+and it is rewritten by the next Send invitations run (an invitation) or the next Follow-up run (a follow-up). This skill
+never writes the new body and never rewrites in place. If Mosaico lists a Message under `alreadyWaiting`, it was already
+waiting for a rewrite and was left as it is; say so. If the Lead has no unsent draft, Mosaico refuses in a plain sentence
+and writes nothing; show it. Call it only for the Lead and Message the person named.
 
 To move a Lead between colleagues (Owner or Admin only), call `outreach_transfer_lead`, show the
 person the preview and let them confirm. Pass `toAgentId` explicitly (null if unknown). If Mosaico says

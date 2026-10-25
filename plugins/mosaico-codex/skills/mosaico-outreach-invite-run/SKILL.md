@@ -207,7 +207,7 @@ not sent before that (`own-evidence-required`).
 ## Rewrite returned invitation drafts
 
 When an Agent's checklist or instructions change, Mosaico returns the unsent drafts that rested on the old ones to Draft
-(reasons `checklist-changed` or `instructions-changed`; a draft that was never approved and whose stored review no longer holds
+(reasons `checklist-changed`, `instructions-changed` or `person-requested`; a draft that was never approved and whose stored review no longer holds
 counts too). Those drafts are rewrite work, and Mosaico orders it: in a Send invitations run it is the step after the sends
 and before the connection checks (`workflowStatus.sendRun`, phase and step `rewrite`, recommended action
 `rewrite_returned_invitation_draft`). It covers every scheduled day, today included.

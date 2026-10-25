@@ -55,6 +55,8 @@ after the person disconnects and reconnects the Mosaico connector in Claude's co
 
 ## Current state (0.9.24)
 
+Plugin 0.9.25 adds loading already-sourced Leads and asking for a new draft to the Lead-management skill (see its changelog entry); the rest below is unchanged from 0.9.24.
+
 Plugin 0.9.24 (not yet tagged or published; it waits for the Mosaico release that ships PRs 2053, 2057 and 2058, not yet promoted):
 the Send invitations and Follow-up routines rewrite the drafts an Agent change returned to Draft, every routine records its run on the
 person's Routines Board, and the installer ships the board page and new default times built around an evening review of drafts
@@ -213,6 +215,22 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.25
+
+Needs the Mosaico release 20261026a and b (both live in production). Skills only: the plugin bundles no Mosaico server, address or token.
+
+- **Load already-sourced Leads.** The Lead-management skill (both packages) loads a CSV, sheet or list of Leads the person already sourced
+  with `outreach_load_leads`, once the person names the Agent. It maps columns to `name`, `linkedInProfileUrl`, `company`, `jobTitle` and
+  `notes`, sends pages of at most 200 rows with no run, and after each page reports the placed rows (with their days), the skipped rows
+  (`duplicate-own`, `duplicate-in-batch`, `held-by-other-owner`) and the rejected rows (`invalid-row`, `invalid-url`, `agent-days-full`,
+  `agent-not-sourceable`, `write-failed`) as Mosaico returned them. It follows `nextAction` (`load_more`, `review_skipped`, `none`) and never
+  sends a rejected row again with changed data without asking. Mosaico chooses the days and checks every row; the skill adds no rules.
+- **Ask for a new draft.** The same skill calls `outreach_request_redraft` with `leadId` (and `messageId` for one Message) when the person
+  asks for a draft to be rewritten. The Message returns to Draft with the reason `person-requested`; the next Send invitations run
+  (invitations) or Follow-up run (follow-ups) rewrites it. Nothing is rewritten in place.
+- **Rewrite reasons.** The invite-run and follow-up-run skills list `person-requested` beside `checklist-changed` and `instructions-changed`.
+  Nothing else changed in them; no schedule, board or installer changes.
 
 ### 0.9.24
 
