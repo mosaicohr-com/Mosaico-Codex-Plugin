@@ -55,7 +55,7 @@ after the person disconnects and reconnects the Mosaico connector in Claude's co
 
 ## Current state (0.9.24)
 
-Plugin 0.9.25 adds loading already-sourced Leads and asking for a new draft to the Lead-management skill (see its changelog entry); the rest below is unchanged from 0.9.24.
+Plugin 0.9.26 makes the schedule installer report each schedule it sets to Mosaico, so the Agent tab's Routines section can show when each routine runs (see its changelog entry). Plugin 0.9.25 adds loading already-sourced Leads and asking for a new draft to the Lead-management skill (see its changelog entry); the rest below is unchanged from 0.9.24.
 
 Plugin 0.9.24 (not yet tagged or published; it waits for the Mosaico release that ships PRs 2053, 2057 and 2058, not yet promoted):
 the Send invitations and Follow-up routines rewrite the drafts an Agent change returned to Draft, every routine records its run on the
@@ -215,6 +215,20 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.9.26
+
+Needs the Mosaico release that adds `outreach_record_routine_schedule` and the Routines section of the Agent tab (the server release named in
+mosaicohr-com/mosaico pull request 2158). Do not tag, publish or install this plugin before that release is live in production. Skills only:
+the plugin bundles no Mosaico server, address or token.
+
+- **The installer reports the schedules it sets.** The schedule-install skill (Claude) calls `outreach_record_routine_schedule` once per
+  routine after it creates, updates, pauses or resumes a scheduled task and has read it back, with the time zone, the days of the week, the
+  times of day and the paused state the task actually saved, and the plugin version. It says in its report which routines were recorded and
+  which were not. Mosaico shows them in Outreach, Agent tab, Routines, with each routine's last run from its own run records. A refused or
+  unavailable tool never undoes a schedule.
+- **Codex.** The Codex schedule-install skill does the same for the one schedule it installs, Source leads.
+- Nothing else changed: no routine text, stamp, cron, board or default time moved.
 
 ### 0.9.25
 

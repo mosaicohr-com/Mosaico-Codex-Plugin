@@ -40,7 +40,7 @@ def section(text: str, name: str) -> str:
 def main() -> None:
     # Version, README entry and the page asset.
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(read(manifest))["version"] == "0.9.25", f"{manifest.name} is not at 0.9.25")
+        check(json.loads(read(manifest))["version"] == "0.9.26", f"{manifest.name} is not at 0.9.26")
     readme = read(ROOT / "README.md")
     check(readme.index(f"### {VERSION}") < readme.index("### 0.9.23"), f"README changelog lacks {VERSION} above 0.9.23")
     entry = flat(readme[readme.index(f"### {VERSION}"):readme.index("### 0.9.23")])

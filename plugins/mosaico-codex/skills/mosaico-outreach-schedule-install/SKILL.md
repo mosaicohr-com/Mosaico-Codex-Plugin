@@ -91,6 +91,10 @@ Use this when a Source leads automation is already installed and only its standi
 3. Replace the whole text with the Source leads text above, filled with the saved answers, so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in"; carry them over unchanged unless the person gave a new one, and drop any quota map. Change nothing else: keep its times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
 4. Read the saved automation back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion.
 
+## Record the schedule in Mosaico
+
+Mosaico stores no schedule of its own. Outreach, Agent tab has a Routines section that shows when each routine runs; Mosaico knows it only because you tell it. After you create or update the Source leads automation and have read it back, call `outreach_record_routine_schedule` once with `routine` `source_own`, the `timeZone` it saved with (an IANA zone such as `Pacific/Auckland`), the `days` it fires on (`mon` to `sun`, each once), every time of day it fires as `HH:MM` on the 24-hour clock (`times`), `paused` `true` when the automation is saved disabled and `false` when it is on, and the installed plugin's version as `pluginVersion`. Use the values the automation saved, never the defaults. Do not pass `ownerUserId`: the schedule is the person's own. If the tool is not available or Mosaico refuses a value, the automation stays installed; say that it was not recorded and why, and that running this installer again records it. The tool changes nothing but the report and starts no run. Say in the readback whether the schedule was recorded.
+
 ## Keep it apart from the daily schedules
 
 The schedules must not overlap. If the person has the Claude schedules, place every Source leads
@@ -116,3 +120,4 @@ works too (45 minutes before the first Follow-up). Say in the readback that you 
 6. Read back the saved automation state and confirm name, local timezone, enabled status, next run
    times and that the saved text is the thin text (it names the skill and its routine section and holds no
    steps). A write attempt without readback is not completion.
+7. Record the schedule in Mosaico (**Record the schedule in Mosaico**), from that readback.

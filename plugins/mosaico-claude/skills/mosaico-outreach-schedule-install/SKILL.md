@@ -9,7 +9,8 @@ Use Claude Desktop's supported persistent local scheduled-task mechanism. These 
 person's authenticated LinkedIn browser, so do not substitute a cloud routine that lacks that local
 browser session. Create and change the tasks with the app's scheduled-tasks tools (`list_scheduled_tasks`,
 `create_scheduled_task`, `update_scheduled_task`); a cron is read in the person's local time. This action
-configures personal schedule state; it does not change Mosaico records.
+configures personal schedule state. The one thing it tells Mosaico is when each schedule runs, so the Routines section of
+Outreach, Agent tab can show it (see **Record the schedules in Mosaico**); it changes no Lead, Message, Agent or run.
 
 ## Check before installing
 
@@ -254,7 +255,7 @@ Use this when a schedule is already installed and only its standing answers have
 1. Ask only for the answer that is missing or changing (the timezone or the LinkedIn public identifier). Ask nothing else. Never ask for a quota: Leads per day, Leads per run and who sources them are set on each Agent in Outreach, Agent tab, not in the schedule.
 2. Find the installed task, for example "Mosaico Outreach — Source leads (own)", matching by purpose, scope and instructions as under Install. If there is none, say so and offer to install it; do not create one here without being asked.
 3. Replace the whole text with the thin text for that routine above (for Source leads, the text of its lane, carrying its `sourcing scope` line over; a text with no scope line gets `sourcing scope: own`), filled with the saved answers and the board address (the saved `routines board:` line when there is one, otherwise the person's board, see **The Routines Board**), so the saved text holds only the standing answers. If the saved text is the older long form, read its answers from it: the timezone after "Resolve the current business date and time in" and the public identifier in the brackets after "signed in to my LinkedIn"; carry them over unchanged unless the person gave a new one, and drop any quota map. Change nothing else: keep its cron times, timezone, name, enabled state, working folder and every other saved setting exactly as they are.
-4. Read the saved task back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion.
+4. Read the saved task back and confirm to the person its name, timezone, enabled state, times (unchanged), that its text is now the thin text, and the standing answers it holds. A write without readback is not completion. If the timezone changed, record the routine again (**Record the schedules in Mosaico**).
 
 **Mosaico Outreach — Repair** — once a week, by default Sunday at 10:00 AM local time (cron
 `0 10 * * 0`) unless the person chose another day or time, and also whenever the person asks for it. It
@@ -317,6 +318,21 @@ The Routines Board is one page per person, "Outreach Routines Board", where ever
 
 The board page is for Claude only: the Codex package does not carry it and installs no board line.
 
+## Record the schedules in Mosaico
+
+Mosaico stores no schedule of its own. Outreach, Agent tab has a Routines section that shows, for each routine, what it does, when it runs and its last run; Mosaico knows when it runs only because you tell it. After you create, update, pause or resume a scheduled task, and after you have read that task back, call `outreach_record_routine_schedule` once for that routine, with the values the task actually saved, never the defaults:
+
+- `routine`: `source_own` (Source leads, own lane), `source_colleagues` (Source leads, colleagues lane), `send_invitations`, `follow_up`, `withdraw` (Withdraw stale invitations), `routines_report` or `repair`.
+- `timeZone`: the IANA zone the task saved with, for example `Pacific/Auckland`; never an abbreviation.
+- `days`: the days of the week the saved cron fires on, as `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. A `*` day field is all seven days; `0` is `sun`; each day once.
+- `times`: every time of day the saved cron fires, as `HH:MM` on the 24-hour clock in that zone, each once: `45 18,22 * * *` is `18:45` and `22:45`; `0 0,3 * * *` is `00:00` and `03:00`.
+- `paused`: `true` when the task is saved disabled, `false` when it is enabled. A Withdraw stale invitations task installed paused is recorded `true`; when the person later tells you to turn it on, enable it, read it back and record it again.
+- `pluginVersion`: the version of the installed Mosaico plugin, read from the plugin's manifest, for example `0.9.26`.
+
+Do not pass `ownerUserId`: the schedules are the person's own. Record a routine only when its task exists and you have read it back: a person who does not source has no Source leads task, the colleagues lane is optional, and the retired Sync data task is not recorded. One call per routine, after the readback; a second call for the same routine replaces the first. The answer is the stored state (`state` `recorded`, `schedule.text`, `changed`); check that `schedule.text` matches what you saved.
+
+If the tool is not available, or Mosaico refuses a value, the schedule stays installed: do not undo it and do not retry more than once. Say which routines were not recorded and why, and tell the person that running this installer again records them. The tool changes nothing but the report; it starts no run. The readback and the final report say which routines were recorded and which were not.
+
 ## Install
 
 1. Use the person's local timezone and current working folder. Inspect existing scheduled tasks
@@ -352,3 +368,4 @@ The board page is for Claude only: the Codex package does not carry it and insta
    confirm the cron `0 10 * * 0` (or the person's own day and time), and that Repair is also available on
    demand through `/mosaico:mosaico-outreach-repair-run`. A write attempt without readback is not
    completion. Also confirm that no Sync data task remains enabled: read the three new tasks back first, and only then say the old one is retired.
+8. Record each installed or changed schedule in Mosaico (**Record the schedules in Mosaico**): one `outreach_record_routine_schedule` call per routine, from the readback you just made, after the Sync data task is retired. Say in the report which routines were recorded, with the times Mosaico now shows (`schedule.text`), and which were not and why. Skip the routines whose task you did not touch only when the person says they were already recorded.
