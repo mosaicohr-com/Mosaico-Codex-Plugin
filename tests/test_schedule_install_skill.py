@@ -630,7 +630,7 @@ def main() -> None:
         check("Leads per run" in overview and "no `day`" in overview and "sourced only when it is on and both numbers are set" in overview and "nothing to source" in overview and "preserved `day`, `intent: source_invitation_leads`" not in overview, f"{package} overview skill does not describe Leads per run and day placement")
 
     for manifest in (CLAUDE / ".claude-plugin" / "plugin.json", CODEX / ".codex-plugin" / "plugin.json"):
-        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.25", f"{manifest.name} is not at 0.9.25")
+        check(json.loads(manifest.read_text(encoding="utf-8"))["version"] == "0.9.26", f"{manifest.name} is not at 0.9.26")
     # 0.9.7: neither package bundles a Mosaico server; every call goes through the person's own connector.
     for package_root in (CLAUDE, CODEX):
         check(not (package_root / ".mcp.json").exists(), f"{package_root.name} still ships a bundled .mcp.json")
@@ -642,6 +642,18 @@ def main() -> None:
             check("claude-code-client-metadata" not in body and "oauth_resource" not in body, f"{path.relative_to(ROOT)} still carries bundled-server OAuth wiring")
     for label, text in (("Claude", SKILLS["Claude"]), *((f"Claude {name}", (CLAUDE / "skills" / name / "SKILL.md").read_text(encoding="utf-8")) for name in OUTREACH_SKILLS)):
         check("plugin's own Mosaico server" not in " ".join(text.split()), f"{label} still sends people to the plugin's own Mosaico server")
+    # 0.9.26: the installer reports every schedule it sets to Mosaico (outreach_record_routine_schedule), from the readback, and says which were recorded.
+    claude_text = " ".join(SKILLS["Claude"].split())
+    record = " ".join(claude_text[claude_text.index("## Record the schedules in Mosaico"):claude_text.index("## Install")].split())
+    for needle in ("`outreach_record_routine_schedule`", "once for that routine", "after you have read that task back", "never the defaults",
+                   "`source_own`", "`source_colleagues`", "`send_invitations`", "`follow_up`", "`withdraw`", "`routines_report`", "`repair`",
+                   "`timeZone`", "`days`", "`times`", "`paused`", "`pluginVersion`", "IANA zone", "`HH:MM` on the 24-hour clock",
+                   "Do not pass `ownerUserId`", "stays installed", "do not undo it", "which routines were not recorded", "starts no run"):
+        check(needle in record, f"Claude schedule-install skill does not say: {needle}")
+    check("`outreach_record_routine_schedule`" in claude_text[claude_text.index("## Install"):], "the Claude install steps never record the schedules")
+    codex_text = " ".join(SKILLS["Codex"].split())
+    for needle in ("## Record the schedule in Mosaico", "`outreach_record_routine_schedule`", "`source_own`", "Do not pass `ownerUserId`", "stays installed", "starts no run"):
+        check(needle in codex_text, f"Codex schedule-install skill does not say: {needle}")
     print("PASS: both schedule-install skills install thin routines (standing answers only, under 200 words, naming the skill, the routine section and the version stamp); the run skills hold each routine section; qualified skill names and the stale-copy checks hold.")
 
 
