@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 VERSION = "0.9.23"  # the README entry these checks read (install_methodology_component)
-CURRENT = "0.9.26"  # the manifests
+CURRENT = "0.10.0"  # the manifests
 PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
@@ -58,12 +58,12 @@ ARGUMENTS = {
     "set_person_task_due_date": ("features/core-integration-mcp-claude/server/mcp-flow-person-tools.ts", ("processId", "personId", "taskId", "dueDate")),
 }
 
-# The skills that make Outreach calls. Each carries the acting section in both packages.
+# The skills that make Outreach calls. Each states the thin acting rule in both packages (0.10.0: Mosaico owns the sentences, the skill says stop, report them word for word, never end the session).
 OUTREACH_SKILLS = (
     "mosaico-outreach",
     "mosaico-outreach-invite-run",
     "mosaico-outreach-follow-up-run",
-    "mosaico-outreach-repair-run",
+    "mosaico-outreach-schedule-install",
     "mosaico-outreach-lead-management",
     "mosaico-outreach-agent-management",
 )
@@ -151,24 +151,22 @@ def main() -> None:
     claude_missing = flat(section(general["Claude"], "## When a tool is missing"))
     check("disconnects and reconnects the Mosaico connector in Claude's connector settings" in claude_missing and "Claude keeps a copy of the connector's tool list" in claude_missing, "Claude mosaico skill lacks the reconnect note")
     check("disconnected and connected again" in flat(section(general["Codex"], "## When a tool is missing")), "Codex mosaico skill lacks the missing-tool note")
-    follow = flat(read(CLAUDE / "skills" / "mosaico-outreach-follow-up-run" / "SKILL.md"))
-    check(follow.count("in Claude's connector settings (Claude keeps its old tool list until then, so a new tool does not appear before that)") == 1, "Claude follow-up skill lacks the reconnect note where it says the follow-up queue tool is missing")
+    for name in ("mosaico-outreach", "mosaico-outreach-follow-up-run", "mosaico-outreach-invite-run", "mosaico-outreach-schedule-install"):
+        stale = flat(read(CLAUDE / "skills" / name / "SKILL.md"))
+        check(stale.count("If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.") == 1, f"Claude {name} skill lacks the reconnect note for a missing tool")
 
-    # Outreach: stop on the acting refusal, and stop (no repeat) after the ended refusal.
+    # Outreach: stop on the acting refusal (Mosaico's own sentence, reported word for word) and never end the session. The thin skills hold no copy of
+    # Mosaico's sentences; the application's wording is still checked below with --app-repo.
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
         for name in OUTREACH_SKILLS:
             raw = read(root / "skills" / name / "SKILL.md")
-            check(raw.count("## While the connector is acting as a member") == 1, f"{package} {name} lacks the acting section (exactly once)")
-            words = flat(section(raw, "## While the connector is acting as a member"))
+            words = flat(raw)
             for needle in (
-                OPERATOR_ONLY, "Stop there.", "Report that sentence word for word", "Do not try the call again", "do not end the session yourself",
-                "A scheduled run reports and stops the same way", ENDED_START, 'says "so the task stopped"', "the person ended the acting session while you worked",
-                "Do not repeat the call and do not carry on as yourself", "Do not continue as the operator until the person gives a new instruction",
+                "If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word",
+                "Never end the acting session yourself",
             ):
-                check(needle in words, f"{package} {name} acting section lacks: {needle}")
-            for gone in ("Repeat that same call once", "This call did not run. Repeat it", "Your session acting as"):
-                check(gone not in words, f"{package} {name} acting section still says: {gone}")
-            check("outreach_" not in words, f"{package} {name} acting section names an Outreach tool")
+                check(needle in words, f"{package} {name} lacks the acting rule: {needle}")
+            check("Repeat that same call once" not in words and "carry on as yourself" not in words, f"{package} {name} tells the model to repeat the call or carry on")
 
     # Installing a component: only on the person's ask, and it needs a subscription. There is no approve step. The run loop still never installs.
     for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):

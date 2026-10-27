@@ -171,7 +171,7 @@ main-v2. Plugin and server release together. Skills only: the plugin bundles no 
   lead-management now say what the skill is for, how to start a run, to follow the step Mosaico returns (`step.call`,
   `step.agentInstructions`, `step.guidance`), to end the run and to give `report.lines` and `report.sections` unchanged, how to stop
   on a blocker or refusal (`recommendedAction`), and only the rules the server cannot enforce. The Claude package's Outreach skills
-  fell from about 38,700 words to about 3,300.
+  fell from about 38,700 words (41,500 with the Repair skill) to about 3,500.
 - **Schedule installer.** Routines, texts, times and steps come only from `outreach_get_routine_setup`. Each saved routine is recorded
   with `outreach_record_routine_schedule` and the setup's `catalogueVersion`. A retired routine's scheduled task is offered for removal
   (`remove_retired_routines`). If the server has no `outreach_get_routine_setup`, no step block or an older catalogue than this plugin
@@ -189,11 +189,15 @@ main-v2. Plugin and server release together. Skills only: the plugin bundles no 
   shows the invitation gone, a LinkedIn warning or captcha stops the run, the Routines Board write never blocks the report, contradictory
   state goes to the incident tool, Agent and Lead changes are confirmed with the person, the installer's machine checks, no overlapping
   browser schedules and thin schedule texts.
-- **Tests.** `tests/test_thin_outreach_skills.py` pins the thin contract in both packages, the word budget of the Claude Outreach skills,
-  the absence of any other limit, 24-hour rule or Repair, and the routine section names the server's texts point at.
+- **Tests.** `tests/test_thin_outreach_skills.py` pins the thin contract in both packages, the routine section names the server's routine texts
+  point at, the absence of the moved know-how and Repair, and this release note. `tests/test_thin_skill_budget.py` keeps the Claude Outreach skills
+  under the word budget and free of any limit but 20 invitation sends per owner per day, any 24-hour rule and Repair.
   `tests/test_client_only_rules.py` checks that every client-only rule of the server's rule audit
-  (`tests/fixtures/outreach-client-only-rules.json`, copied from mosaico `origin/stage-v2` 12b5cd8d0f01) is still stated in a thin skill
-  or enforced by the gate hook. Script, gate and integrity tests are unchanged.
+  (`tests/fixtures/outreach-client-only-rules.json`, copied from mosaico `origin/stage-v2` 12b5cd8d0f01) is still stated in a thin skill or enforced
+  by the gate hook. `tests/test_thin_schedule_install_skill.py` pins that the installer hard-codes no cron, time, title or routine text.
+  `tests/test_routines_board_asset.py` pins the board page's document shape, now also written in its header comment.
+  `tests/test_outreach_tool_contract.py --app-repo <stage-v2 export>` checks every tool, step field, version and routine section against the
+  server. The script, gate and integrity tests are unchanged.
 
 ### 0.9.26
 
