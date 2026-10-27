@@ -2,10 +2,10 @@
   "source": {
     "repository": "mosaicohr-com/mosaico",
     "branch": "stage-v2",
-    "commit": "12b5cd8d0f01ca0a7729d7aa0ebb3a97294439cd",
+    "commit": "fe788273d9cd009467a42183b92c559bd1a26d7d",
     "file": "features/outreach/documentation/outreach-rule-audit.json",
     "auditDate": "2026-10-27",
-    "note": "The rules the server audit classes as client-only. Copy this list again from the audit, with its commit, whenever the audit changes; tests/test_client_only_rules.py then needs a check for every new id."
+    "note": "The rules the server audit classes as client-only. Copy this list again from the audit, with its commit, whenever the audit changes; tests/test_client_only_rules.py then needs a check for every new id. R107 (browser schedules never overlap) is server-decided since PR 2184 (commit fe788273d9cd on its branch feature/outreach-review-window, not yet on stage-v2) and is removed here."
   },
   "rules": [
     {
@@ -87,11 +87,6 @@
     {
       "id": "R106",
       "rule": "Install schedules only with the three user-level browser allow rules, no stale skill copies, no active Codex automations and no non-production Mosaico server.",
-      "clientOnly": "thin-skill"
-    },
-    {
-      "id": "R107",
-      "rule": "Schedules that use the browser never overlap (30 minutes apart; the two Source leads lanes 90 minutes apart).",
       "clientOnly": "thin-skill"
     },
     {

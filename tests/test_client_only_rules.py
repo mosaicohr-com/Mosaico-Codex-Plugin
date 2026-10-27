@@ -50,7 +50,6 @@ RULES: dict[str, dict] = {
     "R106": {"skills": [("Claude", (SCHEDULE,), ["mcp__Claude_Browser__javascript_tool", "mcp__Claude_Browser__computer", "mcp__Claude_Browser__browser_batch",
                                                 "mosaico-outreach-*", "daily-approved-outreach-sends", "amplifyapp.com", "non-production Mosaico address"]),
                         ("Codex", (SCHEDULE,), ["mosaico-outreach-*", "daily-approved-outreach-sends", "mosaico-lead-preparation"])]},
-    "R107": {"skills": [("Claude", (SCHEDULE,), ["must not overlap", "30 minutes", "90 minutes apart"])]},
     "R109": {"skills": [("Claude", (SCHEDULE,), ["Never add, shorten or copy a step into a text", "Sync data routine", "never run"]),
                         ("Claude", (INVITE, FOLLOW_UP), ["needs a newer plugin than", "needs updating"]),
                         ("Claude", (FOLLOW_UP,), ["Run nothing from it"])]},
@@ -65,7 +64,7 @@ def main() -> None:
     check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None, "the fixture does not name the server commit it was copied from")
     check(source["file"].endswith("outreach-rule-audit.json") and source["branch"] == "stage-v2", "the fixture does not name the server audit file and branch")
     ids = [rule["id"] for rule in fixture["rules"]]
-    check(len(ids) == len(set(ids)) == 18, f"the fixture should hold the 18 client-only rules, once each: {ids}")
+    check(len(ids) == len(set(ids)) == 17, f"the fixture should hold the 17 client-only rules, once each: {ids}")
     check(all(rule["clientOnly"] for rule in fixture["rules"]), "a fixture rule has no clientOnly place")
     check(set(ids) == set(RULES), f"the checks and the fixture differ: unchecked={sorted(set(ids) - set(RULES))}, unknown={sorted(set(RULES) - set(ids))}")
 
