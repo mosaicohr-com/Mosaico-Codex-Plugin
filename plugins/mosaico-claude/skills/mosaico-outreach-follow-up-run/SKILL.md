@@ -63,4 +63,4 @@ A saved schedule that says "This is the Sync data routine" is the old single sch
 run, open no LinkedIn page, change nothing. Report that it must be reinstalled with the
 `mosaico:mosaico-outreach-schedule-install` skill.
 
-If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.
+If a tool named here is missing, it is likely the person's role or no active Mosaico subscription, not a reason to reconnect.

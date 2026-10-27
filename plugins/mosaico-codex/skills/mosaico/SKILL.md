@@ -130,6 +130,8 @@ organisation. A customer installs its own published components from the Methodol
 
 ## When a tool is missing
 
-The connector's tool list can be older than Mosaico. If a tool named in this skill is missing, or Mosaico
-refuses an argument as unknown, say so and tell the person that Mosaico has to be updated or the Mosaico
-connector disconnected and connected again, then ask again. Do not look for another way in.
+Mosaico lists only the tools this person may use. If a change tool the person needs is not listed, the likely reasons are
+their role or that the organisation has no active Mosaico subscription (Claude can change nothing without one). Read
+`get_tier_status` and tell the person which applies. Suggest that Mosaico be updated or the Mosaico
+connector disconnected and connected again only when the whole connector is missing, Mosaico says the session is invalid, or
+Mosaico refuses an argument as unknown. Do not look for another way in.
