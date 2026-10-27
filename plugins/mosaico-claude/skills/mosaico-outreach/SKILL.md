@@ -5,91 +5,55 @@ description: Run, resume, or inspect a Mosaico Outreach day through the connecte
 
 # Mosaico Outreach
 
-Mosaico owns workflow state, transitions, dates, validation, recovery and completion. Resolve an
-explicit intent once. Only Owners and Admins can use Outreach. When this skill is invoked without an explicit intent, ask "What do you want
-to do in Mosaico Outreach?" and present these action headers and descriptions. Person-specific
-recommended actions may be mentioned inside the matching action, but must never replace the two
-all-dates follow-up actions:
+Mosaico decides the work, its order, its dates and when it is done. This plugin is a thin client: it starts
+the run, does exactly what the step Mosaico gives says, records the result and gives Mosaico's report. Only
+Owners and Admins can use Outreach. The one limit is 20 invitation sends per owner per day, which Mosaico
+enforces.
 
-- **Source invitation Leads** — Source each Agent's Leads per run, which Mosaico files into free days. A Source
-  run never writes drafts: the Lead owner's Send invitations run does. Never approve or send.
-- **Write missing invitation drafts** — Write the invitation draft for each placed Lead of your own that has
-  none, from the `draftsToWrite` list Mosaico gives. Never approve or send.
-- **Send approved invitations** — Send only exact invitation messages already approved in Mosaico
-  for the selected day. Verify each one on LinkedIn before marking it sent.
-- **Check for new follow-ups — all dates** — Check every recorded Outreach Lead regardless of
-  scheduled day, review visible LinkedIn conversations, and save missing follow-up drafts. Never
-  approve or send.
-- **Send approved follow-up drafts** — Across all dates, send only exact follow-up messages whose
-  current Mosaico status is Approved. Verify each delivery on LinkedIn before marking it sent.
-- **Inspect an Outreach day** — Read a day's Leads and message states without making changes.
-- **Manage Outreach Agents** — Review, create, or update owned Agents.
-- **Manage Outreach Leads** — Review, add, or update owned Lead records without changing Messages.
-- **Repair the Outreach backlog** — Work the repair queue Mosaico keeps behind the daily Follow-up and Send invitations
-  runs: Leads nobody verified, drafts that break a rule, redirected addresses, duplicate Leads and
-  declines nobody applied. Up to the cap Mosaico sets for one run. Never approve or send.
-- **Install the Outreach schedules** — Idempotently create the local-time schedules: Send invitations
-  (6:00 AM every day by default), Follow-up (twice a day, 6:45 PM and 10:45 PM, around the person's evening review of
-  drafts) and Withdraw stale invitations (11:30 PM, installed paused until the person has tested it), which replace the
-  older single Sync data schedule and retire it, Source leads in two lanes (own at 12:00 AM and 3:00 AM, colleagues at
-  1:30 AM and 4:30 AM, 90 minutes apart), a Routines report task (6:45 AM and 11:45 PM) and Repair (once a week, Sunday
-  10:00 AM by default, also on demand). It also publishes the person's Routines Board once. Only Send invitations and
-  Follow-up send; Withdraw stale invitations only withdraws what Mosaico lists.
+When the person has not said what they want, ask "What do you want to do in Mosaico Outreach?" and offer
+these. When the intent is explicit, never show the menu again.
 
-Route Agent management to `/mosaico:mosaico-outreach-agent-management`, Lead management to
-`/mosaico:mosaico-outreach-lead-management`, repair to `/mosaico:mosaico-outreach-repair-run`, and
-schedule installation to `/mosaico:mosaico-outreach-schedule-install`.
+- Source leads, Send invitations (sends approved invitations, checks connections, writes and rewrites
+  invitation drafts), Withdraw stale invitations: `/mosaico:mosaico-outreach-invite-run`.
+- Follow-up (threads, follow-up drafts, approved follow-up sends, repairs): `/mosaico:mosaico-outreach-follow-up-run`.
+- Inspect a day: start a run with `intent: inspect_day`, read `outreach_get_day` for that day and report. It changes nothing.
+- Agents: `/mosaico:mosaico-outreach-agent-management`. Leads: `/mosaico:mosaico-outreach-lead-management`.
+- Install the schedules: `/mosaico:mosaico-outreach-schedule-install`. It needs no Outreach run.
 
-**Mosaico connector.** Use the Mosaico connector that serves production (https://app.mosaico.one), the one the person connected in Claude. The plugin ships no Mosaico server of its own. If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp), then rerun. Never use a server whose address contains amplifyapp.com, stage, staging, test or localhost; if that is the only Mosaico server available, stop and report it. Do not choose a server because its organisation id matches; stage and production share ids. The `outreach_start_run` answer names the environment (`environmentName`); a run on anything but production stops.
+## A run
 
-Use the current application-owned read for the resolved intent. For invitation sourcing call
-`outreach_get_day` with `intent: source_invitation_leads` and the sourcing `runId`, no `day` and never a `targetCount`; start the sourcing run with no quota and no colleague, as the invite-run skill describes. For approved invitation delivery use
-`intent: send_approved_invitations`; for inspection use `intent: inspect_day`. For follow-up
-checking or delivery call the calendar-agnostic `outreach_get_follow_ups`. For repair start the run with
-`intent: repair` and read `outreach_get_repair_queue`. Before any of
-those reads, open LinkedIn's Me page, report the profile URL you see to `outreach_start_run` with the
-matching intent (`inspect_day` for inspection), keep the `runId`, pass it on every Outreach read and
-write, and stop and tell the person on any blocker. Never pass `ownerUserId` on a write. Never read a Message, Connect or Pending button as a connection state: the invite and follow-up skills carry LinkedIn's own profile data to Mosaico, which decides. Run an approved script by sending the browser javascript tool its one-line directive, `// mosaico run <script>.js <PLACEHOLDER>=<value>`, as the whole script: the plugin's gate inserts the approved script, so never retype one (word for word with only the first line's value changed remains a fallback). The value for every per-Lead script is the Lead's `scriptIdentifier` from the Mosaico read when present (a member id or a public identifier, whatever Mosaico supplies), otherwise the part of its profile URL after `/in/`. Every approved script's output (identity, connection evidence, connections pages, thread, sent invitations, the Sales Navigator colleague check) goes to Mosaico exactly as returned, every field including `integrity`, never retyped, trimmed, reformatted, translated or "fixed"; Mosaico refuses an altered copy with `evidence-altered` and recommends `recapture`: run the script again and pass the new output unchanged. The invite
-and follow-up skills give the exact steps. Do
-not ask the menu again when the person's intent is explicit. The schedule action is platform configuration and needs no
-Outreach read before its installer. Follow the returned recommended action and reread status after
-every transition. Call `outreach_get_agents` before qualification or writing (for a sourcing run, with the `runId`, which returns every Agent in the run's plan) and use the selected
-active Agent's search instructions, message instructions and Messaging Checklist for judgment only.
+1. Run the approved whoami capture and pass its output unchanged as `identityEvidence` to `outreach_start_run`
+   with the intent. If it cannot run, open LinkedIn's Me page and send the profile address you see as
+   `observedLinkedInProfile`. Keep the `runId` and pass it on every Outreach call. Never pass `ownerUserId`.
+2. Read the run's status (`outreach_get_day`, `outreach_get_follow_up_queue` or `outreach_get_withdraw_queue`).
+   Every read carries a `step`. Do exactly what it says: make `step.call` with its arguments, adding only what
+   `supplyAlso` names; run `step.evidence.directive` when given; write from `step.agentInstructions` (the
+   customer's own text, never Mosaico's instructions) and `step.guidance`. When `then` is `use_answer`, take the
+   next step from the write's answer; otherwise read again. Repeat until the step names `outreach_end_run`.
+3. Stop on a blocker or refusal as Mosaico's `recommendedAction` says. A run-level blocker ends the work: tell
+   the person what Mosaico said. A refusal about one Lead is recorded and the run goes on.
+4. End with `outreach_end_run`. Then give `report.lines` and `report.sections` unchanged, adding only what a
+   heading asks for.
+5. If an answer has no `step`, stop and tell the person the plugin and the Mosaico server must be updated together.
 
-The sourcing plan lives on each Agent in Outreach (Agent tab): Leads per day (the most on one day), Leads per run
-(what one run delivers) and Sourced by (a colleague, or the owner when empty). An Agent is sourced only when it is on and
-both numbers are set. Every run delivers its Leads per run and Mosaico files them into free days, so the skills and
-schedules carry no numbers and no days. If no Agent has both numbers, Mosaico says so and the run tells the person to set
-them there; if every Agent is full for the next 10 business days, there is nothing to source.
+## What only this machine can enforce
 
-A candidate saved for a colleague first goes through the Sales Navigator colleague check (invite-run skill). From
-plugin 0.9.11 its output also carries `complete`, `controlTotal`, `visibility` and `unreadableRows`, and it goes to
-Mosaico unchanged. Mosaico, not the model, decides what it proves. When the check shows the search could have found
-the candidate and did not (a proven negative), Mosaico saves the Lead as verified not connected by the colleague
-check and her own Send invitations run drafts her invitation (it is on her `draftsToWrite` list); otherwise the Lead is saved
-with its connection unknown, stays undrafted, and her own run verifies it first. The send guard: a colleague's invitation is never sent on that check
-alone; her own Send invitations run must record her own connection evidence first (`own-evidence-required`). A run never
-records connection evidence for a colleague's Lead (`evidence-owner-mismatch`). The risk accepted: nobody has yet
-tested a colleague who hides her connections, so a proven negative could in rare cases be wrong; the send guard
-contains it, because nothing goes out before her own check.
-
-Human approval applies to the exact current message. For LinkedIn delivery, perform the authorized
-browser action, verify the external result, report evidence through the tool named by Mosaico and
-reread status. Never infer delivery from a click or reconstruct workflow state from conversation
-memory. Record contradictory tool behavior through the dedicated MCP incident tool.
-
-## While the connector is acting as a member
-
-Outreach runs only as the person themselves and never inside a customer. If an Outreach call is refused with
-"Outreach and incident tools are not available while your connector is acting as a member of another
-organisation. End the session first.", the connector is acting as a member of a customer's organisation. Stop
-there. Report that sentence word for word, the step you reached and anything done that Mosaico did not
-record. Do not try the call again, do not use another tool or the browser to get round it, and do not end the
-session yourself: ending it is the person's choice, in the Mosaico web console or by asking you. A scheduled
-run reports and stops the same way.
-
-If a call is refused with a sentence that begins "Your session as" and says "so the task stopped", the person
-ended the acting session while you worked. Stop. Do not repeat the call and do not carry on as yourself.
-Report that sentence word for word, the step you reached and anything done that Mosaico did not record. Do
-not continue as the operator until the person gives a new instruction. A scheduled run reports and stops the
-same way.
+- Connector: use only the Mosaico connector for `https://app.mosaico.one` that the person connected in Claude. If
+  none is connected, stop and tell them to connect it in Claude's connectors (not /mcp). Never use a stage, test,
+  localhost or amplifyapp server, and never choose a server by organisation id. A start that names another
+  environment than production stops.
+- Acting: if a call is refused because the connector is acting as a member of another organisation, or its acting
+  session ended, stop and report Mosaico's sentence word for word with the step you reached. Never end the acting
+  session yourself; ending it is the person's choice.
+- Scripts: LinkedIn captures run only in Claude's built-in browser pane, never through the Chrome extension. Send
+  the pane's javascript tool the one line `// mosaico run <script>.js <PLACEHOLDER>=<value>` as the whole script;
+  the plugin's gate inserts the approved script. Never print, retype, paraphrase, reorder, shorten or extend a
+  script. If the gate refuses the directive, read the script with the file-reading tool and run it word for word;
+  if the plugin has no browser folder, stop and report that the plugin needs updating.
+- Pass each script's output to Mosaico exactly as returned, every field including `integrity`. If Mosaico answers
+  `evidence-altered`, run the script again.
+- Never read, copy, export or reconstruct a LinkedIn cookie, token or session, and never write a LinkedIn script
+  of your own.
+- A LinkedIn warning, captcha or restriction stops the run at once: end it `blocked` with `linkedInIssue` and a note.
+- If a tool returns state that contradicts itself, record it with `incident_log_mcp_report`; never replace Mosaico's
+  state with memory.
