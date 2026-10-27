@@ -142,7 +142,7 @@ def main() -> None:
     for needle in ("#2168 to #2182", "Do not tag, publish or install this plugin before that release is live on main-v2", "Plugin and server release together",
                    "mosaico-outreach-repair-run", "outreach_get_repair_queue", "24-hour rules", "20 invitation sends per owner per day", "outreach_get_routine_setup",
                    "outreach_record_routine_schedule", "catalogueVersion", "remove_retired_routines", CATALOGUE_VERSION, "browser-script gate",
-                   "tests/test_thin_outreach_skills.py", "tests/test_client_only_rules.py", "tests/test_thin_skill_budget.py"):
+                   "tests/test_thin_outreach_skills.py", "tests/test_client_only_rules.py", "tests/test_thin_skill_budget.py", "#2184", "reviewWindow"):
         check(needle in entry, f"the README 0.10.0 entry lacks: {needle}")
     check("## Current state (0.10.0)" in readme, "the README lacks the 0.10.0 current state")
 

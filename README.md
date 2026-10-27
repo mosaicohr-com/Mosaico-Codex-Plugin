@@ -162,9 +162,9 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ### 0.10.0
 
-Needs the Mosaico server release that ships stage-v2 pull requests #2168 to #2182 (the step block, server-only run guidance, the rule
+Needs the Mosaico server release that ships stage-v2 pull requests #2168 to #2182 and #2184 (the step block, server-only run guidance, the rule
 audit, the server-only routine catalogue and `outreach_get_routine_setup`, trimmed tool descriptions with run-scoped step guidance, one
-limit only, held-back items, and the retired Repair routine). Do not tag, publish or install this plugin before that release is live on
+limit only, held-back items, the retired Repair routine, and the review window that works out the routine times). Do not tag, publish or install this plugin before that release is live on
 main-v2. Plugin and server release together. Skills only: the plugin bundles no Mosaico server, address or token.
 
 - **Thin Outreach skills (both packages).** Mosaico-outreach, invite-run, follow-up-run, schedule-install, agent-management and
@@ -175,7 +175,12 @@ main-v2. Plugin and server release together. Skills only: the plugin bundles no 
 - **Schedule installer.** Routines, texts, times and steps come only from `outreach_get_routine_setup`. Each saved routine is recorded
   with `outreach_record_routine_schedule` and the setup's `catalogueVersion`. A retired routine's scheduled task is offered for removal
   (`remove_retired_routines`). If the server has no `outreach_get_routine_setup`, no step block or an older catalogue than this plugin
-  expects (`2026-10-27.3`), the skills stop and say the plugin and server must be updated together.
+  expects (`2026-10-27.4`), the skills stop and say the plugin and server must be updated together.
+- **Review window (restored).** The owner's design that the routine times follow the person's evening review was dropped from the thin
+  installer by mistake. Mosaico (server pull request #2184) now works out the times: the installer asks the person once when they review
+  and approve drafts, passes the answer to `outreach_get_routine_setup` as `reviewWindow`, saves exactly the times returned, reads back
+  the server's `readback` lines and records the window with each routine. It never asks when Mosaico already knows the window. No time
+  or rule is written in the skill. The catalogue it expects is `2026-10-27.4`.
 - **Removed.** The Repair skill (`mosaico-outreach-repair-run`) in both packages and every mention of the Repair routine and
   `outreach_get_repair_queue`; the verify, draft, check, withdraw, colleague-check and sourcing caps; the weekly invitation ceiling;
   the 24-hour rules (the Routines report look-back, the capture age); the routine texts, default times and step lists that were
