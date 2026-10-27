@@ -132,6 +132,6 @@ organisation. A customer installs its own published components from the Methodol
 
 Mosaico lists only the tools this person may use. If a change tool the person needs is not listed, the likely reasons are
 their role or that the organisation has no active Mosaico subscription (Claude can change nothing without one). Read
-`get_tier_status` and tell the person which applies. Suggest that Mosaico be updated or the Mosaico
-connector disconnected and connected again only when the whole connector is missing, Mosaico says the session is invalid, or
-Mosaico refuses an argument as unknown. Do not look for another way in.
+`get_tier_status` and tell the person which applies. If it shows an active subscription and the person's role allows the change, the connector's tool list is out of date:
+tell the person that Mosaico has to be updated or the Mosaico connector disconnected and connected again. Say that also
+when the whole connector is missing, Mosaico says the session is invalid, or Mosaico refuses an argument as unknown. Do not look for another way in.

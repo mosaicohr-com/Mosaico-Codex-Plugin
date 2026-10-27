@@ -151,13 +151,14 @@ def main() -> None:
     claude_missing = flat(section(general["Claude"], "## When a tool is missing"))
     codex_missing = flat(section(general["Codex"], "## When a tool is missing"))
     for package, missing in (("Claude", claude_missing), ("Codex", codex_missing)):
-        for needle in ("lists only the tools this person may use", "their role", "no active Mosaico subscription", "get_tier_status", "only when the whole connector is missing"):
+        for needle in ("lists only the tools this person may use", "their role", "no active Mosaico subscription", "get_tier_status", "active subscription", "out of date", "reconnect" if package == "Claude" else "connected again"):
             check(needle in missing, f"{package} mosaico skill's missing-tool note lacks: {needle}")
         check("a tool named in this skill is missing" not in missing and "tell the person to do that" not in missing, f"{package} mosaico skill still tells the person to reconnect for one missing tool")
-    check("reconnects the Mosaico connector in Claude's connector settings" not in claude_missing, "Claude mosaico skill still says a missing tool means reconnect")
+    check("tell the person to disconnect and reconnect" in claude_missing and "If it shows an active subscription and the person's role allows the change" in claude_missing, "Claude mosaico skill lacks the active-subscription, list-out-of-date, reconnect case")
+    check("If it shows an active subscription and the person's role allows the change" in codex_missing, "Codex mosaico skill lacks the active-subscription, list-out-of-date case")
     for name in ("mosaico-outreach", "mosaico-outreach-follow-up-run", "mosaico-outreach-invite-run", "mosaico-outreach-schedule-install"):
         stale = flat(read(CLAUDE / "skills" / name / "SKILL.md"))
-        check(stale.count("If a tool named here is missing, it is likely the person's role or no active Mosaico subscription") == 1 and "Claude kept an old tool list" not in stale, f"Claude {name} skill lacks the role-or-subscription note for a missing tool")
+        check(stale.count("If a tool named here is missing: role or no subscription") == 1 and "Claude kept an old tool list" not in stale and "with an active subscription, the list is out of date: reconnect" in stale, f"Claude {name} skill lacks the role-or-subscription note for a missing tool")
 
     # Outreach: stop on the acting refusal (Mosaico's own sentence, reported word for word) and never end the session. The thin skills hold no copy of
     # Mosaico's sentences; the application's wording is still checked below with --app-repo.
