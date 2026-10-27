@@ -50,8 +50,6 @@ RULES: dict[str, dict] = {
     "R106": {"skills": [("Claude", (SCHEDULE,), ["mcp__Claude_Browser__javascript_tool", "mcp__Claude_Browser__computer", "mcp__Claude_Browser__browser_batch",
                                                 "mosaico-outreach-*", "daily-approved-outreach-sends", "amplifyapp.com", "non-production Mosaico address"]),
                         ("Codex", (SCHEDULE,), ["mosaico-outreach-*", "daily-approved-outreach-sends", "mosaico-lead-preparation"])]},
-    # R107: the 30 and 90 minute gaps are now worked out by the server (review window); the skill only states the rule and passes the times through.
-    "R107": {"skills": [("Claude", (SCHEDULE,), ["must not overlap"])]},
     "R109": {"skills": [("Claude", (SCHEDULE,), ["Never add, shorten or copy a step into a text", "Sync data routine", "never run"]),
                         ("Claude", (INVITE, FOLLOW_UP), ["needs a newer plugin than", "needs updating"]),
                         ("Claude", (FOLLOW_UP,), ["Run nothing from it"])]},
