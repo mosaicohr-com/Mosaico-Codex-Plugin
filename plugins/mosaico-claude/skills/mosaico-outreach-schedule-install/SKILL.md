@@ -73,4 +73,4 @@ She sets up her own schedules on her own Mac: the plugin, her own Mosaico connec
 inside Claude's built-in browser pane, the three allow rules above, and her LinkedIn profile registered in Outreach,
 Agent tab. Then run this installer there, with her own Routines Board.
 
-If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.
+If a tool named here is missing: role or no subscription; with an active subscription, the list is out of date: reconnect.

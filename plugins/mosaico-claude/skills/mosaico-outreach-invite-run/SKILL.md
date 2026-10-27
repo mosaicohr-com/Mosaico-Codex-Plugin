@@ -61,4 +61,4 @@ Run intent `send_approved_invitations`. Open `https://www.linkedin.com/feed/` on
 
 Run intent `manage_leads`, read `outreach_get_withdraw_queue`. Open `https://www.linkedin.com/feed/` once. Board key `withdraw`.
 
-If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.
+If a tool named here is missing: role or no subscription; with an active subscription, the list is out of date: reconnect.

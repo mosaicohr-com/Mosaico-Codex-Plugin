@@ -58,4 +58,4 @@ these. When the intent is explicit, never show the menu again.
 - If a tool returns state that contradicts itself, record it with `incident_log_mcp_report`; never replace Mosaico's
   state with memory.
 
-If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.
+If a tool named here is missing: role or no subscription; with an active subscription, the list is out of date: reconnect.

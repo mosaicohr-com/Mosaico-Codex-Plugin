@@ -122,7 +122,8 @@ organisation. A customer installs its own published components from the Methodol
 
 ## When a tool is missing
 
-Claude keeps a copy of the connector's tool list, and a new Mosaico tool appears in it only after the
-person disconnects and reconnects the Mosaico connector in Claude's connector settings. If a tool named in
-this skill is missing, or Mosaico refuses an argument as unknown, say so and tell the person to do that,
-then ask again. Do not look for another way in.
+Mosaico lists only the tools this person may use. If a change tool the person needs is not listed, the likely reasons are
+their role or that the organisation has no active Mosaico subscription (Claude can change nothing without one). Read
+`get_tier_status` and tell the person which applies. If it shows an active subscription and the person's role allows the change, Claude's copy of the tool list is out of
+date: tell the person to disconnect and reconnect the Mosaico connector in Claude's connector settings. Suggest that also
+when the whole connector is missing, Mosaico says the session is invalid, or Mosaico refuses an argument as unknown. Do not look for another way in.
