@@ -35,6 +35,18 @@
     states (optional object { <routine key>: "on" | "paused" }) overrides the default on/paused labels
 
   Access rules: everyone admitted reads; only Editors/Owner (admin) write.
+
+  WRITING (a routine records its run, with the ArtifactData tool and this page's address as url): one batch, after the run's report.
+  Get each document before updating it and pass its version as if_version; create one that does not exist without it.
+  runs id = the run's runId (else "<routine key>-<start as yyyymmddhhmm, UTC>"). outcome: "nothing-to-do" for a run Mosaico ended
+  complete with nothing to do, "refused-busy" for a start Mosaico refused because another run was working, "failed" for a run that
+  failed or stopped with work open. counts holds only numbers from Mosaico's report.
+  actions id = "act-<slug>-<yyyymmdd>" (a few lowercase words; the run's day); leave an existing one alone. issues id = "iss-<slug>":
+  keep firstSeenAt and fixRef, set lastSeenAt, status "open" (a fixed issue that returns is open again).
+  meta/board: id "board", lastUpdatedAt now, lastUpdatedBy "<routine name> run"; keep states; never write improvements.
+  The Routines report writes the runs a routine could not: id "sched-<routine key>-<start as yyyymmddhhmm, UTC>", notes include
+  "recorded by the Routines report", and it invents nothing the run's report does not state.
+  A failed write is one line in the report ("Routines Board not updated: <reason>"), never a retry loop and never a halt.
 -->
 <style>
 /* Layout: one narrow column; "Needs you" queue first, then a stack of routine cards in schedule order. */

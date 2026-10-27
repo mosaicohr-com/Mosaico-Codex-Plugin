@@ -8,7 +8,7 @@ description: Install or repair the Mosaico Outreach schedules, Send invitations,
 Mosaico owns the routines: their names, texts, default times, steps and report headings. This skill only checks the
 machine, saves what `outreach_get_routine_setup` returns as Claude Desktop scheduled tasks (`list_scheduled_tasks`,
 `create_scheduled_task`, `update_scheduled_task`, `delete_scheduled_task`), and tells Mosaico what it saved. It
-changes no Lead, Message, Agent or run. This plugin is 0.10.0 and expects routine catalogue `2026-10-27.3` or later.
+changes no Lead, Message, Agent or run. If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word. Never end the acting session yourself. This plugin is 0.10.0 and expects routine catalogue `2026-10-27.3` or later.
 
 ## Check before installing
 
@@ -66,3 +66,5 @@ If any check fails, install nothing and tell the person what to do.
 She sets up her own schedules on her own Mac: the plugin, her own Mosaico connector, her own LinkedIn signed in
 inside Claude's built-in browser pane, the three allow rules above, and her LinkedIn profile registered in Outreach,
 Agent tab. Then run this installer there, with her own Routines Board.
+
+If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.

@@ -8,14 +8,14 @@ description: Check Mosaico Outreach for new LinkedIn follow-ups, send already-ap
 For Follow-up: Mosaico lists the connections to capture, threads to read, follow-up drafts to write or rewrite,
 approved follow-ups to send and the repairs it can decide from evidence. Codex cannot run the approved LinkedIn
 captures, so most steps name a blocker here: this skill reads the queue and reports what a person should do from
-Claude. Mosaico decides what to do and in what order.
+Claude. Mosaico decides what to do and in what order. Do not ask the person for days or scopes.
 
 ## The run
 
 1. Start: open LinkedIn's Me page and send the profile address you see as `observedLinkedInProfile` to
    `outreach_start_run` with `intent: follow_up_pass` and `clientCapabilities: { browserEvidence: false }`. Keep the
    `runId` and pass it on every call; never pass `ownerUserId`.
-2. Read `outreach_get_follow_up_queue` with the `runId` (not `outreach_get_follow_ups`).
+2. Read `outreach_get_follow_up_queue` with the `runId`.
 3. Do exactly what `step` says: make `step.call`, adding only what `supplyAlso` names; write from
    `step.agentInstructions` and `step.guidance`. Follow `then`, then repeat until the step names `outreach_end_run`.
    A step with a `blocker` has no call: report it and go on only as Mosaico's answer allows. Never reorder or skip items.

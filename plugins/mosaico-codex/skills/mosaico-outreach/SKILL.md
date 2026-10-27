@@ -43,9 +43,9 @@ these. When the intent is explicit, never show the menu again.
 - Connector: use only the Mosaico connector for `https://app.mosaico.one` that the person added in Codex. If none is
   connected, stop and tell them to add it. Never use a stage, test, localhost or amplifyapp server, and never
   choose a server by organisation id. A start that names another environment than production stops.
-- Acting: if a call is refused because the connector is acting as a member of another organisation, or its acting
-  session ended, stop and report Mosaico's sentence word for word with the step you reached. Never end the acting
-  session yourself; ending it is the person's choice.
+- If a call is refused because the connector is acting as a member of another organisation, or its acting session
+  ended, stop and report Mosaico's sentence word for word, with the step you reached. Never end the acting session
+  yourself; ending it is the person's choice.
 - Never read, copy, export or reconstruct a LinkedIn cookie, token or session, and never write a LinkedIn script
   of your own.
 - A LinkedIn warning, captcha or restriction stops the run at once: end it `blocked` with `linkedInIssue` and a note.

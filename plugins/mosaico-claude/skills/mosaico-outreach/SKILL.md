@@ -42,9 +42,9 @@ these. When the intent is explicit, never show the menu again.
   none is connected, stop and tell them to connect it in Claude's connectors (not /mcp). Never use a stage, test,
   localhost or amplifyapp server, and never choose a server by organisation id. A start that names another
   environment than production stops.
-- Acting: if a call is refused because the connector is acting as a member of another organisation, or its acting
-  session ended, stop and report Mosaico's sentence word for word with the step you reached. Never end the acting
-  session yourself; ending it is the person's choice.
+- If a call is refused because the connector is acting as a member of another organisation, or its acting session
+  ended, stop and report Mosaico's sentence word for word, with the step you reached. Never end the acting session
+  yourself; ending it is the person's choice.
 - Scripts: LinkedIn captures run only in Claude's built-in browser pane, never through the Chrome extension. Send
   the pane's javascript tool the one line `// mosaico run <script>.js <PLACEHOLDER>=<value>` as the whole script;
   the plugin's gate inserts the approved script. Never print, retype, paraphrase, reorder, shorten or extend a
@@ -57,3 +57,5 @@ these. When the intent is explicit, never show the menu again.
 - A LinkedIn warning, captcha or restriction stops the run at once: end it `blocked` with `linkedInIssue` and a note.
 - If a tool returns state that contradicts itself, record it with `incident_log_mcp_report`; never replace Mosaico's
   state with memory.
+
+If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.

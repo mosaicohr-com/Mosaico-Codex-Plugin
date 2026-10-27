@@ -8,6 +8,7 @@ description: Review, update, or create owned Mosaico Outreach Agents without cha
 Agents are the instructions Mosaico gives a run: search and message instructions, the Messaging Checklist, the
 sourcing plan and an active switch. This skill reads and changes Agents only, never Leads or Messages. Only
 Owners and Admins can use Outreach; an Owner or Admin may manage another member's Agents with `ownerUserId`.
+If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word. Never end the acting session yourself.
 
 1. Read `outreach_get_agents` and show every Agent: name, id, active state, instructions, Leads per day, Leads per
    run, Sourced by, and Mosaico's own sourcing sentence as written.

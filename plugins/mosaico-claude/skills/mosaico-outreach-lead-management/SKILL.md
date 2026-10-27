@@ -12,7 +12,7 @@ between colleagues.
 
 Run (not needed for loading a file): run the approved whoami capture, pass its output unchanged as `identityEvidence`
 to `outreach_start_run` with `intent: manage_leads`, and pass the `runId` on every call; never pass `ownerUserId`.
-The connector, acting, script and cookie rules of `/mosaico:mosaico-outreach` apply. A refusal about one Lead is
+If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word. Never end the acting session yourself. The connector and cookie rules of `/mosaico:mosaico-outreach` apply. A refusal about one Lead is
 recorded and shown; a run-level blocker stops the work.
 
 - Update: read `outreach_get_leads` and `outreach_get_agents`, show the Leads, and let the person pick the exact
@@ -21,8 +21,8 @@ recorded and shown; a run-level blocker stops the work.
   Mosaico judges the day and returns the allowed days when it refuses one.
 - Load a new Lead: choose an active Agent, ask for the Lead's values, then `outreach_save_lead`.
 - Load a file of Leads: confirm the Agent, map the columns to `name`, `linkedInProfileUrl`, `company`, `jobTitle`
-  and `notes`, and show the mapping and row count. Send the rows in pages with `outreach_load_leads` (no run, no
-  `ownerUserId`), report Mosaico's answer row by row and follow its `nextAction`. Never resend a rejected row
+  and `notes`, and show the mapping and row count. Send the rows in pages with `outreach_load_leads` (no run; never
+  pass `ownerUserId`), report Mosaico's answer row by row and follow its `nextAction`. Never resend a rejected row
   with changed data without asking.
 - New draft: `outreach_request_redraft` with the `leadId`, and the `messageId` when one is named. Mosaico returns it
   to Draft; the next routine run writes it. Report anything it lists as `alreadyWaiting`.

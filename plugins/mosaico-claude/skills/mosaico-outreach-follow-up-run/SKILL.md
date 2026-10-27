@@ -16,7 +16,7 @@ decides what to do and in what order. Do not ask the person for days or scopes.
    unchanged as `identityEvidence` to `outreach_start_run` with `intent: follow_up_pass`. If whoami cannot run,
    send the Me page's profile address as `observedLinkedInProfile`. Keep the `runId` and pass it on every call;
    never pass `ownerUserId`.
-2. Read `outreach_get_follow_up_queue` with the `runId` (not `outreach_get_follow_ups`).
+2. Read `outreach_get_follow_up_queue` with the `runId`.
 3. Do exactly what `step` says: make `step.call`, adding only what `supplyAlso` names (when it names
    `identityEvidence`, run whoami again and pass its output unchanged); run `step.evidence.directive`; write from
    `step.agentInstructions` and `step.guidance`. Follow `then`, then repeat until the step names `outreach_end_run`.
@@ -62,3 +62,5 @@ shape the page's header comment gives. It touches nothing else.
 A saved schedule that says "This is the Sync data routine" is the old single schedule. Run nothing from it: start no
 run, open no LinkedIn page, change nothing. Report that it must be reinstalled with the
 `mosaico:mosaico-outreach-schedule-install` skill.
+
+If a tool named here is missing, Claude kept an old tool list: disconnect and reconnect the Mosaico connector in Claude's connector settings.
