@@ -1,0 +1,109 @@
+{
+  "source": {
+    "repository": "mosaicohr-com/mosaico",
+    "branch": "stage-v2",
+    "commit": "12b5cd8d0f01ca0a7729d7aa0ebb3a97294439cd",
+    "file": "features/outreach/documentation/outreach-rule-audit.json",
+    "auditDate": "2026-10-27",
+    "note": "The rules the server audit classes as client-only. Copy this list again from the audit, with its commit, whenever the audit changes; tests/test_client_only_rules.py then needs a check for every new id."
+  },
+  "rules": [
+    {
+      "id": "R002",
+      "rule": "Use only the production Mosaico connector; never a stage, test, localhost or amplifyapp server, and never choose a server by organisation id.",
+      "clientOnly": "thin-skill",
+      "note": "Which connector a client uses is decided on the person's machine. Mosaico names its environment on every start (next rule)."
+    },
+    {
+      "id": "R004",
+      "rule": "If no Mosaico connector is connected, stop and tell the person to connect it in Claude's connectors (not /mcp).",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R006",
+      "rule": "Never end the acting session yourself; ending it is the person's choice.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R017",
+      "rule": "Run approved scripts only through the one-line directive; never print, retype, paraphrase, reorder, shorten or extend a script.",
+      "clientOnly": "plugin-gate-hook",
+      "clientOnlyWhere": "plugins/mosaico-claude/hooks/browser-script-gate.py"
+    },
+    {
+      "id": "R018",
+      "rule": "Never read, copy, export or reconstruct a LinkedIn cookie, token or session, and never write a LinkedIn script of your own.",
+      "clientOnly": "plugin-gate-hook",
+      "clientOnlyWhere": "plugins/mosaico-claude/hooks/browser-script-gate.py (refuses LinkedIn and credential-store scripts); thin skill",
+      "note": "Matches the settled decision: LinkedIn session cookies are never exported."
+    },
+    {
+      "id": "R019",
+      "rule": "Read each script file with the file-reading tool; if the installed plugin has no browser folder, stop and report the plugin needs updating.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R020",
+      "rule": "Captures run in Claude's built-in browser pane only, never through the Chrome extension, and Codex cannot run them.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R043",
+      "rule": "Re-send with acknowledgeProfileOnOtherOwner only after the person decides; never set it yourself.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R056",
+      "rule": "If LinkedIn asks for the person's email, record email-required, never cannot-message.",
+      "clientOnly": "thin-skill",
+      "note": "Only the screen shows the email prompt; Mosaico keeps the Lead and flags it in To sort once told."
+    },
+    {
+      "id": "R090",
+      "rule": "Record a withdrawal only after LinkedIn shows the invitation gone; never click Connect or Message in a Withdraw run.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R093",
+      "rule": "A LinkedIn warning or captcha stops the run at once.",
+      "clientOnly": "thin-skill",
+      "note": "Only the screen shows it; Mosaico accepts it as the proof of a blocked end (linkedInIssue)."
+    },
+    {
+      "id": "R098",
+      "rule": "Leave a record of each routine on the Routines Board in one batch; a failed board write never blocks the report.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R099",
+      "rule": "If a tool returns contradictory state, record it with the MCP incident tool; never substitute memory for Mosaico state.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R101",
+      "rule": "Confirm every Agent and Lead change with the person immediately before the call, and never infer a bulk target from a partial name.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R106",
+      "rule": "Install schedules only with the three user-level browser allow rules, no stale skill copies, no active Codex automations and no non-production Mosaico server.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R107",
+      "rule": "Schedules that use the browser never overlap (30 minutes apart; the two Source leads lanes 90 minutes apart).",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R109",
+      "rule": "Schedule texts are thin: never copy a procedure step into one; a run on an older plugin stops and asks for an update; a saved Sync data task is retired, never run.",
+      "clientOnly": "thin-skill"
+    },
+    {
+      "id": "R110",
+      "rule": "Codex reads the repair queue only and never starts a Repair run, writes or opens LinkedIn.",
+      "clientOnly": "thin-skill (Codex package)",
+      "note": "Moot since 2026-10-27: the Repair queue and the Repair run are gone from the server. The Codex skill line goes with the thin plugin 0.10.0."
+    }
+  ]
+}
