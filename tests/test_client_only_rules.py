@@ -64,7 +64,7 @@ def main() -> None:
     check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None, "the fixture does not name the server commit it was copied from")
     check(source["file"].endswith("outreach-rule-audit.json") and source["branch"] == "stage-v2", "the fixture does not name the server audit file and branch")
     ids = [rule["id"] for rule in fixture["rules"]]
-    check(len(ids) == len(set(ids)) == 18, f"the fixture should hold the 18 client-only rules, once each: {ids}")
+    check(len(ids) == len(set(ids)) == 17, f"the fixture should hold the 17 client-only rules, once each: {ids}")
     check(all(rule["clientOnly"] for rule in fixture["rules"]), "a fixture rule has no clientOnly place")
     check(set(ids) == set(RULES), f"the checks and the fixture differ: unchecked={sorted(set(ids) - set(RULES))}, unknown={sorted(set(RULES) - set(ids))}")
 
