@@ -53,93 +53,37 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.9.24)
+## Current state (0.10.0)
 
-Plugin 0.9.26 makes the schedule installer report each schedule it sets to Mosaico, so the Agent tab's Routines section can show when each routine runs (see its changelog entry). Plugin 0.9.25 adds loading already-sourced Leads and asking for a new draft to the Lead-management skill (see its changelog entry); the rest below is unchanged from 0.9.24.
-
-Plugin 0.9.24 (not yet tagged or published; it waits for the Mosaico release that ships PRs 2053, 2057 and 2058, not yet promoted):
-the Send invitations and Follow-up routines rewrite the drafts an Agent change returned to Draft, every routine records its run on the
-person's Routines Board, and the installer ships the board page and new default times built around an evening review of drafts
-(7:00 to 10:30 PM): Source leads (own) `0 0,3 * * *`, Source leads (colleagues) `30 1,4 * * *`, Send invitations `0 6 * * *`, Follow-up
-`45 18,22 * * *`, Withdraw stale invitations `30 23 * * *` (installed paused until tested), Routines report `45 6,23 * * *`, Repair
-Sunday 10:00 AM. The older description of the schedules below stays as history; the changelog entry for 0.9.24 and the schedule
-installer skill are authoritative for times.
+Plugin 0.10.0 is the thin plugin. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
+the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
+the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
+person's machine: which connector is used, the acting-session stop, the approved browser scripts and their gate, the
+rule that LinkedIn cookies and sessions are never read or exported, LinkedIn warnings and captchas, the Routines Board
+write and the schedule installer's machine checks. The one Outreach limit is 20 invitation sends per owner per day,
+which Mosaico enforces.
 
 ## Outreach workflows
 
-The provider packages include dedicated invitation, follow-up and schedule-installation skills.
-Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an
-action. The schedule option installs per-user local-time schedules: Send invitations (from 0.9.15, once a day, 1:00 PM by
-default; from 0.9.19 it works the one ordered list Mosaico keeps: it sends the approved invitations, checks the connections Mosaico
-hands out, then writes the missing invitation drafts for the person's own Leads), Follow-up
-(from 0.9.15, once a day, 1:30 PM; from 0.9.16 it starts a run with intent `follow_up_pass` and works the paged queue
-`outreach_get_follow_up_queue` hands it: the connections list when it is due, connections still to verify, threads to read, the
-approved follow-ups to send and the missing follow-up drafts, one pass per thread; from 0.9.17 it also fixes redirected addresses and
-drops Leads who said no before anything else, and reports the Leads it skipped; from 0.9.18 it books a later touch when a conversation
-asks to be picked up later ("talk in January": a day on the follow-up draft, or on the Lead when no draft is due yet) and leaves work
-booked for a later day alone until its day), Withdraw stale invitations (from 0.9.15, once a day, 2:00 PM: it withdraws the invitations Mosaico lists as
-stale and never sends; these three replace the older single Sync data schedule, which the installer retires), Source leads in two lanes from 0.9.12 (an own lane on the even hours and a
-colleagues lane on the odd hours, each at least 60 minutes from the other lane and from the three daily times, never writes drafts and never sends; how many Leads
-it finds, and for whom, comes from each Agent's sourcing plan in Outreach) and Repair (once a week, Sunday 10:00 AM by default, also on
-demand, never sends). Before installing, the Claude package checks that a Mosaico connector pointing at `https://app.mosaico.one`
-is connected and signed in, that no project or user MCP server points at a non-production Mosaico address, and that
-`~/.claude/settings.json` allows the three browser tools scheduled sessions need
-(`mcp__Claude_Browser__javascript_tool`, `mcp__Claude_Browser__computer` and
-`mcp__Claude_Browser__browser_batch`; the pane batches a click with a wait and a screenshot through the
-last one, so without it every Connect or Send click is blocked), and both packages
-refuse while stale `mosaico-outreach-*` skill copies or the old Codex automations exist; Codex installs
-only Source leads. Plugin installation never creates or enables a user's schedules silently.
+Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claude Code to choose an action.
 
-**Sourcing plan.** How many Leads Source leads finds, and for whom, is set on each Agent in Outreach (Agent
-tab): Leads per day (the most Leads on one day, 1 to 100), Leads per run (what one run delivers, 1 to 100) and
-Sourced by (an active colleague, or the owner when empty). An Agent is sourced only when it is on and both numbers
-are set. Every run delivers its Leads per run, and Mosaico files the Leads into the first free business days (never
-more than Leads per day on one day, 20 invitations a day for the owner, up to 10 business days ahead). The run ends
-when Mosaico says so, not when the model decides. The schedule and the skills carry no numbers and no days. If no
-Agent has both numbers, Mosaico answers `sourcing_plan_empty` and the run reports: "Set Leads per day and Leads per
-run on an Agent in Outreach (Agent tab), then rerun." If every Agent is full for the next 10 business days, the
-run reports "Every Agent is full for the next 10 business days; nothing to source" and ends; that is not a failure.
-
-**How a run ends.** A run ends through Mosaico, not on the model's say-so. A Source leads run reads every Agent in its
-plan (`outreach_get_agents` with the `runId`), keeps searching with no search limit, and stops only when Mosaico says
-the run is complete (every Agent delivered, ran out of free days, or became unavailable), or on a genuine blocker (a
-code Mosaico gave in the run, or a LinkedIn warning, captcha or restriction). Every run ends with `outreach_end_run`
-and the honest reason (`complete` or `blocked`); Mosaico refuses an end it cannot back while a line is open
-(`sourcing-run-open`) and the run keeps going. A Send invitations run (from 0.9.19) ends `complete` only when Mosaico says its work list
-is empty (`workflowStatus.sendRun.phase` `done`, recommended action `end_run`); asked earlier, Mosaico refuses with `send-run-open`, keeps
-the run open and names the next action. A run with no Mosaico call for 30 minutes is closed by the next Source
-leads run and reported as "run failed: stopped with N open". The start answer names the Mosaico environment (`environmentName`), every report begins with it, and a run on
-anything but production stops.
-
-Installed schedules are thin routines. A saved schedule holds only the person's standing answers (timezone,
-LinkedIn public identifier) and tells the run to follow a named routine
-section in the installed plugin's skill: "Follow-up routine" in the follow-up-run skill, "Send invitations routine",
-"Withdraw stale invitations routine" and "Source leads routine" in the invite-run skill and "Repair routine" in the repair-run skill. The procedure is therefore always the one
-in the plugin you have installed, so a plugin release no longer leaves a saved schedule stale. A saved text
-names the minimum plugin version it needs; a run on an older plugin stops and reports that the plugin needs
-updating. Run the installer again only to change an answer or a time, or once to replace a schedule saved in the
-older long form.
-
-The colleague check. When Source leads saves a candidate for a colleague, the Sales Navigator colleague check
-(`browser/linkedin-salesnav-colleague-connection.js`) asks whether the candidate is already one of her connections.
-From 0.9.11 its sealed output also says whether the search could have found them, and Mosaico decides what that
-proves. If the candidate is not listed and the check shows the search could have found them (every result page read,
-her connection list visible to the searching account, no result row unread), the negative is proven: Mosaico saves
-the Lead as verified not connected by the colleague check; from 0.9.13 the sourcing run writes no draft, and her own
-Send invitations run writes her invitation from its `draftsToWrite` list. Otherwise the Lead is saved with its connection unknown
-and stays undrafted until her own run verifies it. A proven
-negative never sends: her invitation is held until her own Send invitations run records her own LinkedIn connection evidence for
-the Lead (the send guard, `own-evidence-required`), and a run never records connection evidence for a colleague's Lead.
-The risk accepted: nobody has yet tested a colleague who hides her connections, so a proven negative could in rare
-cases be wrong; the send guard contains it, because nothing is sent before her own check.
-
-**Who writes invitation drafts (0.9.13).** A Source leads run finds Leads, saves them and lets Mosaico place them on days,
-then ends. It never writes an invitation draft, for its own Leads or a colleague's: Mosaico refuses the write with
-`sourcing-writes-no-drafts`, which the skill treats as expected. The Lead owner's Send invitations run writes the missing drafts,
-for its own Leads only, from the `draftsToWrite` list that `outreach_get_day` (in `workflowStatus`) and
-`outreach_get_follow_ups` return (`count`, `entries` with `leadId`, `name`, `agentId`, `day` and `action`,
-`writableInThisRun` and `recommendedAction`). The application builds the list and its recommended action; the skill
-follows it. A draft is never approved or sent by the run that wrote it.
+- **Send invitations** sends the approved invitations, checks connections and writes or rewrites invitation drafts as Mosaico
+  orders. **Follow-up** reads threads, writes follow-up drafts only, sends approved follow-ups and makes the repairs Mosaico
+  lists. **Withdraw stale invitations** withdraws what Mosaico lists. **Source leads** is paused; Leads arrive as lists
+  loaded to each member. Agents and Leads have their own management skills.
+- The schedule installer (Claude) reads `outreach_get_routine_setup`, saves each routine's text, name and default schedule
+  exactly as Mosaico returns them, records each with `outreach_record_routine_schedule` and the `catalogueVersion`, and offers
+  to remove a routine Mosaico retired. It publishes the person's Routines Board once. Before installing it checks that a
+  production Mosaico connector is connected, that no non-production Mosaico server is configured, that
+  `~/.claude/settings.json` allows the three browser tools scheduled sessions need (`mcp__Claude_Browser__javascript_tool`,
+  `mcp__Claude_Browser__computer` and `mcp__Claude_Browser__browser_batch`) and that no stale `mosaico-outreach-*` skill copies
+  or old Codex automations exist. Codex installs no routine: every routine needs the approved captures, which only
+  Claude's built-in browser pane can run.
+- A saved schedule holds only the text Mosaico returned, which names the skill and its routine section, so the procedure is
+  always the one Mosaico serves. A run on a plugin or server that does not match stops and says both must be updated.
+- The colleague check and the other approved scripts under `browser/` are unchanged; the gate still refuses any other script
+  that touches LinkedIn or a credential store.
 
 ## Set up a second person
 
@@ -215,6 +159,41 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.10.0
+
+Needs the Mosaico server release that ships stage-v2 pull requests #2168 to #2182 (the step block, server-only run guidance, the rule
+audit, the server-only routine catalogue and `outreach_get_routine_setup`, trimmed tool descriptions with run-scoped step guidance, one
+limit only, held-back items, and the retired Repair routine). Do not tag, publish or install this plugin before that release is live on
+main-v2. Plugin and server release together. Skills only: the plugin bundles no Mosaico server, address or token.
+
+- **Thin Outreach skills (both packages).** Mosaico-outreach, invite-run, follow-up-run, schedule-install, agent-management and
+  lead-management now say what the skill is for, how to start a run, to follow the step Mosaico returns (`step.call`,
+  `step.agentInstructions`, `step.guidance`), to end the run and to give `report.lines` and `report.sections` unchanged, how to stop
+  on a blocker or refusal (`recommendedAction`), and only the rules the server cannot enforce. The Claude package's Outreach skills
+  fell from about 38,700 words to about 3,300.
+- **Schedule installer.** Routines, texts, times and steps come only from `outreach_get_routine_setup`. Each saved routine is recorded
+  with `outreach_record_routine_schedule` and the setup's `catalogueVersion`. A retired routine's scheduled task is offered for removal
+  (`remove_retired_routines`). If the server has no `outreach_get_routine_setup`, no step block or an older catalogue than this plugin
+  expects (`2026-10-27.3`), the skills stop and say the plugin and server must be updated together.
+- **Removed.** The Repair skill (`mosaico-outreach-repair-run`) in both packages and every mention of the Repair routine and
+  `outreach_get_repair_queue`; the verify, draft, check, withdraw, colleague-check and sourcing caps; the weekly invitation ceiling;
+  the 24-hour rules (the Routines report look-back, the capture age); the routine texts, default times and step lists that were
+  hard-coded in the installer and the run skills; the sequencing recipes, judgement guidance, drafting style and report wording that the
+  server now serves; the rule that a skill works only on the signed-in person's own records. Outreach records are company-owned: an
+  Owner or Admin reads and writes any member's records. The only limit is 20 invitation sends per owner per day.
+- **Kept, unchanged.** The approved browser scripts, the browser-script gate hook and the Routines Board page. The client-only rules
+  stay in the skills or the gate: the production connector only, no connector means stop, never end an acting session, run approved scripts
+  only through the one-line directive, pass script output unchanged, never read or export a LinkedIn cookie, session or token, captures in
+  Claude's built-in browser pane only, the email prompt is recorded as `email-required`, a withdrawal is recorded only after LinkedIn
+  shows the invitation gone, a LinkedIn warning or captcha stops the run, the Routines Board write never blocks the report, contradictory
+  state goes to the incident tool, Agent and Lead changes are confirmed with the person, the installer's machine checks, no overlapping
+  browser schedules and thin schedule texts.
+- **Tests.** `tests/test_thin_outreach_skills.py` pins the thin contract in both packages, the word budget of the Claude Outreach skills,
+  the absence of any other limit, 24-hour rule or Repair, and the routine section names the server's texts point at.
+  `tests/test_client_only_rules.py` checks that every client-only rule of the server's rule audit
+  (`tests/fixtures/outreach-client-only-rules.json`, copied from mosaico `origin/stage-v2` 12b5cd8d0f01) is still stated in a thin skill
+  or enforced by the gate hook. Script, gate and integrity tests are unchanged.
 
 ### 0.9.26
 
