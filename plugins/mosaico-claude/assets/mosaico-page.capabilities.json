@@ -1,0 +1,31 @@
+{
+  "mcp": {
+    "servers": [
+      {
+        "server": "mosaico",
+        "tools": [
+          "get_daily_brief",
+          "reseller_list_customers",
+          "reseller_list_customer_components",
+          "reseller_list_customer_members",
+          "install_methodology_component",
+          "get_methodology_components_view",
+          "discard_conversion_components",
+          "get_teams_view",
+          "get_domains_view",
+          "delete_domain_record",
+          "get_flows_view",
+          "get_flow_people_view",
+          "assign_person_to_flow",
+          "delete_process",
+          "get_account_view",
+          "get_security_view",
+          "get_notifications_view",
+          "get_permissions_view",
+          "get_usage_audit_view"
+        ]
+      }
+    ]
+  },
+  "assets": {}
+}
