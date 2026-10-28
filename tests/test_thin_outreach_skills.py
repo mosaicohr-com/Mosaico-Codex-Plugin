@@ -45,7 +45,7 @@ SECTIONS = {
 
 
 def main() -> None:
-    # Version: both manifests are at 0.10.0 and the skills name it.
+    # Version: both manifests are at 0.11.0 and the skills name it.
     for package, manifest in manifests().items():
         check(manifest["version"] == VERSION, f"the {package} manifest is not at {VERSION}")
         check("mcpServers" not in str(manifest), f"the {package} manifest bundles a Mosaico server")
@@ -144,7 +144,7 @@ def main() -> None:
                    "outreach_record_routine_schedule", "catalogueVersion", "remove_retired_routines", CATALOGUE_VERSION, "browser-script gate",
                    "tests/test_thin_outreach_skills.py", "tests/test_client_only_rules.py", "tests/test_thin_skill_budget.py", "#2184", "reviewWindow"):
         check(needle in entry, f"the README 0.10.0 entry lacks: {needle}")
-    check("## Current state (0.10.0)" in readme, "the README lacks the 0.10.0 current state")
+    check("## Current state (0.11.0)" in readme, "the README lacks the 0.11.0 current state")
 
     print(
         "PASS: both packages carry thin Outreach skills (start the run, follow the step, end the run, give the server's report unchanged, stop on a blocker), "

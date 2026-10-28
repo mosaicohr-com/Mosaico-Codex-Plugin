@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.10.0)
+## Current state (0.11.0)
 
-Plugin 0.10.0 is the thin plugin. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.11.0 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -63,6 +63,16 @@ person's machine: which connector is used, the acting-session stop, the approved
 rule that LinkedIn cookies and sessions are never read or exported, LinkedIn warnings and captchas, the Routines Board
 write and the schedule installer's machine checks. The one Outreach limit is 20 invitation sends per owner per day,
 which Mosaico enforces.
+
+## The Mosaico page (Claude only)
+
+The Claude package carries the Mosaico page (`plugins/mosaico-claude/assets/mosaico-page.html`), a claude.ai artifact that only shows screens.
+Every rule and every piece of know-how stays on the Mosaico server. Run `/mosaico:mosaico-page-install` once: it publishes one copy for the
+person with the Artifact tool, titled "Mosaico", keeps the link in `~/.claude/mosaico-page-url`, and on a later run (after a plugin update)
+republishes to the same link, never a new one. The page calls the connector named `mosaico`, so the person's Mosaico connector must have that
+name. The Codex package cannot publish pages and does not get the page or the skill.
+
+The page's background video is not shipped: its address points at a file in Mosaico's own artifact, so a copy keeps the static background.
 
 ## Outreach workflows
 
@@ -159,6 +169,18 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.11.0
+
+Pairs with the Mosaico server release 20261029a (main-v2 `cd87c125a`, live 2026-10-29): the page calls 19 tools that are live since then, so
+this plugin can ship any time after. Skills and one more page asset only: the plugin bundles no Mosaico server, address or token.
+
+- **New skill `mosaico-page-install` (Claude only).** Publishes `assets/mosaico-page.html` unchanged, once per person, with the capabilities of
+  `assets/mosaico-page.capabilities.json`; republishes to the same link on later runs. It says plainly when Claude has no Artifact tool or the
+  connector is not named `mosaico`, and tells the person to reconnect Mosaico when the page says a tool is missing.
+- **Assets.** `mosaico-page.html`, `mosaico-page.capabilities.json` and `mosaico-page.source.json` (commit, release, date and checksums).
+- The Codex package does not get the skill or the page.
+- Tests: `tests/test_mosaico_page_asset.py`. Version stamps in the other skills moved to 0.11.0; the server still asks for 0.10.0 or later.
 
 ### 0.10.0
 
