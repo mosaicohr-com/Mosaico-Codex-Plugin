@@ -11,7 +11,7 @@ CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 PACKAGES = {"Claude": CLAUDE, "Codex": CODEX}
 
-VERSION = "0.11.0"  # the plugin version; the server's OUTREACH_PLUGIN_VERSION is the same
+VERSION = "0.11.1"  # the plugin version; the server's OUTREACH_PLUGIN_VERSION is the same
 CATALOGUE_VERSION = "2026-10-27.4"  # the server's OUTREACH_ROUTINE_CATALOGUE_VERSION this plugin expects
 
 HUB = "mosaico-outreach"
