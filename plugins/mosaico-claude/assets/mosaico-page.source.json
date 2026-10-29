@@ -1,14 +1,14 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "3ce5886e01dc28159d98f7cef7e7015766714a72",
-  "release": "20261029c",
-  "date": "2026-10-29",
+  "commit": "acd69af6d2cff00c9d0e969526d7a0e985b27d22",
+  "release": "20261030a",
+  "date": "2026-10-30",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "1b19f28f88105a2b3cb43ae9fe0f8a5b449dc44f91b3ddaea9588e1d30361c3e",
-      "bytes": 1679160
+      "sha256": "f596ac0dc0c7f7523b14771e66f8b75329cf222b2491aed6439dd13d7aa09495",
+      "bytes": 1679220
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",

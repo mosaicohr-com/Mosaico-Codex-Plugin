@@ -8,7 +8,7 @@ description: Install or repair the Mosaico Outreach schedules, Send invitations,
 Mosaico owns the routines: their names, texts, default times, steps and report headings. This skill only checks the
 machine, saves what `outreach_get_routine_setup` returns as Claude Desktop scheduled tasks (`list_scheduled_tasks`,
 `create_scheduled_task`, `update_scheduled_task`, `delete_scheduled_task`), and tells Mosaico what it saved. It
-changes no Lead, Message, Agent or run. If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word. Never end the acting session yourself. This plugin is 0.11.1 and expects routine catalogue `2026-10-27.4` or later.
+changes no Lead, Message, Agent or run. If a call is refused because the connector is acting as a member of another organisation, or its acting session ended, stop and report Mosaico's sentence word for word. Never end the acting session yourself. This plugin is 0.11.2 and expects routine catalogue `2026-10-27.4` or later.
 
 ## Check before installing
 
@@ -41,7 +41,7 @@ If any check fails, install nothing and tell the person what to do.
    ```
 2. Read `outreach_get_routine_setup` with the person's IANA `timeZone` and `boardUrl`; for another member an Owner or
    Admin adds `ownerUserId`, but each person's tasks are saved on her own machine. If the tool is missing, or the answer
-   has no `catalogueVersion`, an older one than above, or a `minimumPluginVersion` newer than 0.11.1, stop and say the
+   has no `catalogueVersion`, an older one than above, or a `minimumPluginVersion` newer than 0.11.2, stop and say the
    plugin and the Mosaico server must be updated together. A `blocked` state (for example
    `register_linkedin_identity`) is reported with its blocker's action; install nothing.
    If `standingAnswers.reviewWindow.state` is `missing` (`recommendedAction` `ask_review_window`), ask the person once:
