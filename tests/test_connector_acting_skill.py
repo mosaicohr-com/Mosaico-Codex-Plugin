@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 VERSION = "0.9.23"  # the README entry these checks read (install_methodology_component)
-CURRENT = "0.11.1"  # the manifests
+CURRENT = "0.11.2"  # the manifests
 PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."

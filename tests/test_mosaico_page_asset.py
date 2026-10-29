@@ -30,7 +30,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261029c" and source["date"] == "2026-10-29", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030a" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
