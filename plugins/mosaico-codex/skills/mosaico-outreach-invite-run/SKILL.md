@@ -41,4 +41,4 @@ cannot run the approved LinkedIn captures: a step that needs one is for Claude's
 ## Source leads routine
 
 Run intent `source_invitation_leads` once. Pass `sourcingScope` exactly as the standing answers name it and nothing
-else about the plan. If the saved text needs a newer plugin than 0.11.2, stop and report that the plugin needs updating.
+else about the plan. If the saved text needs a newer plugin than 0.11.3, stop and report that the plugin needs updating.
