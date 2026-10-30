@@ -1,19 +1,19 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "4511421801a6171ecaff49b13407082c1a9482a7",
-  "release": "20261030b",
+  "commit": "ffb1cc9c2259cff8c5e67f43ef9e1a9d3115a503",
+  "release": "20261030e",
   "date": "2026-10-30",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "0d99ee06aad3219fb8443d7d60232b7513ef079dcbbc9b0ff03650d1edd2f5f2",
-      "bytes": 1695022
+      "sha256": "3d259b63192c2553d87ed7fcb7a0f226cb9b9e1a6966609efa4e36bccc28aed1",
+      "bytes": 1695225
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
-      "sha256": "e0fd3a3f4f8b2797f36cb5edde69fbaced337bd8565e922d9d66729082934171",
-      "bytes": 913
+      "sha256": "fd1fb7a01453f559bedb86adbdb674f7a51a906c8a02fd46ec2428ebe6fbe275",
+      "bytes": 934
     }
   },
   "note": "The page's background video address (/_blob/aaefb1d9...) belongs to Mosaico's own artifact. Copies keep the static background; the video is not shipped."
