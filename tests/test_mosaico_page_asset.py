@@ -30,7 +30,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030b" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030e" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -44,7 +44,7 @@ def main() -> None:
     check(len(servers) == 1 and servers[0]["server"] == "mosaico", "the capabilities do not name the one connector 'mosaico'")
     tools = servers[0]["tools"]
     check(len(tools) == 22 and len(set(tools)) == 22, f"the page should declare 22 distinct tools, not {len(tools)}")
-    check(set(caps) == {"mcp", "assets"} and caps["assets"] == {}, "the capabilities hold more than mcp and empty assets")
+    check(set(caps) == {"mcp", "assets", "downloads"} and caps["assets"] == {} and caps["downloads"] is True, "the capabilities hold more than mcp, empty assets and downloads")
     check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 22 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
     # The page names its read tools in code; the write tools are named by the views it reads, so only the read ones are looked for.
     named = {tool for tool in tools if f'"{tool}"' in text or tool in text}
