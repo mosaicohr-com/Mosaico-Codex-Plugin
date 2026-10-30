@@ -29,5 +29,5 @@ recorded and shown; a run-level blocker stops the work.
 - Move Leads between colleagues (Owner or Admin): `outreach_transfer_lead` or `outreach_transfer_leads`; show the
   preview and, when Mosaico asks, which Lead to merge into.
 
-Confirm every Lead change with the person immediately before the call. Re-send with `acknowledgeProfileOnOtherOwner`
-only after the person decides; never set it yourself. Read again and report what was saved.
+Confirm every Lead change with the person immediately before the call. A held Lead is skipped
+with its reason; never re-send it. Read again and report what was saved.

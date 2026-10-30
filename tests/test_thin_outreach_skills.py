@@ -34,18 +34,18 @@ MOVED_IN_RUN_SKILLS = (
     "outreach_mark_message_sent", "outreach_record_connection_evidence", "outreach_record_connections_snapshot", "outreach_save_lead",
     "outreach_record_message", "outreach_link_duplicate_leads",
 )
-INTENTS = {INVITE: ("send_approved_invitations", "source_invitation_leads", "manage_leads"), FOLLOW_UP: ("follow_up_pass",)}
+INTENTS = {INVITE: ("send_approved_invitations", "manage_leads"), FOLLOW_UP: ("follow_up_pass",)}
 READS = {INVITE: ("outreach_get_day", "outreach_get_withdraw_queue"), FOLLOW_UP: ("outreach_get_follow_up_queue",)}
 # The routine sections the server's routine texts name: "Follow that skill's <section> section exactly" (outreach-routine-catalogue.ts).
 SECTIONS = {
-    "Claude": {INVITE: ("Source leads routine", "Send invitations routine", "Withdraw stale invitations routine"),
+    "Claude": {INVITE: ("Load leads routine", "Send invitations routine", "Withdraw stale invitations routine"),
                FOLLOW_UP: ("Follow-up routine", "Routines report routine")},
-    "Codex": {INVITE: ("Source leads routine",), FOLLOW_UP: ("Follow-up routine",)},
+    "Codex": {INVITE: ("Load leads routine",), FOLLOW_UP: ("Follow-up routine",)},
 }
 
 
 def main() -> None:
-    # Version: both manifests are at 0.11.3 and the skills name it.
+    # Version: both manifests are at 0.12.0 and the skills name it.
     for package, manifest in manifests().items():
         check(manifest["version"] == VERSION, f"the {package} manifest is not at {VERSION}")
         check("mcpServers" not in str(manifest), f"the {package} manifest bundles a Mosaico server")
@@ -111,8 +111,8 @@ def main() -> None:
 
     # The invite-run skill keeps the machine-only rules and the routine details Mosaico cannot know.
     invite = flat(skill("Claude", INVITE))
-    for needle in ("onBehalfOfMemberId", "sourcingScope", "https://www.linkedin.com/feed/", "Board key", "ArtifactData", "assets/routines-board.html",
-                   "acknowledgeProfileOnOtherOwner", "email-required", "never cannot-message"):
+    for needle in ("onBehalfOfMemberId", "outreach_load_leads", "https://www.linkedin.com/feed/", "Board key", "ArtifactData", "assets/routines-board.html",
+                   "re-send it", "email-required", "never cannot-message"):
         check(needle in invite, f"the Claude invite-run skill lacks: {needle}")
     follow = flat(skill("Claude", FOLLOW_UP))
     for needle in ("Never reorder or skip items", "writes follow-up drafts only", "never invitation drafts",
@@ -127,7 +127,7 @@ def main() -> None:
     check("works only on the signed-in person's own" not in agents and "Do not pass ownerUserId" not in agents, "the agent-management skill still refuses another member's Agents")
     leads = flat(skill("Claude", LEADS))
     for needle in ("outreach_update_lead", "outreach_save_lead", "outreach_load_leads", "outreach_request_redraft", "outreach_transfer_lead", "outreach_transfer_leads",
-                   "nextTouchOn", "Never infer a bulk target from a partial name", "immediately before", "acknowledgeProfileOnOtherOwner"):
+                   "nextTouchOn", "Never infer a bulk target from a partial name", "immediately before", "re-send it"):
         check(needle in leads, f"the Claude lead-management skill lacks: {needle}")
     check(flat(skill("Codex", AGENTS)) == agents.replace("/mosaico:", "$mosaico:"), "the Codex agent-management skill differs from Claude's")
 
@@ -144,7 +144,7 @@ def main() -> None:
                    "outreach_record_routine_schedule", "catalogueVersion", "remove_retired_routines", CATALOGUE_VERSION, "browser-script gate",
                    "tests/test_thin_outreach_skills.py", "tests/test_client_only_rules.py", "tests/test_thin_skill_budget.py", "#2184", "reviewWindow"):
         check(needle in entry, f"the README 0.10.0 entry lacks: {needle}")
-    check("## Current state (0.11.3)" in readme, "the README lacks the 0.11.3 current state")
+    check("## Current state (0.12.0)" in readme, "the README lacks the 0.12.0 current state")
 
     print(
         "PASS: both packages carry thin Outreach skills (start the run, follow the step, end the run, give the server's report unchanged, stop on a blocker), "

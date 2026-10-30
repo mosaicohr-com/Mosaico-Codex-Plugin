@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.11.3)
+## Current state (0.12.0)
 
-Plugin 0.11.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.12.0 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -80,8 +80,8 @@ Use `$mosaico:mosaico-outreach` in Codex or `/mosaico:mosaico-outreach` in Claud
 
 - **Send invitations** sends the approved invitations, checks connections and writes or rewrites invitation drafts as Mosaico
   orders. **Follow-up** reads threads, writes follow-up drafts only, sends approved follow-ups and makes the repairs Mosaico
-  lists. **Withdraw stale invitations** withdraws what Mosaico lists. **Source leads** is paused; Leads arrive as lists
-  loaded to each member. Agents and Leads have their own management skills.
+  lists. **Withdraw stale invitations** withdraws what Mosaico lists. **Load leads** loads the Leads a member was given;
+  it finds none on LinkedIn. Agents and Leads have their own management skills.
 - The schedule installer (Claude) reads `outreach_get_routine_setup`, saves each routine's text, name and default schedule
   exactly as Mosaico returns them, records each with `outreach_record_routine_schedule` and the `catalogueVersion`, and offers
   to remove a routine Mosaico retired. It publishes the person's Routines Board once. Before installing it checks that a
@@ -123,9 +123,8 @@ A colleague sets up her own schedules on her own Mac:
 5. Register her LinkedIn profile in Mosaico Outreach, Agent tab, "LinkedIn profile". The installer checks
    it with `outreach_start_run` (intent `inspect_day`); if Mosaico answers
    `linkedin_identity_not_registered`, register the profile there, or have an Owner do it, and check again.
-6. Run the schedule installer. It installs her Send invitations, Follow-up, Withdraw stale invitations and Routines report schedules and her own Routines Board (and retires an older Sync data task), and Source leads only if she sources
-   Leads herself. Her Source leads schedule needs no quota: she sets Leads per day and Leads per run on her Agent
-   in Outreach (Agent tab) and may name a colleague as "Sourced by".
+6. Run the schedule installer. It installs her Send invitations, Follow-up, Withdraw stale invitations and Routines report schedules and her own Routines Board (and retires an older Sync data task), and Load leads (which loads the Leads she
+   is given into her Agents), and deletes the old Source leads tasks.
 
 Each person's Send invitations, Follow-up and Withdraw stale invitations schedules run on that person's own Mac, in that person's own pane, and sends only
 from that person's account. Nobody's run touches another owner's Leads.
@@ -169,6 +168,15 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.12.0
+
+Pairs with the Mosaico server release 20261030c (PR 2233, catalogue `2026-10-30.1`). Not additive: a routine is renamed and an argument is removed. Run the installer again after updating.
+
+- Load leads replaces Source leads. It reads the Leads the person gave, loads them in pages with `outreach_load_leads`, and reports placed, skipped and rejected rows. It starts no run and opens no LinkedIn page. One routine, daily 05:00, installed for everyone.
+- Held Leads are skipped with their reason, never re-sent. `acknowledgeProfileOnOtherOwner` and `sourcingScope` are gone from the skills.
+- The installer deletes the old "Mosaico Outreach — Source leads (own)" and "(colleagues)" scheduled tasks that the setup read lists as `retiredRoutines`.
+- The Routines Board has one `load-leads` entry in place of the two source entries.
 
 ### 0.11.3
 
@@ -224,12 +232,12 @@ main-v2. Plugin and server release together. Skills only: the plugin bundles no 
 - **Schedule installer.** Routines, texts, times and steps come only from `outreach_get_routine_setup`. Each saved routine is recorded
   with `outreach_record_routine_schedule` and the setup's `catalogueVersion`. A retired routine's scheduled task is offered for removal
   (`remove_retired_routines`). If the server has no `outreach_get_routine_setup`, no step block or an older catalogue than this plugin
-  expects (`2026-10-27.4`), the skills stop and say the plugin and server must be updated together.
+  expects (`2026-10-30.1`), the skills stop and say the plugin and server must be updated together.
 - **Review window (restored).** The owner's design that the routine times follow the person's evening review was dropped from the thin
   installer by mistake. Mosaico (server pull request #2184) now works out the times: the installer asks the person once when they review
   and approve drafts, passes the answer to `outreach_get_routine_setup` as `reviewWindow`, saves exactly the times returned, reads back
   the server's `readback` lines and records the window with each routine. It never asks when Mosaico already knows the window. No time
-  or rule is written in the skill. The catalogue it expects is `2026-10-27.4`.
+  or rule is written in the skill. The catalogue it expects is `2026-10-30.1`.
 - **Removed.** The Repair skill (`mosaico-outreach-repair-run`) in both packages and every mention of the Repair routine and
   `outreach_get_repair_queue`; the verify, draft, check, withdraw, colleague-check and sourcing caps; the weekly invitation ceiling;
   the 24-hour rules (the Routines report look-back, the capture age); the routine texts, default times and step lists that were

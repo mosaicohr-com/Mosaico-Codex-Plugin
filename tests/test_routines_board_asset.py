@@ -14,7 +14,7 @@ def main() -> None:
     board = read(CLAUDE / "assets" / "routines-board.html")
     for needle in (
         "<title>Outreach Routines Board</title>", "DATABASE SCHEMA (db capability)", "runs/<id>", "actions/<id>", "issues/<id>", "improvements/<id>", "meta/board",
-        '"follow-up" | "send-invitations" | "source-own" | "source-colleagues" | "withdraw"', "only Editors/Owner (admin) write",
+        '"follow-up" | "send-invitations" | "load-leads" | "withdraw"', "only Editors/Owner (admin) write",
         "WRITING (a routine records its run", "pass its version as if_version", "one batch", "never a retry loop and never a halt", "Routines Board not updated: <reason>",
         "act-<slug>-<yyyymmdd>", "iss-<slug>", "never write improvements", "sched-<routine key>-", "recorded by the Routines report",
     ):

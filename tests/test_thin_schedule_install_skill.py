@@ -16,7 +16,7 @@ ALLOW_RULES = ("mcp__Claude_Browser__javascript_tool", "mcp__Claude_Browser__com
 CRON = re.compile(r"(?<![\w-])(?:[\d*/,]+\s+){4}[\d*/,]+(?![\w-])")
 CLOCK_TIME = re.compile(r"\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:AM|PM)\b|\bHH:MM\b", re.I)
 TITLE = re.compile(r"Mosaico Outreach\s+[—-]")
-ROUTINE_TEXT = re.compile(r"Standing answers for this recurring automation|Follow that skill's|This is the (?:Send invitations|Follow-up|Source leads|Withdraw|Routines report) routine", re.I)
+ROUTINE_TEXT = re.compile(r"Standing answers for this recurring automation|Follow that skill's|This is the (?:Send invitations|Follow-up|Load leads|Withdraw|Routines report) routine", re.I)
 
 
 def main() -> None:
@@ -26,7 +26,9 @@ def main() -> None:
     # Nothing about a routine is hard-coded.
     check(not CRON.search(text), f"the Claude installer hard-codes a cron: {CRON.search(text) and CRON.search(text).group(0)}")
     check(not CLOCK_TIME.search(text.replace("`HH:MM`", "")), f"the Claude installer hard-codes a time: {CLOCK_TIME.search(text) and CLOCK_TIME.search(text).group(0)}")
-    check(not TITLE.search(text), "the Claude installer hard-codes a task title")
+    # Only the two retired Source leads titles may be named: the installer tells the person which old tasks it deletes.
+    named = text.replace("Mosaico Outreach — Source leads (own)", "").replace("Mosaico Outreach — Source leads (colleagues)", "")
+    check(not TITLE.search(named), "the Claude installer hard-codes a task title")
     check(not ROUTINE_TEXT.search(text), "the Claude installer carries a routine text")
     for stale in ("Sync data", "evening review", "quota"):
         check(stale not in text.replace("Sync data routine", ""), f"the Claude installer still carries: {stale}")
