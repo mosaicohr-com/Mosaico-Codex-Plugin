@@ -24,7 +24,7 @@ decides what to do and in what order. Do not ask the person for days or scopes.
 4. A run-level blocker (`recommendedAction`) stops the run: tell the person what Mosaico said. A refusal about one
    Lead is recorded and the run goes on.
 5. End with `outreach_end_run`. Give `report.lines` and `report.sections` unchanged, adding only what a heading asks for.
-6. An answer without `step` means the plugin and the Mosaico server must be updated together: stop and say so. Likewise if a saved routine text needs a newer plugin than 0.11.3 or a section this skill lacks: stop and report that the plugin needs updating.
+6. An answer without `step` means the plugin and the Mosaico server must be updated together: stop and say so. Likewise if a saved routine text needs a newer plugin than 0.12.0 or a section this skill lacks: stop and report that the plugin needs updating.
 
 ## What only this machine can enforce
 

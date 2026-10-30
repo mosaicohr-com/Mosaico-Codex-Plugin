@@ -13,7 +13,7 @@ enforces.
 When the person has not said what they want, ask "What do you want to do in Mosaico Outreach?" and offer
 these. When the intent is explicit, never show the menu again.
 
-- Source leads, Send invitations (sends approved invitations, checks connections, writes and rewrites
+- Load leads, Send invitations (sends approved invitations, checks connections, writes and rewrites
   invitation drafts), Withdraw stale invitations: `/mosaico:mosaico-outreach-invite-run`.
 - Follow-up (threads, follow-up drafts, approved follow-up sends, repairs): `/mosaico:mosaico-outreach-follow-up-run`.
 - Inspect a day: start a run with `intent: inspect_day`, read `outreach_get_day` for that day and report. It changes nothing.

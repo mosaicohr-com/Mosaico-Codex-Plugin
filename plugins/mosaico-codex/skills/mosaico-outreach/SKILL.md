@@ -17,7 +17,7 @@ call: stop at it, report it, and tell the person to run that routine from Claude
 When the person has not said what they want, ask "What do you want to do in Mosaico Outreach?" and offer
 these. When the intent is explicit, never show the menu again.
 
-- Source leads, Send invitations, Withdraw stale invitations: `$mosaico:mosaico-outreach-invite-run`.
+- Load leads, Send invitations, Withdraw stale invitations: `$mosaico:mosaico-outreach-invite-run`.
 - Follow-up: `$mosaico:mosaico-outreach-follow-up-run`.
 - Inspect a day: start a run with `intent: inspect_day`, read `outreach_get_day` for that day and report. It changes nothing.
 - Agents: `$mosaico:mosaico-outreach-agent-management`. Leads: `$mosaico:mosaico-outreach-lead-management`.
