@@ -16,7 +16,7 @@ EXPECTED_TOOLS = (
     "get_daily_brief", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members", "install_methodology_component",
     "get_methodology_components_view", "discard_conversion_components", "get_teams_view", "create_organization_users", "get_domains_view", "delete_domain_record", "get_flows_view",
     "get_flow_people_view", "assign_person_to_flow", "delete_process", "get_account_view", "get_security_view", "get_notifications_view",
-    "get_permissions_view", "get_usage_audit_view",
+    "get_permissions_view", "get_usage_audit_view", "get_integrations_view", "revoke_integration_grant",
 )
 FORBIDDEN = (
     "system message", "pattern list", "agentInstructions", "step.guidance", "draftsToWrite", "sendRun.", "sourcing_plan_empty", "completion.mustContinue",
@@ -30,7 +30,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030a" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030b" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -43,9 +43,9 @@ def main() -> None:
     servers = caps["mcp"]["servers"]
     check(len(servers) == 1 and servers[0]["server"] == "mosaico", "the capabilities do not name the one connector 'mosaico'")
     tools = servers[0]["tools"]
-    check(len(tools) == 20 and len(set(tools)) == 20, f"the page should declare 20 distinct tools, not {len(tools)}")
+    check(len(tools) == 22 and len(set(tools)) == 22, f"the page should declare 22 distinct tools, not {len(tools)}")
     check(set(caps) == {"mcp", "assets"} and caps["assets"] == {}, "the capabilities hold more than mcp and empty assets")
-    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 20 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
+    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 22 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
     # The page names its read tools in code; the write tools are named by the views it reads, so only the read ones are looked for.
     named = {tool for tool in tools if f'"{tool}"' in text or tool in text}
     check(len(named) >= 14, f"the page names only {len(named)} of its declared tools")
@@ -69,7 +69,7 @@ def main() -> None:
         check(rule not in body, f"the page skill carries Mosaico method text: {rule}")
     readme = read(ROOT / "README.md")
     check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
-    print("PASS: the Mosaico page equals its recorded source, declares exactly its 20 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
+    print("PASS: the Mosaico page equals its recorded source, declares exactly its 22 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
 
 
 if __name__ == "__main__":
