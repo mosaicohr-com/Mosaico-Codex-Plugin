@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.12.2)
+## Current state (0.12.3)
 
-Plugin 0.12.2 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.12.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,14 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.12.3
+
+Pairs with the Mosaico server release 20261101a (main-v2 `5d7b9420f`). Page asset refresh only.
+
+- Methodology Overview shows real counts (`get_methodology_view` with `organisation_overview`).
+- Flows can attach, read and remove step files (`add_step_file`, `get_step_file`, `remove_step_file`).
+- The page now carries 64 tools (was 22).
 
 ### 0.12.2
 

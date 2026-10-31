@@ -13,9 +13,21 @@ ASSETS = CLAUDE / "assets"
 NAME = "mosaico-page-install"
 # Server-only know-how and secrets: none of it may be in the page (phrases from the run guidance, the moved tokens, key shapes).
 EXPECTED_TOOLS = (
-    "get_daily_brief", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members", "install_methodology_component",
-    "get_methodology_components_view", "discard_conversion_components", "get_teams_view", "create_organization_users", "get_domains_view", "delete_domain_record", "get_flows_view",
-    "get_flow_people_view", "assign_person_to_flow", "delete_process", "get_account_view", "get_security_view", "get_notifications_view",
+    "get_daily_brief", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members",
+    "install_methodology_component", "get_methodology_view", "create_methodology_project", "add_methodology_source",
+    "update_methodology_source", "delete_methodology_project", "save_methodology_guidance", "set_reseller_terminology",
+    "edit_methodology_component", "start_methodology_analysis", "cancel_methodology_analysis", "retry_methodology_analysis_unit",
+    "retry_methodology_failed_units", "get_teams_view", "get_team_member_view", "get_teams_analytics_view",
+    "create_organization_users", "resend_invitation", "delete_user", "set_self_assessment",
+    "set_personal_target", "set_member_career_view", "set_member_role", "remove_person_position",
+    "set_person_compliance_record", "batch_assign_teams", "batch_assign_positions", "batch_update_profile_fields",
+    "set_person_capability_levels", "get_domains_view", "get_domain_view", "get_domain_position_view",
+    "get_domain_record_view", "get_domains_analytics_view", "delete_domain_record", "update_domain_record_description",
+    "set_position_capability_requirements", "set_position_ladder_level", "get_flows_view", "get_flow_view",
+    "get_flow_step_answers", "get_flow_answers", "save_step_answer", "add_step_file",
+    "get_step_file", "remove_step_file", "assign_person_to_flow", "set_step_people",
+    "set_step_delegates", "set_task_due_date", "approve_task_completion", "send_task_back",
+    "delete_process", "get_account_view", "get_security_view", "get_notifications_view",
     "get_permissions_view", "get_usage_audit_view", "get_integrations_view", "revoke_integration_grant",
 )
 FORBIDDEN = (
@@ -30,7 +42,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261030f" and source["date"] == "2026-10-30", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261101a" and source["date"] == "2026-11-01", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -43,9 +55,9 @@ def main() -> None:
     servers = caps["mcp"]["servers"]
     check(len(servers) == 1 and servers[0]["server"] == "mosaico", "the capabilities do not name the one connector 'mosaico'")
     tools = servers[0]["tools"]
-    check(len(tools) == 22 and len(set(tools)) == 22, f"the page should declare 22 distinct tools, not {len(tools)}")
+    check(len(tools) == 64 and len(set(tools)) == 64, f"the page should declare 64 distinct tools, not {len(tools)}")
     check(set(caps) == {"mcp", "assets", "downloads"} and caps["assets"] == {} and caps["downloads"] is True, "the capabilities hold more than mcp, empty assets and downloads")
-    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 22 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
+    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 64 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
     # The page names its read tools in code; the write tools are named by the views it reads, so only the read ones are looked for.
     named = {tool for tool in tools if f'"{tool}"' in text or tool in text}
     check(len(named) >= 14, f"the page names only {len(named)} of its declared tools")
@@ -69,7 +81,7 @@ def main() -> None:
         check(rule not in body, f"the page skill carries Mosaico method text: {rule}")
     readme = read(ROOT / "README.md")
     check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
-    print("PASS: the Mosaico page equals its recorded source, declares exactly its 22 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
+    print("PASS: the Mosaico page equals its recorded source, declares exactly its 64 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
 
 
 if __name__ == "__main__":
