@@ -67,7 +67,8 @@
           "get_permissions_view",
           "get_usage_audit_view",
           "get_integrations_view",
-          "revoke_integration_grant"
+          "revoke_integration_grant",
+          "start_acting"
         ]
       }
     ]

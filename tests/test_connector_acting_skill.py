@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 VERSION = "0.9.23"  # the README entry these checks read (install_methodology_component)
-CURRENT = "0.13.0"  # the manifests
+CURRENT = "0.13.1"  # the manifests
 PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
@@ -131,7 +131,7 @@ def main() -> None:
             "There is no timer: the session ends only when the person ends it or signs out", "copies that member's permissions exactly and adds nothing",
             "billing is reachable only when working as the Owner", "Progress in the member's name is allowed as the member could do it, and Mosaico logs it under both names",
             "Do not repeat the call and do not carry on the task", "then wait for their new instruction", "Do not continue as the operator until they give one",
-            "tell_the_person_the_task_stopped", "Only the operator's own click in the Mosaico web console starts it", "No tool starts it",
+            "tell_the_person_the_task_stopped", "Acting starts directly from the Mosaico page or from chat, with the start_acting tool on the signed-in connector", "reseller Owners and Admins only", "call stop_acting first",
             "connector.reference", "recommendedAction", "phase (not-acting, acting or ended)", "needs no confirmation and always works",
             "Without a subscription I cannot change anything",
             "no approve step, no publish step, no Private or Public setting", "no Examples tab or example library",
@@ -244,7 +244,7 @@ def main() -> None:
     else:
         suffix = "(pass --app-repo to check the application contract too)"
     print(
-        f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started only in the web console), stop an Outreach run on the acting refusal, "
+        f"PASS: both packages teach connector acting (tools, no timer, an exact replica of the member, started from the page or chat with start_acting), stop an Outreach run on the acting refusal, "
         f"stop the task after the session-ended refusal, say installing a component needs a subscription, teach install_methodology_component, "
         f"the people tools, carry the reconnect note, bundle no Mosaico server, and are at {CURRENT} {suffix}."
     )

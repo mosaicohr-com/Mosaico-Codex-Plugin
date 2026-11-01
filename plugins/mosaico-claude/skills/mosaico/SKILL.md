@@ -28,9 +28,10 @@ Do not try another tool to make the same change.
 ## Acting as a member of a customer
 
 A reseller operator can make their own Claude connector act as a member of one of their customer
-organisations. There is no timer: the session ends only when the person ends it or signs out. Only the operator's own click in the Mosaico web console starts it
-(Customers, the customer, Members, the member, then "my connected Claude"). No tool starts it, so never
-try to start it or offer to: if the person wants it, tell them where to click.
+organisations. There is no timer: the session ends only when the person ends it or signs out. Acting starts directly from the Mosaico page or from chat, with the `start_acting` tool on the
+signed-in connector (`customerOrganizationId`, `memberUserProfileId`). It is for reseller Owners and Admins only. With no `mode` it previews
+who, the role and the customer, and writes nothing; start only after the person agrees, with `mode: "execute"` and the `confirmationToken`.
+It is refused while already acting: call `stop_acting` first.
 
 While it lasts, every call runs as that member in that customer, with that member's role and the
 customer's rules. Working as a member copies that member's permissions exactly and adds nothing: billing is

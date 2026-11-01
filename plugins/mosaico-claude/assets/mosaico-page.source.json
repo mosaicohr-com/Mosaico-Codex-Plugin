@@ -1,20 +1,20 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "8f77c6e2634138fcced73d28cda83133203dac41",
-  "release": "20261101c",
+  "commit": "1fc3e8592f96deddb5bfd8ad8e2572dc04bc7b2e",
+  "release": "20261101d",
   "date": "2026-11-01",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "ce2bd9cc489ffc1436ac34517e91c0c775642415f96d4baf6d8b1639a37307e8",
+      "sha256": "cbb48818197e68d741e40800e2e92534e12233a9cce28eb334ed5b241eb1efaa",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
-      "sha256": "ea8e9d95a05062994ec4fb6b3941a431c98c351563359ca731d55355c1d7054c",
-      "bytes": 2417
+      "sha256": "b32f550f3f0baee3e7f057d115e1f35fe6489587b7db9ef7e0753fc9d959bbf6",
+      "bytes": 2443
     }
   },
-  "note": "The page is a small loader (PR 2260). It loads React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.0 from jsDelivr with an integrity value. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader (PR 2260) loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.1 from jsDelivr with an integrity value. This version adds the start_acting tool (PR 2262) so acting as a customer member starts from the page and chat. The page's background video is not shipped; copies keep the static background."
 }
