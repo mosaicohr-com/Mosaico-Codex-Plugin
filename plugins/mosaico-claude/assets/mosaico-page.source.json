@@ -1,20 +1,20 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "1fc3e8592f96deddb5bfd8ad8e2572dc04bc7b2e",
-  "release": "20261101d",
-  "date": "2026-11-01",
+  "commit": "1baff9711fc3af203fe1080e99d357d789d1dadd",
+  "release": "20261102a",
+  "date": "2026-11-02",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "cbb48818197e68d741e40800e2e92534e12233a9cce28eb334ed5b241eb1efaa",
+      "sha256": "1fed1948300631e21d9431ad08df3ac6185eaca9385851f4b1f2e355df4c6fe6",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
-      "sha256": "b32f550f3f0baee3e7f057d115e1f35fe6489587b7db9ef7e0753fc9d959bbf6",
-      "bytes": 2443
+      "sha256": "17a61f2aefffff1e2a8a9a85522220f3762758562f640cb0eaa956d034bb6b93",
+      "bytes": 2499
     }
   },
-  "note": "The page is the small loader (PR 2260) loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.1 from jsDelivr with an integrity value. This version adds the start_acting tool (PR 2262) so acting as a customer member starts from the page and chat. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader (PR 2260) loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.2 from jsDelivr with an integrity value. This version adds a dialog for starting to act as a customer member from the page with server-confirmed success and a Stop acting control (PR 2265), and declares get_acting_status and stop_acting. The page's background video is not shipped; copies keep the static background."
 }

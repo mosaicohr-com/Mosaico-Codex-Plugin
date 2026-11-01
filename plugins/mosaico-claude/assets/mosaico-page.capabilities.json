@@ -68,7 +68,9 @@
           "get_usage_audit_view",
           "get_integrations_view",
           "revoke_integration_grant",
-          "start_acting"
+          "start_acting",
+          "get_acting_status",
+          "stop_acting"
         ]
       }
     ]
