@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.12.3)
+## Current state (0.13.0)
 
-Plugin 0.12.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.13.0 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,14 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.13.0
+
+Pairs with the Mosaico server release 20261101c (PR 2260, `8f77c6e26`). Page asset change; the page is now a small loader.
+
+- The page file is a 5 KB readable loader (it was 3 MB). A person's Claude can now read all of it before publishing, so the install no longer fails on other computers.
+- The loader loads React 18.3.1 from cdnjs and Mosaico's own public npm package `mosaico-page@1.0.0` from jsDelivr, with an integrity value.
+- The capabilities are unchanged (64 tools, assets, downloads). The install skill publishes the file unchanged and must never swap the script address or the integrity value.
 
 ### 0.12.3
 
