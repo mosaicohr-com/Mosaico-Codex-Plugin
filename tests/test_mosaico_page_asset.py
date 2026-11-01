@@ -42,7 +42,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261101a" and source["date"] == "2026-11-01", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261101c" and source["date"] == "2026-11-01", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -50,6 +50,19 @@ def main() -> None:
         check(len(data) == record["bytes"], f"{name} size differs from the record")
     text = read(page)
     check("<title>Mosaico</title>" in text, "the page title is not Mosaico")
+    # The page is a small readable loader over the public package mosaico-page, not an inline bundle.
+    check(page.stat().st_size < 30_000, f"the page is {page.stat().st_size} bytes: it should be a small loader under 30 KB")
+    scripts = re.findall(r"<script\b[^>]*\bsrc=\"([^\"]+)\"[^>]*>", text)
+    package_url = "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.0/dist/mosaico-page.js"
+    check(scripts.count(package_url) == 1, "the page does not load exactly mosaico-page@1.0.0 from jsDelivr")
+    for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", text):
+        check(re.search(r'integrity="sha384-[A-Za-z0-9+/=]{64}"', tag) is not None, f"a script has no sha384 integrity: {tag[:90]}")
+    allowed = ("cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com", "cdn.tailwindcss.com", "code.jquery.com")
+    for url in scripts:
+        check(re.match(r"https://([^/]+)/", url).group(1) in allowed, f"a script loads from a host the artifact runtime does not allow: {url}")
+    check("cdnjs.cloudflare.com/ajax/libs/react/18.3.1/" in text and "cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/" in text, "the page does not load React 18.3.1 from cdnjs")
+    inline = [body for body in re.findall(r"<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>", text, re.S)]
+    check(all(len(body) < 5_000 for body in inline), "the page carries a large inline script: the bundle must not be inline")
 
     caps = json.loads(read(caps_file))
     servers = caps["mcp"]["servers"]
@@ -59,8 +72,7 @@ def main() -> None:
     check(set(caps) == {"mcp", "assets", "downloads"} and caps["assets"] == {} and caps["downloads"] is True, "the capabilities hold more than mcp, empty assets and downloads")
     check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 64 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
     # The page names its read tools in code; the write tools are named by the views it reads, so only the read ones are looked for.
-    named = {tool for tool in tools if f'"{tool}"' in text or tool in text}
-    check(len(named) >= 14, f"the page names only {len(named)} of its declared tools")
+    # The tool names now live in the package, so the loader names none of them; only undeclared names are checked.
     undeclared = set(re.findall(r"\b((?:get|reseller_list)_[a-z_]+_(?:view|brief|customers|components|members))\b", text)) - set(tools)
     check(not undeclared, f"the page names tools its capabilities do not declare: {sorted(undeclared)}")
 
@@ -76,12 +88,14 @@ def main() -> None:
     for needle in ("assets/mosaico-page.html", "unchanged", 'title "Mosaico"', 'icon "dashboard"', "assets/mosaico-page.capabilities.json", "~/.claude/mosaico-page-url",
                    "same link", "Never publish without the link when one exists", "Artifact tool", "named `mosaico`".replace("`", ""), "reconnect"):
         check(needle in text_flat, f"the page skill lacks: {needle}")
+    for needle in ("mosaico-page@1.0.0", "Mosaico's own public package", "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.0/dist/mosaico-page.js", "integrity value", "Never swap", "read all of it"):
+        check(needle in text_flat, f"the page skill lacks: {needle}")
     check(text_flat.count("without the link") == 1 and "second copy" in text_flat, "the page skill does not keep to one link per person")
     for rule in ("outreach_", "routine", "Lead", "step.", "checklist"):
         check(rule not in body, f"the page skill carries Mosaico method text: {rule}")
     readme = read(ROOT / "README.md")
     check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
-    print("PASS: the Mosaico page equals its recorded source, declares exactly its 64 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
+    print("PASS: the Mosaico page is the recorded small loader over mosaico-page 1.0.0, declares exactly its 64 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
 
 
 if __name__ == "__main__":

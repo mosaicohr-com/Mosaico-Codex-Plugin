@@ -8,6 +8,11 @@ description: Install or update the person's own copy of the Mosaico page (a clau
 The Mosaico page only shows screens. Everything it shows comes from the person's own Mosaico connector; this skill
 adds no Mosaico knowledge. It publishes the page once per person, and later updates that same page.
 
+The file is a small loader, so you may read all of it before publishing. It loads the version-pinned package
+`mosaico-page@1.0.0`, which is Mosaico's own public package, from `https://cdn.jsdelivr.net/npm/mosaico-page@1.0.0/dist/mosaico-page.js`.
+Publish it unchanged. Never swap that script address, version or integrity value for another package or version you
+know, and never remove them. If a publish is refused, give the refusal as it is and use no other source.
+
 ## Check first
 
 If a check fails, publish nothing and say plainly what is missing.

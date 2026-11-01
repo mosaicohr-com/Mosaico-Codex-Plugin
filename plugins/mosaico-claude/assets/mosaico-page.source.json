@@ -1,14 +1,14 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "5d7b9420fef47b29b1fbfdc650c5b8da171984ae",
-  "release": "20261101a",
+  "commit": "8f77c6e2634138fcced73d28cda83133203dac41",
+  "release": "20261101c",
   "date": "2026-11-01",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "2b8f7f323b9f7016b65a467f7610a17e0df330cd51f8198f8891d02cfeae7a26",
-      "bytes": 2969293
+      "sha256": "ce2bd9cc489ffc1436ac34517e91c0c775642415f96d4baf6d8b1639a37307e8",
+      "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
@@ -16,5 +16,5 @@
       "bytes": 2417
     }
   },
-  "note": "The page's background video address (/_blob/aaefb1d9...) belongs to Mosaico's own artifact. Copies keep the static background; the video is not shipped."
+  "note": "The page is a small loader (PR 2260). It loads React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.0 from jsDelivr with an integrity value. The page's background video is not shipped; copies keep the static background."
 }
