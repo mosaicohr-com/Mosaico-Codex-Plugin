@@ -41,4 +41,4 @@ cannot run the approved LinkedIn captures: a step that needs one is for Claude's
 Start no run and open no LinkedIn page. Read the Leads the person gave you and load each Agent's rows with
 `outreach_load_leads`, one page at a time, following `nextAction`. Report placed, skipped and rejected rows as Mosaico
 answers; fix or re-send none. With nothing to load, say "Nothing to load." If the saved text needs a newer plugin than
-0.13.1, stop and report that the plugin needs updating.
+0.13.2, stop and report that the plugin needs updating.
