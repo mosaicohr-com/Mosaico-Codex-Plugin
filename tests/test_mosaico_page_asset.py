@@ -42,7 +42,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261102b" and source["date"] == "2026-11-02", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261102c" and source["date"] == "2026-11-02", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -53,8 +53,8 @@ def main() -> None:
     # The page is a small readable loader over the public package mosaico-page, not an inline bundle.
     check(page.stat().st_size < 30_000, f"the page is {page.stat().st_size} bytes: it should be a small loader under 30 KB")
     scripts = re.findall(r"<script\b[^>]*\bsrc=\"([^\"]+)\"[^>]*>", text)
-    package_url = "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.3/dist/mosaico-page.js"
-    check(scripts.count(package_url) == 1, "the page does not load exactly mosaico-page@1.0.3 from jsDelivr")
+    package_url = "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.4/dist/mosaico-page.js"
+    check(scripts.count(package_url) == 1, "the page does not load exactly mosaico-page@1.0.4 from jsDelivr")
     for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", text):
         check(re.search(r'integrity="sha384-[A-Za-z0-9+/=]{64}"', tag) is not None, f"a script has no sha384 integrity: {tag[:90]}")
     allowed = ("cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com", "cdn.tailwindcss.com", "code.jquery.com")
@@ -88,14 +88,14 @@ def main() -> None:
     for needle in ("assets/mosaico-page.html", "unchanged", 'title "Mosaico"', 'icon "dashboard"', "assets/mosaico-page.capabilities.json", "~/.claude/mosaico-page-url",
                    "same link", "Never publish without the link when one exists", "Artifact tool", "named `mosaico`".replace("`", ""), "reconnect"):
         check(needle in text_flat, f"the page skill lacks: {needle}")
-    for needle in ("mosaico-page@1.0.3", "Mosaico's own public package", "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.3/dist/mosaico-page.js", "integrity value", "Never swap", "read all of it"):
+    for needle in ("mosaico-page@1.0.4", "Mosaico's own public package", "https://cdn.jsdelivr.net/npm/mosaico-page@1.0.4/dist/mosaico-page.js", "integrity value", "Never swap", "read all of it"):
         check(needle in text_flat, f"the page skill lacks: {needle}")
     check(text_flat.count("without the link") == 1 and "second copy" in text_flat, "the page skill does not keep to one link per person")
     for rule in ("outreach_", "routine", "Lead", "step.", "checklist"):
         check(rule not in body, f"the page skill carries Mosaico method text: {rule}")
     readme = read(ROOT / "README.md")
     check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
-    print("PASS: the Mosaico page is the recorded small loader over mosaico-page 1.0.3, declares exactly its 67 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
+    print("PASS: the Mosaico page is the recorded small loader over mosaico-page 1.0.4, declares exactly its 67 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
 
 
 if __name__ == "__main__":

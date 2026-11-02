@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "300bb151cc49defb68c04791a6d9b8113dd09a1d",
-  "release": "20261102b",
+  "commit": "98a7e61d3e2f9931d834411877a9cdaff866b1b4",
+  "release": "20261102c",
   "date": "2026-11-02",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "8e497166fc09b0c274123c2f251f006595008aea51970a29c4daab3a30868885",
+      "sha256": "eaa1e9a0fe34259573b94efd64db185b249b0d0a7b279a79c2c480a74704e3e5",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 2499
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.3 from jsDelivr with an integrity value. This version adds a strip on every view showing who the connector is working as, with a Stop acting button (PR 2267), a 12-second read timeout so a call that claude.ai drops shows 'could not be read' with Retry instead of loading forever, and the daily brief capped at 8 seconds with a per-call read cache (PR 2268). 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.4 from jsDelivr with an integrity value. This version draws the Reseller Overview tab with the site's own totals and recent installs (PR 2270), caps the customers read so a slow part is marked unavailable instead of failing the call, and lands an acted-as member on Flows with the member's own menu as the site does (PR 2271). 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
 }
