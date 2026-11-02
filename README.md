@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.13.2)
+## Current state (0.13.3)
 
-Plugin 0.13.2 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.13.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,15 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.13.3
+
+Pairs with the Mosaico server release 20261102b (PR 2269, `300bb151c`). Page asset change.
+
+- The page asset now pins `mosaico-page@1.0.3` from jsDelivr (still the 5 KB loader with an integrity value). The capabilities list the same 67 tools.
+- Every view shows who the connector is working as, with a Stop acting button (PR 2267).
+- A call that claude.ai drops now shows "could not be read" with Retry after 12 seconds instead of loading forever.
+- The daily brief is capped at 8 seconds and calls are cached per read (PR 2268).
 
 ### 0.13.2
 

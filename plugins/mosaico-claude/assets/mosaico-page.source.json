@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "1baff9711fc3af203fe1080e99d357d789d1dadd",
-  "release": "20261102a",
+  "commit": "300bb151cc49defb68c04791a6d9b8113dd09a1d",
+  "release": "20261102b",
   "date": "2026-11-02",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "1fed1948300631e21d9431ad08df3ac6185eaca9385851f4b1f2e355df4c6fe6",
+      "sha256": "8e497166fc09b0c274123c2f251f006595008aea51970a29c4daab3a30868885",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 2499
     }
   },
-  "note": "The page is the small loader (PR 2260) loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.2 from jsDelivr with an integrity value. This version adds a dialog for starting to act as a customer member from the page with server-confirmed success and a Stop acting control (PR 2265), and declares get_acting_status and stop_acting. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.3 from jsDelivr with an integrity value. This version adds a strip on every view showing who the connector is working as, with a Stop acting button (PR 2267), a 12-second read timeout so a call that claude.ai drops shows 'could not be read' with Retry instead of loading forever, and the daily brief capped at 8 seconds with a per-call read cache (PR 2268). 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
 }
