@@ -9,7 +9,7 @@
     1. Draws a plain "Loading Mosaico..." state on the right background for the viewer's theme.
     2. Loads React 18.3.1 from cdnjs.
     3. Loads the Mosaico page script from the public npm package "mosaico-page" through jsDelivr, at one exact version
-       (1.0.3). That script is Mosaico's own and holds screens only; it draws the page and talks to the
+       (1.0.4). That script is Mosaico's own and holds screens only; it draws the page and talks to the
        person's own Mosaico connector through claude.ai. It reads its styles from itself, so this file has none to load.
     4. If anything fails to load, shows what failed in words instead of a blank page.
 
@@ -79,7 +79,7 @@ function mosaicoLoadFailed(what) {
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/mosaico-page@1.0.3/dist/mosaico-page.js" integrity="sha384-F2vygoGPZ4+i8f50nCSsNKgIUjU2Wb4scpT8if+1Bd+6rIgOJYCL+bjnTB0oOSOQ" crossorigin="anonymous" onerror="mosaicoLoadFailed('The Mosaico page script (mosaico-page 1.0.3) did not load.')"></script>
+<script src="https://cdn.jsdelivr.net/npm/mosaico-page@1.0.4/dist/mosaico-page.js" integrity="sha384-b1mGYFMboRGJ7daaryjvEsdbcYMk38j+iai8/7YxJsA1ysyMkh/1c6sHWEeH3/R/" crossorigin="anonymous" onerror="mosaicoLoadFailed('The Mosaico page script (mosaico-page 1.0.4) did not load.')"></script>
 <script>
 /* If React itself did not load, the page script could not start. */
 if (!window.React || !window.ReactDOM) mosaicoLoadFailed('React did not load.');

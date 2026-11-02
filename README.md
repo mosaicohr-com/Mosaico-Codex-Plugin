@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.13.3)
+## Current state (0.13.4)
 
-Plugin 0.13.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.13.4 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,14 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.13.4
+
+Pairs with the Mosaico server release 20261102c (PR 2273, `98a7e61d3`). Page asset change.
+
+- The page asset now pins `mosaico-page@1.0.4` from jsDelivr (still the 5 KB loader with an integrity value). The capabilities list the same 67 tools.
+- The Reseller Overview tab draws the site's own totals and recent installs (PR 2270), and the customers read is capped so a slow part is marked unavailable instead of failing the call.
+- While acting as a member, the page lands on Flows with the member's own menu, as the site does (PR 2271).
 
 ### 0.13.3
 
