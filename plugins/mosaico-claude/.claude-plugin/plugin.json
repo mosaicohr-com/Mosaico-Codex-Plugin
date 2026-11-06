@@ -1,6 +1,6 @@
 {
   "name": "mosaico",
-  "version": "0.13.4",
+  "version": "0.14.0",
   "description": "Manage Mosaico through the person's own production Mosaico connector.",
   "author": {
     "name": "Mosaico Limited",
