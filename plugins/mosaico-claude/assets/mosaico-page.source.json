@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "98a7e61d3e2f9931d834411877a9cdaff866b1b4",
-  "release": "20261102c",
-  "date": "2026-11-02",
+  "commit": "3e81dcd8029f86a1cc21748f8880a5a2413d1dbe",
+  "release": "20261106a",
+  "date": "2026-11-06",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "eaa1e9a0fe34259573b94efd64db185b249b0d0a7b279a79c2c480a74704e3e5",
+      "sha256": "2970465b10ae0658c5eb108c3c9f13ea77ca3bfc6265cc9477140eef4ed47015",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 2499
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.0.4 from jsDelivr with an integrity value. This version draws the Reseller Overview tab with the site's own totals and recent installs (PR 2270), caps the customers read so a slow part is marked unavailable instead of failing the call, and lands an acted-as member on Flows with the member's own menu as the site does (PR 2271). 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.1.0 from jsDelivr with an integrity value. This version has no in-app chat, the top bar spans the first row, Owners and Admins get a setup guide column with steps that open the real screens, and the Integrations screen shows the Claude install steps with pictures. 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
 }

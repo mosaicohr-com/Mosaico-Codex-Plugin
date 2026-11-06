@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.13.4)
+## Current state (0.14.0)
 
-Plugin 0.13.4 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.14.0 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,15 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.14.0
+
+Pairs with the Mosaico server release 20261106a (app PR 2314, `4175be9e7` on main-v2, production build 418). Page asset change.
+
+- The page asset now pins `mosaico-page@1.1.0` from jsDelivr (still the small loader with an integrity value). The capabilities list the same 67 tools.
+- The page has no in-app chat, and the top bar spans the first row.
+- Owners and Admins get a setup guide column with steps that open the real screens.
+- The Integrations screen shows the Claude install steps with pictures.
 
 ### 0.13.4
 
