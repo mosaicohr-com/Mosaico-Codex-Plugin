@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "5614f670efc430603b3cb6cd0aafc2155beaf989",
-  "release": "20261108c",
+  "commit": "d1bca59b610aef9a49df86b4d9641477fef1e09e",
+  "release": "20261109a",
   "date": "2026-11-09",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "cab103eeb173be2ee22cbf5bf1fc01d3ee88a1bbe3d4c40fb9bef7b8a6dbfd15",
+      "sha256": "8999e80e27a42dd8d979df91efd636c8be2e2af2223c1f8ef19f9eea961efe62",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 3394
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.1 from jsDelivr with an integrity value. 1.5.1 fixes three gaps seen on the live page: the Daily brief is first in a reseller's menu and its landing, the Methodology overview drops the numbers block, and the brief icon is a newspaper. 90 tools, none new; no connector reconnect needed."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.3 from jsDelivr with an integrity value. 1.5.3 is the first automatic release (release-page workflow): Self Progress own step opens on the page; accent text, loader wash, marketing orange, sign-in bar and tab ring all follow the one brand accent. 90 tools, none new; no connector reconnect needed."
 }
