@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "bf2d7b10ae01588304b04053494d846323078f4a",
-  "release": "20261108b",
-  "date": "2026-11-08",
+  "commit": "5614f670efc430603b3cb6cd0aafc2155beaf989",
+  "release": "20261108c",
+  "date": "2026-11-09",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "9e5327f5bf06a862303085f11c5c190d9072067890cb9833241dc7d882ebba50",
+      "sha256": "cab103eeb173be2ee22cbf5bf1fc01d3ee88a1bbe3d4c40fb9bef7b8a6dbfd15",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 3394
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.0 from jsDelivr with an integrity value. This version mounts the web app's own shell (glass menu bar, one server-decided menu, setup side column, shared headers), adds the reseller look and account picture, editable Notifications and Permissions, flows step preview, admin edits and the file drop zone, the Mosaico Setup screen, the organisations console for MasterUsers, deep addresses, and one error and loading block. 90 tools (23 new). The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.1 from jsDelivr with an integrity value. 1.5.1 fixes three gaps seen on the live page: the Daily brief is first in a reseller's menu and its landing, the Methodology overview drops the numbers block, and the brief icon is a newspaper. 90 tools, none new; no connector reconnect needed."
 }

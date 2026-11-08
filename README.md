@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.16.0)
+## Current state (0.16.1)
 
-Plugin 0.16.0 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.16.1 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -168,6 +168,14 @@ of any cookie or session export:
 The Codex package ships no such capability, so its Outreach skills do not capture connection evidence.
 
 ## Changelog
+
+### 0.16.1
+
+Pairs with the Mosaico server release 20261108c (`5614f670e` on main-v2). Page asset change only.
+
+- The page asset now pins `mosaico-page@1.5.1` from jsDelivr (still the small loader with an integrity value).
+- Fixes three gaps seen on the live page: the Daily brief is first in a reseller's menu and is the reseller's landing; the Methodology overview drops the projects, documents, conversions and components numbers block; the Daily brief icon is a newspaper.
+- Same 90 tools as 0.16.0. No connector reconnect needed.
 
 ### 0.16.0
 
