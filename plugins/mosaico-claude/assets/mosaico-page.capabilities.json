@@ -70,7 +70,30 @@
           "revoke_integration_grant",
           "start_acting",
           "get_acting_status",
-          "stop_acting"
+          "stop_acting",
+          "set_my_avatar",
+          "set_notification_settings",
+          "set_role_permission",
+          "set_feature_availability",
+          "reseller_create_customer",
+          "reseller_confirm_customer",
+          "set_reseller_branding",
+          "reseller_get_daily_brief_settings",
+          "reseller_update_daily_brief_settings",
+          "set_step_assignee_type",
+          "add_step_question",
+          "remove_question_item",
+          "outreach_get_setup_view",
+          "outreach_apply_lead_action",
+          "get_agent_setup_view",
+          "save_agent_setup_methodology",
+          "save_agent_setup_voice_and_tone",
+          "save_agent_setup_outreach_agent",
+          "get_organizations_console_view",
+          "get_foundation_library_promote_preview",
+          "clean_organization",
+          "incinerate_organization",
+          "promote_foundation_library"
         ]
       }
     ]

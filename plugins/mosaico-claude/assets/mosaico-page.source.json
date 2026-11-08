@@ -1,20 +1,20 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "c2893d029b4f4fd154c0ec3c0f4efc60a2cccc59",
-  "release": "20261108a",
+  "commit": "bf2d7b10ae01588304b04053494d846323078f4a",
+  "release": "20261108b",
   "date": "2026-11-08",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "b28ccc21a4a9b944699f1cc57e9d9bfb4bbfa2429f17dc705dc1c2f05405d05a",
+      "sha256": "9e5327f5bf06a862303085f11c5c190d9072067890cb9833241dc7d882ebba50",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
-      "sha256": "17a61f2aefffff1e2a8a9a85522220f3762758562f640cb0eaa956d034bb6b93",
-      "bytes": 2499
+      "sha256": "107e91a8719917f4ac027314fd8acb9984a8e9099fb36bad6d50d0408b0cd8ae",
+      "bytes": 3394
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.2.0 from jsDelivr with an integrity value. This version adds an Overview tab with a brief card on Methodology, Flows, Domains and People, the rebuilt Setup panel whose steps open the real screens, the setup help button beside the gear, one design token file, and hides the Terminology tab for customer organisations. 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.0 from jsDelivr with an integrity value. This version mounts the web app's own shell (glass menu bar, one server-decided menu, setup side column, shared headers), adds the reseller look and account picture, editable Notifications and Permissions, flows step preview, admin edits and the file drop zone, the Mosaico Setup screen, the organisations console for MasterUsers, deep addresses, and one error and loading block. 90 tools (23 new). The page's background video is not shipped; copies keep the static background."
 }
