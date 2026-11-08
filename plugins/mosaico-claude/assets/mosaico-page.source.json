@@ -1,13 +1,13 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "b985d3977828e3defb9d96c53f6caa85ad7b94dd",
-  "release": "20261106a",
-  "date": "2026-11-06",
+  "commit": "c2893d029b4f4fd154c0ec3c0f4efc60a2cccc59",
+  "release": "20261108a",
+  "date": "2026-11-08",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "ba848680dc880fc4684d1e2c095085fea084ddc03b123ef0a3e0cf172b3eb9e8",
+      "sha256": "b28ccc21a4a9b944699f1cc57e9d9bfb4bbfa2429f17dc705dc1c2f05405d05a",
       "bytes": 5224
     },
     "mosaico-page.capabilities.json": {
@@ -16,5 +16,5 @@
       "bytes": 2499
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.1.0 from jsDelivr with an integrity value. This version has no in-app chat, the top bar spans the first row, Owners and Admins get a setup guide column with steps that open the real screens, and the Integrations screen shows the Claude install steps with pictures. 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.2.0 from jsDelivr with an integrity value. This version adds an Overview tab with a brief card on Methodology, Flows, Domains and People, the rebuilt Setup panel whose steps open the real screens, the setup help button beside the gear, one design token file, and hides the Terminology tab for customer organisations. 67 tools unchanged. The page's background video is not shipped; copies keep the static background."
 }
