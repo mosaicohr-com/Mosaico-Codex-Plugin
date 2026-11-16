@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / "plugins" / "mosaico-claude"
 CODEX = ROOT / "plugins" / "mosaico-codex"
 VERSION = "0.9.23"  # the README entry these checks read (install_methodology_component)
-CURRENT = "0.15.0"  # the manifests
+CURRENT = "0.16.3"  # the manifests
 PREVIOUS = "0.9.22"
 
 OPERATOR_ONLY = "Outreach and incident tools are not available while your connector is acting as a member of another organisation. End the session first."
@@ -135,11 +135,11 @@ def main() -> None:
             "connector.reference", "recommendedAction", "phase (not-acting, acting or ended)", "needs no confirmation and always works",
             "Without a subscription I cannot change anything",
             "no approve step, no publish step, no Private or Public setting", "no Examples tab or example library",
-            "projectId, componentKind (flow or domain), componentKey and targetOrganizationId", "mode: \"execute\" and the confirmationToken",
+            "projectId, componentKind (flow or domain), componentKey and targetOrganizationId", "mode: \"execute\" and the confirmationToken",  # the conversion project, its status and its analysis codes are retired (0.16.3)
             "replaces the earlier copy in place when nobody has progress on it", "Mosaico makes a new copy and keeps the old one",
             "component_not_published", "analysis_not_complete", "not_compilable", "tenant_access_denied", "subscription_required",
-            "only target allowed is that member's organisation", "state (draft or published)", "installs (organizationId, organizationName, installedAt, by, changedSinceInstall)",
-            "fix_warnings", "install_component",
+            "only target allowed is that member's organisation",
+           
             "Removing a person deletes the work they have recorded on the flow",
         ):
             check(needle in words, f"{package} mosaico skill lacks: {needle}")

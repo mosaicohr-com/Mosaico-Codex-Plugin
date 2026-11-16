@@ -1,20 +1,20 @@
 {
   "repository": "mosaicohr-com/mosaico",
   "branch": "main-v2",
-  "commit": "d1bca59b610aef9a49df86b4d9641477fef1e09e",
-  "release": "20261109a",
-  "date": "2026-11-09",
+  "commit": "73c23a91831a4391add8b6f50deb2e60844de5ab",
+  "release": "20261116c",
+  "date": "2026-11-16",
   "files": {
     "mosaico-page.html": {
       "source": "features/core-shell/artifacts/dist/mosaico.html",
-      "sha256": "8999e80e27a42dd8d979df91efd636c8be2e2af2223c1f8ef19f9eea961efe62",
-      "bytes": 5224
+      "sha256": "b1dc0ee04a25b353e786d694cb50e94d3e3de8515c473ea80a2987ccbd709df5",
+      "bytes": 5923
     },
     "mosaico-page.capabilities.json": {
       "source": "features/core-shell/artifacts/dist/mosaico.capabilities.json",
-      "sha256": "107e91a8719917f4ac027314fd8acb9984a8e9099fb36bad6d50d0408b0cd8ae",
-      "bytes": 3394
+      "sha256": "90fc0efbf4ecdaff957dd188fba351df6cdc0c278ef7db28f6c71aea8029447a",
+      "bytes": 2592
     }
   },
-  "note": "The page is the small loader loading React 18.3.1 from cdnjs and the public npm package mosaico-page@1.5.3 from jsDelivr with an integrity value. 1.5.3 is the first automatic release (release-page workflow): Self Progress own step opens on the page; accent text, loader wash, marketing orange, sign-in bar and tab ring all follow the one brand accent. 90 tools, none new; no connector reconnect needed."
+  "note": "The page is the small loader loading React 18.3.1 from cdnjs and Mosaico's own public npm package mosaico-page from jsDelivr, floating within major version 1 (mosaico-page@1, no integrity value; ADR-0022 amendment of 16 November 2026, design B). At this release jsDelivr resolves @1 to mosaico-page@1.6.31, published by the server repository's release-page run 31 from this commit. The Methodology document conversion is retired: the capabilities list 70 tools, none of the 25 conversion tools; no connector reconnect needed for the page, but people reconnect to drop the retired tools."
 }

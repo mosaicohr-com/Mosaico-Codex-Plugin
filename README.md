@@ -53,9 +53,9 @@ Nothing in the plugin needs updating for this. A new tool, such as `get_acting_s
 after the person disconnects and reconnects the Mosaico connector in Claude's connector settings; the
 `mosaico` skill and the Follow-up skill say so when a tool they name is missing.
 
-## Current state (0.16.2)
+## Current state (0.16.3)
 
-Plugin 0.16.2 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
+Plugin 0.16.3 is the thin plugin (0.10.0), plus the Mosaico page for Claude. Mosaico's Outreach know-how (the order of the work, when a run stops, how to search,
 how to write, the routine texts, times and steps, and the report wording) lives on the Mosaico server and is served to
 the signed-in person's run. The Outreach skills only start the run, do exactly what the step Mosaico returns says, record
 the result, end the run and give Mosaico's report unchanged. What stays in the plugin is what can happen only on the
@@ -169,14 +169,25 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
-### Unreleased
+### 0.16.3
+
+Pairs with the Mosaico server release 20261116c (`73c23a918` on main-v2: pull request 2551, Amplify build 462, live 16 November 2026).
+Page asset and skill removal: 0.16.3 ↔ server release 20261116c (mosaico-page@1.6.31, commit 73c23a918).
 
 - Removes the skills `mosaico-methodology-convert` and `mosaico-methodology-conversion-run` (both packages) and their test. The
   Methodology document conversion is retired from the Mosaico server (owner decision, 16 November 2026; mosaicohr-com/mosaico
-  #2547 to #2550). Claude creates components directly with `create_methodology_components_from_definition`,
+  #2547 to #2550, carried to main-v2 by #2551). Claude creates components directly with `create_methodology_components_from_definition`,
   `create_domain_from_definition` and `create_flow_from_definition`, installs with `install_methodology_component` and changes
-  with `edit_methodology_component`. The general skill and the Mosaico page tool list drop the retired conversion tools.
-  No version change here: release after mosaicohr-com/mosaico #2548 is on main-v2.
+  with `edit_methodology_component`.
+- The page asset is now the production loader of the server's design B (ADR-0022 amendment, 16 November 2026): it loads
+  `mosaico-page@1` from jsDelivr, the newest release within major version 1, with no integrity value, so later page releases
+  reach every installed copy without a plugin update. At this release `@1` resolves to `mosaico-page@1.6.31`, published by the
+  server's release-page run from `73c23a918`. The install skill now says the script floats on purpose and must not be pinned.
+- The capabilities list 70 tools (none of the 25 retired Methodology conversion tools; the earlier 81 also named tools the
+  server no longer has). People update the plugin, republish their page with the install skill, and reconnect their Mosaico
+  connector so the retired tools disappear.
+- The four version-pin tests and the page asset test are brought back to the released version; they had stayed at 0.15.0 and
+  page 1.2.0 since 0.16.0.
 
 ### 0.16.2
 
