@@ -169,6 +169,15 @@ The Codex package ships no such capability, so its Outreach skills do not captur
 
 ## Changelog
 
+### Unreleased
+
+- Removes the skills `mosaico-methodology-convert` and `mosaico-methodology-conversion-run` (both packages) and their test. The
+  Methodology document conversion is retired from the Mosaico server (owner decision, 16 November 2026; mosaicohr-com/mosaico
+  #2547 to #2550). Claude creates components directly with `create_methodology_components_from_definition`,
+  `create_domain_from_definition` and `create_flow_from_definition`, installs with `install_methodology_component` and changes
+  with `edit_methodology_component`. The general skill and the Mosaico page tool list drop the retired conversion tools.
+  No version change here: release after mosaicohr-com/mosaico #2548 is on main-v2.
+
 ### 0.16.2
 
 Pairs with the Mosaico server release 20261109a (`d1bca59b6` on main-v2). Page asset change only.
@@ -1498,7 +1507,6 @@ python3 tests/test_follow_up_thread_skill.py
 python3 tests/test_run_guards_skill.py
 python3 tests/test_sync_drafts_skill.py
 python3 tests/test_lead_management_skill.py --app-repo ../mosaico-app
-python3 tests/test_methodology_conversion_run_skill.py --app-repo ../mosaico-app
 python3 tests/test_connector_acting_skill.py --app-repo ../mosaico-app
 ```
 

@@ -103,7 +103,7 @@ def main() -> None:
     unreleased = flat(readme[readme.index(f"### {VERSION}"):readme.index(f"### {PREVIOUS}")])
     for needle in (
         "20261019d", "build 349", "#2011", "#2013", "install_methodology_component", "projectId", "componentKind", "componentKey", "targetOrganizationId",
-        "confirmationToken", "no Approve", "no Publish", "Private or Public", "Examples tab", "get_methodology_project_status", "install_component",
+        "confirmationToken", "no Approve", "no Publish", "Private or Public", "Examples tab",
         "Removed tools", "tests/test_connector_acting_skill.py",
     ) + REMOVED_TOOLS + REMOVED_ACTIONS:
         check(needle in unreleased, f"README {VERSION} entry lacks: {needle}")
@@ -173,19 +173,6 @@ def main() -> None:
                 check(needle in words, f"{package} {name} lacks the acting rule: {needle}")
             check("Repeat that same call once" not in words and "carry on as yourself" not in words, f"{package} {name} tells the model to repeat the call or carry on")
 
-    # Installing a component: only on the person's ask, and it needs a subscription. There is no approve step. The run loop still never installs.
-    for package, root in (("Claude", CLAUDE), ("Codex", CODEX)):
-        convert = flat(read(root / "skills" / "mosaico-methodology-convert" / "SKILL.md"))
-        for needle in (
-            "install_methodology_component", "install_component", "Call it only when the person asks you to install it", "There is no approve step and no publish step",
-            "projectId, componentKind (flow or domain), componentKey and targetOrganizationId", 'mode: "execute" and the confirmationToken', "component_not_published",
-            "Without a subscription nothing can be changed through the connector", "Install button in the Mosaico web app",
-            "Never install a component the person did not ask you to install.",
-        ):
-            check(needle in convert, f"{package} convert skill lacks: {needle}")
-        run = flat(read(root / "skills" / "mosaico-methodology-conversion-run" / "SKILL.md"))
-        check("Never approve or install anything." in run and "install_methodology_component" not in run, f"{package} conversion-run skill no longer leaves installing to the person")
-
     if args.app_repo is not None:
         app = args.app_repo.resolve()
         source = lambda relative: read(app / relative)  # noqa: E731
@@ -226,7 +213,7 @@ def main() -> None:
             text = path.read_text(encoding="utf-8")
             registered |= {m.group(1) for m in re.finditer(r"(?:\bname|\btoolName):\s*'([a-z_]+)'", text)}
             registered |= {m.group(1) for m in re.finditer(r"_TOOL\s*=\s*'([a-z_]+)'", text)}
-        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process", "list_conversion_components"):
+        for tool in NEW_TOOLS + ("batch_assign_teams", "assign_team_to_process"):
             check(tool in registered, f"the application does not register {tool}")
         for tool in REMOVED_TOOLS:
             check(tool not in registered, f"the application still registers the retired {tool}")

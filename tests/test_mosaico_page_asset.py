@@ -14,10 +14,10 @@ NAME = "mosaico-page-install"
 # Server-only know-how and secrets: none of it may be in the page (phrases from the run guidance, the moved tokens, key shapes).
 EXPECTED_TOOLS = (
     "get_daily_brief", "start_acting", "get_acting_status", "stop_acting", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members",
-    "install_methodology_component", "get_methodology_view", "create_methodology_project", "add_methodology_source",
-    "update_methodology_source", "delete_methodology_project", "save_methodology_guidance", "set_reseller_terminology",
-    "edit_methodology_component", "start_methodology_analysis", "cancel_methodology_analysis", "retry_methodology_analysis_unit",
-    "retry_methodology_failed_units", "get_teams_view", "get_team_member_view", "get_teams_analytics_view",
+    "install_methodology_component", "get_methodology_view",
+    "set_reseller_terminology",
+    "edit_methodology_component",
+    "get_teams_view", "get_team_member_view", "get_teams_analytics_view",
     "create_organization_users", "resend_invitation", "delete_user", "set_self_assessment",
     "set_personal_target", "set_member_career_view", "set_member_role", "remove_person_position",
     "set_person_compliance_record", "batch_assign_teams", "batch_assign_positions", "batch_update_profile_fields",

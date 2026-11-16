@@ -98,7 +98,7 @@ the chat. Take ids from Mosaico, never from memory: `get_team_profiles` for peop
 
 ## Installing a Methodology component
 
-A converted Flow or Domain is a component of a conversion project. It is either a draft (it still has warnings)
+A Methodology Flow or Domain is a component. It is either a draft (it still has warnings)
 or published (it has no warnings). Fixing a component's warnings is what makes it installable;
 there is no approve step, no publish step, no Private or Public setting, no hide or show for one customer and
 no Examples tab or example library. What a customer sees is what the reseller installed into that customer's
@@ -106,8 +106,7 @@ organisation. A customer installs its own published components from the Methodol
 
 - `install_methodology_component` installs a copy of one published component into one organisation, exactly as
   the Install button does: `projectId`, `componentKind` (`flow` or `domain`), `componentKey` and
-  `targetOrganizationId`. Take the first three exactly as `get_methodology_project_status` lists them under
-  `components`; the status offers `install_component` with these arguments already filled in. The target is the
+  `targetOrganizationId`. Take the first three exactly as `get_methodology_components_view` lists them. The target is the
   person's own organisation, or, for a reseller Owner or Admin, the organisation id of one of its customers.
 - It shows a preview first, then installs when you call it again with `mode: "execute"` and the
   `confirmationToken` from the preview. Read the preview aloud in Mosaico's words: it says whether the install
@@ -122,12 +121,9 @@ organisation. A customer installs its own published components from the Methodol
   `subscription_required`. Give Mosaico's sentence, never your own; nothing was changed.
 - While your connector works as a member of a customer, the only target allowed is that member's organisation.
   Any other target is refused with the reseller-tools sentence above.
-- `get_methodology_project_status` carries, for every component: `state` (`draft` or `published`), `warnings`
-  (a count), `installs` (`organizationId`, `organizationName`, `installedAt`, `by`, `changedSinceInstall`),
-  `allowedActions` and one `recommendedAction`. For a component the recommended action is `fix_warnings`,
-  `install_component`, `none` (the installed copy is up to date) or, while the analysis is unfinished,
-  `finish_analysis` or `resolve_in_app`. Do what it says, and read the status again after each step. Never build or send a flow or
-  domain definition yourself, and do not use `create_flow_from_definition` to install a component.
+- Components are created directly with `create_methodology_components_from_definition`, `create_domain_from_definition` and
+  `create_flow_from_definition`, and changed with `edit_methodology_component`. The document conversion is retired: there is no
+  conversion project, analysis or model-request loop. Never use `create_flow_from_definition` to install a component.
 
 ## When a tool is missing
 
