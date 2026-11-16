@@ -8,12 +8,14 @@
   What it does, in order:
     1. Draws a plain "Loading Mosaico..." state on the right background for the viewer's theme.
     2. Loads React 18.3.1 from cdnjs.
-    3. Loads the Mosaico page script from the public npm package "mosaico-page" through jsDelivr, at one exact version
-       (1.5.3). That script is Mosaico's own and holds screens only; it draws the page and talks to the
-       person's own Mosaico connector through claude.ai. It reads its styles from itself, so this file has none to load.
+    3. Loads the Mosaico page script from the public npm package "mosaico-page" through jsDelivr:
+       the newest release within major version 1, "mosaico-page@1".
+       That script is Mosaico's own and holds screens only; it draws the page and talks to the person's own Mosaico
+       connector through claude.ai. It reads its styles from itself, so this file has none to load.
     4. If anything fails to load, shows what failed in words instead of a blank page.
 
-  Mosaico changes the page by publishing a new package version and a new copy of this file that names it.
+  Mosaico changes the page by publishing a new package version from its release job (one job on every merge). This file
+  is published once and changes only when the loader itself changes.
 -->
 <html lang="en">
 <head>
@@ -79,7 +81,21 @@ function mosaicoLoadFailed(what) {
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/mosaico-page@1.5.3/dist/mosaico-page.js" integrity="sha384-A3MWoXJlnUJ8/kEHCakOCIdPJ+IrOZfUhixOFNbZ/EHGpLohKHCYvwTfkhGZCtBn" crossorigin="anonymous" onerror="mosaicoLoadFailed('The Mosaico page script (mosaico-page 1.5.3) did not load.')"></script>
+<script>
+/* The page script: the newest release of mosaico-page within major version 1.
+   A new release reaches this page without republishing it (ADR-0022 amendment, 16 November 2026). Only Mosaico's
+   release job publishes mosaico-page, so there is no single version to name and no integrity value. The "r" value
+   changes every 15 minutes, so a browser never keeps an older script longer than that; jsDelivr serves the same file
+   with or without it. */
+(function () {
+  var src = 'https://cdn.jsdelivr.net/npm/mosaico-page@1/dist/mosaico-page.js';
+  var script = document.createElement('script');
+  script.src = src + '?r=' + Math.floor(Date.now() / 900000);
+  script.crossOrigin = 'anonymous';
+  script.onerror = function () { mosaicoLoadFailed('The Mosaico page script (mosaico-page@1) did not load.'); };
+  document.body.appendChild(script);
+})();
+</script>
 <script>
 /* If React itself did not load, the page script could not start. */
 if (!window.React || !window.ReactDOM) mosaicoLoadFailed('React did not load.');

@@ -12,23 +12,21 @@ from skill_text import CLAUDE, CODEX, ROOT, check, flat, read, skill, words
 ASSETS = CLAUDE / "assets"
 NAME = "mosaico-page-install"
 # Server-only know-how and secrets: none of it may be in the page (phrases from the run guidance, the moved tokens, key shapes).
+# The 70 tools the page was released with (mosaico-page@1.6.31, main-v2 73c23a918): the Methodology conversion tools are gone.
 EXPECTED_TOOLS = (
-    "get_daily_brief", "start_acting", "get_acting_status", "stop_acting", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members",
-    "install_methodology_component", "get_methodology_view",
-    "set_reseller_terminology",
-    "edit_methodology_component",
-    "get_teams_view", "get_team_member_view", "get_teams_analytics_view",
-    "create_organization_users", "resend_invitation", "delete_user", "set_self_assessment",
-    "set_personal_target", "set_member_career_view", "set_member_role", "remove_person_position",
-    "set_person_compliance_record", "batch_assign_teams", "batch_assign_positions", "batch_update_profile_fields",
-    "set_person_capability_levels", "get_domains_view", "get_domain_view", "get_domain_position_view",
-    "get_domain_record_view", "get_domains_analytics_view", "delete_domain_record", "update_domain_record_description",
-    "set_position_capability_requirements", "set_position_ladder_level", "get_flows_view", "get_flow_view",
-    "get_flow_step_answers", "get_flow_answers", "save_step_answer", "add_step_file",
-    "get_step_file", "remove_step_file", "assign_person_to_flow", "set_step_people",
-    "set_step_delegates", "set_task_due_date", "approve_task_completion", "send_task_back",
-    "delete_process", "get_account_view", "get_security_view", "get_notifications_view",
-    "get_permissions_view", "get_usage_audit_view", "get_integrations_view", "revoke_integration_grant",
+    "get_daily_brief", "reseller_list_customers", "reseller_list_customer_components", "reseller_list_customer_members",
+    "install_methodology_component", "get_methodology_view", "set_reseller_terminology", "edit_methodology_component", "get_teams_view",
+    "get_team_member_view", "get_teams_analytics_view", "create_organization_users", "resend_invitation", "revoke_invitation", "delete_user",
+    "set_self_assessment", "set_personal_target", "set_member_career_view", "set_member_role", "remove_person_position",
+    "set_person_compliance_record", "batch_assign_teams", "batch_assign_positions", "batch_update_profile_fields", "set_person_capability_levels",
+    "get_domains_view", "get_domain_view", "delete_domain_record", "set_position_capability_requirements", "get_flows_view", "get_flow_view",
+    "get_flow_people_view", "get_flow_step_answers", "get_flow_answers", "save_step_answer", "add_step_file", "get_step_file", "remove_step_file",
+    "set_task_due_date", "approve_task_completion", "send_task_back", "set_my_step_status", "delete_process", "get_account_view", "get_security_view",
+    "get_notifications_view", "get_permissions_view", "get_usage_audit_view", "get_integrations_view", "revoke_integration_grant", "start_acting",
+    "get_acting_status", "stop_acting", "set_my_avatar", "set_notification_settings", "set_role_permission", "set_feature_availability",
+    "reseller_add_customer", "set_reseller_branding", "outreach_get_setup_view", "outreach_apply_lead_action", "get_agent_setup_view",
+    "save_agent_setup_methodology", "save_agent_setup_voice_and_tone", "save_agent_setup_outreach_agent", "get_organizations_console_view",
+    "get_foundation_library_promote_preview", "clean_organization", "incinerate_organization", "promote_foundation_library",
 )
 FORBIDDEN = (
     "system message", "pattern list", "agentInstructions", "step.guidance", "draftsToWrite", "sendRun.", "sourcing_plan_empty", "completion.mustContinue",
@@ -42,7 +40,7 @@ def main() -> None:
     page = ASSETS / "mosaico-page.html"
     caps_file = ASSETS / "mosaico-page.capabilities.json"
     source = json.loads(read(ASSETS / "mosaico-page.source.json"))
-    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261108a" and source["date"] == "2026-11-08", "the source record lacks commit, release or date")
+    check(re.fullmatch(r"[0-9a-f]{40}", source["commit"]) is not None and source["release"] == "20261116c" and source["date"] == "2026-11-16", "the source record lacks commit, release or date")
     for name, path in (("mosaico-page.html", page), ("mosaico-page.capabilities.json", caps_file)):
         data = path.read_bytes()
         record = source["files"][name]
@@ -53,8 +51,11 @@ def main() -> None:
     # The page is a small readable loader over the public package mosaico-page, not an inline bundle.
     check(page.stat().st_size < 30_000, f"the page is {page.stat().st_size} bytes: it should be a small loader under 30 KB")
     scripts = re.findall(r"<script\b[^>]*\bsrc=\"([^\"]+)\"[^>]*>", text)
-    package_url = "https://cdn.jsdelivr.net/npm/mosaico-page@1.2.0/dist/mosaico-page.js"
-    check(scripts.count(package_url) == 1, "the page does not load exactly mosaico-page@1.2.0 from jsDelivr")
+    # Design B (ADR-0022 amendment, 16 November 2026): the page script floats within major version 1 and is added by a small inline
+    # script with a 15-minute refresh value, so it has no integrity value; React still comes from cdnjs with its integrity.
+    package_url = "https://cdn.jsdelivr.net/npm/mosaico-page@1/dist/mosaico-page.js"
+    check(text.count(package_url) == 1 and package_url not in scripts, "the page does not load exactly mosaico-page@1 from jsDelivr by its inline loader")
+    check(re.search(r"mosaico-page@1\.\d", text) is None and "integrity" not in text.split(package_url)[1].split("</script>")[0], "the page pins one version or an integrity value: it must float within major version 1")
     for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", text):
         check(re.search(r'integrity="sha384-[A-Za-z0-9+/=]{64}"', tag) is not None, f"a script has no sha384 integrity: {tag[:90]}")
     allowed = ("cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com", "cdn.tailwindcss.com", "code.jquery.com")
@@ -68,9 +69,9 @@ def main() -> None:
     servers = caps["mcp"]["servers"]
     check(len(servers) == 1 and servers[0]["server"] == "mosaico", "the capabilities do not name the one connector 'mosaico'")
     tools = servers[0]["tools"]
-    check(len(tools) == 67 and len(set(tools)) == 67, f"the page should declare 67 distinct tools, not {len(tools)}")
+    check(len(tools) == 70 and len(set(tools)) == 70, f"the page should declare 70 distinct tools, not {len(tools)}")
     check(set(caps) == {"mcp", "assets", "downloads"} and caps["assets"] == {} and caps["downloads"] is True, "the capabilities hold more than mcp, empty assets and downloads")
-    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 67 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
+    check(sorted(tools) == sorted(EXPECTED_TOOLS), f"the declared tools differ from the 70 the page was released with: {sorted(set(tools) ^ set(EXPECTED_TOOLS))}")
     # The page names its read tools in code; the write tools are named by the views it reads, so only the read ones are looked for.
     # The tool names now live in the package, so the loader names none of them; only undeclared names are checked.
     undeclared = set(re.findall(r"\b((?:get|reseller_list)_[a-z_]+_(?:view|brief|customers|components|members))\b", text)) - set(tools)
@@ -88,14 +89,15 @@ def main() -> None:
     for needle in ("assets/mosaico-page.html", "unchanged", 'title "Mosaico"', 'icon "dashboard"', "assets/mosaico-page.capabilities.json", "~/.claude/mosaico-page-url",
                    "same link", "Never publish without the link when one exists", "Artifact tool", "named `mosaico`".replace("`", ""), "reconnect"):
         check(needle in text_flat, f"the page skill lacks: {needle}")
-    for needle in ("mosaico-page@1.2.0", "Mosaico's own public package", "https://cdn.jsdelivr.net/npm/mosaico-page@1.2.0/dist/mosaico-page.js", "integrity value", "Never swap", "read all of it"):
+    for needle in ("mosaico-page@1", "Mosaico's own public package", "https://cdn.jsdelivr.net/npm/mosaico-page@1/dist/mosaico-page.js", "floating within major version 1",
+                   "no integrity value", "Never pin", "swap it for another package", "read all of it", "ADR-0022"):
         check(needle in text_flat, f"the page skill lacks: {needle}")
     check(text_flat.count("without the link") == 1 and "second copy" in text_flat, "the page skill does not keep to one link per person")
     for rule in ("outreach_", "routine", "Lead", "step.", "checklist"):
         check(rule not in body, f"the page skill carries Mosaico method text: {rule}")
     readme = read(ROOT / "README.md")
-    check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
-    print("PASS: the Mosaico page is the recorded small loader over mosaico-page 1.2.0, declares exactly its 67 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
+    check("## The Mosaico page (Claude only)" in readme and "### 0.11.0" in readme and "### 0.16.3" in readme and "does not get the page or the skill" in flat(readme), "the README lacks the page section or note")
+    print("PASS: the Mosaico page is the recorded small loader over the floating mosaico-page@1 (1.6.31 at release), declares exactly its 70 tools, carries no server-only text or keys, and its Claude-only skill installs one copy per person at one link.")
 
 
 if __name__ == "__main__":
